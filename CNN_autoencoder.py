@@ -12,19 +12,41 @@ todo:
 
 class CNN_autoencoder:
 	def __init__(self, input_x, **network_para):
+
+		def feature_normalize_input_data(input_x):
+			input_shape = input_x.shape
+
+			axis = tuple(range(len(input_shape)-1))
+			mean  = np.mean(input_x,axis=axis)
+			std = np.std(input_x,axis=axis)
+			print('mean:{},std:{}'.format(mean,std))
+			X_normalize =(input_x-mean)/std
+			return X_normalize,mean,std
+		
 		print('input_x shape:{}'.format(input_x.shape))
+		
 		X_data = input_x[0:-1]
 		Y_data = input_x[1:]
-		self.training_X = X_data[0:int(9*X_data.shape[0]/10)]
-		self.training_Y = Y_data[0:int(9*X_data.shape[0]/10)]
+		X_data,self.mean,self.std = feature_normalize_input_data(X_data)
+		#Y_data = Y_data[:,np.newaxis]
+		#print(X_data[1,0,0,0,-1],Y_data[0,0,0,0,-1])
+		training_X = X_data[0:int(9*X_data.shape[0]/10)]
+		training_Y = Y_data[0:int(9*X_data.shape[0]/10)]
 		self.testing_X =  X_data[int(9*X_data.shape[0]/10):]
 		self.testing_Y =  Y_data[int(9*X_data.shape[0]/10):]
-	
-		self.learning_rate = 0.003
-		self.training_iters = 5000
-		self.batch_size = 30
-		self.display_step = 10
-		self.dropout = 0.6
+		self.training_file = 'training.tfrecoeds'
+		self.testing_file = 'testing.tfrecoeds'
+		print('training X shape:{}, training Y shape:{}'.format(training_X.shape,training_Y.shape))
+		self._write_to_Tfrecord(training_X ,training_Y,self.training_file)
+		self._write_to_Tfrecord(self.testing_X ,self.testing_Y,self.testing_file)
+
+		self.learning_rate = 0.0007
+		self.training_iters = 20000
+		self.batch_size = 35
+		self.display_step = 50
+		self.dropout = 0.7
+		self.shuffle_capacity = 700
+		self.shuffle_min_after_dequeue = 500
 		# self.n_input = 100*100
 
 		# network parameter
@@ -33,18 +55,18 @@ class CNN_autoencoder:
 		self.pooling_times = 0
 		# self.deconv1 = network_para.get('deconv1')
 		# self.deconv2 = network_para.get('deconv2')
-		self.training_data_number = self.training_X.shape[0]
-		self.input_temporal = self.training_X.shape[1]
-		self.input_vertical = self.training_X.shape[2]
-		self.input_horizontal = self.training_X.shape[3]
-		self.input_channel = self.training_X.shape[4]
+		self.training_data_number = training_X.shape[0]
+		self.input_temporal = training_X.shape[1]
+		self.input_vertical = training_X.shape[2]
+		self.input_horizontal = training_X.shape[3]
+		self.input_channel = training_X.shape[4]
 
 		# placeholder
 		with tf.device('/cpu:0'):
 			self.Xs = tf.placeholder(tf.float32, shape=[
 									 None, self.input_temporal, self.input_vertical, self.input_horizontal, self.input_channel])
 			self.Ys = tf.placeholder(tf.float32, shape=[
-									 None, self.input_temporal, self.input_vertical, self.input_horizontal, self.input_channel])
+									 None,  self.input_temporal, self.input_vertical, self.input_horizontal, self.input_channel])
 			self.keep_prob = tf.placeholder(tf.float32)
 			self.norm = tf.placeholder(tf.bool, name='norm')
 			
@@ -74,8 +96,12 @@ class CNN_autoencoder:
 		self.init_OP = tf.global_variables_initializer()
 		self.saver = tf.train.Saver()
 
+
+
+
 	def MSE_loss(self):
 		with tf.variable_scope('loss'):
+			#print('endecoder_OP shape:{}, Ys shape{}'.format(self.endecoder_OP[:,5].get_shape(),self.Ys.get_shape()))
 			loss = tf.reduce_mean(tf.pow(self.endecoder_OP - self.Ys, 2))
 			loss = tf.div(loss, 2)
 		return loss
@@ -169,11 +195,50 @@ class CNN_autoencoder:
 		if not os.path.isdir('./output_model'):
 			os.makedirs('./output_model')
 		try:
-				save_path = self.saver.save(sess, './output_model/CNN_autoencoder.ckpt')
+				save_path = self.saver.save(sess, './output_model/CNN_autoencoder_onlyinternet.ckpt')
 		except:
 				save_path = self.saver.save(sess, './output_model/temp.ckpt')
 		finally:
 			print('save_path{}'.format(save_path))
+	def _write_to_Tfrecord(self,X_array,Y_array,filename):
+		writer = tf.python_io.TFRecordWriter(filename)
+		for index, each_record in enumerate(X_array):
+			tensor_record = each_record.astype(np.float32).tobytes()
+			tensor_result = Y_array[index].astype(np.float32).tobytes()
+			#print('in _write_to_Tfrecord',X_array.shape,Y_array.shape)
+			example = tf.train.Example(features = tf.train.Features (feature = {
+					'index': tf.train.Feature(int64_list = tf.train.Int64List(value =[index])),
+					'record':tf.train.Feature(bytes_list = tf.train.BytesList(value = [tensor_record])),
+					'result':tf.train.Feature(bytes_list = tf.train.BytesList(value = [tensor_result]))
+				}))
+			
+			writer.write(example.SerializeToString())
+		writer.close()
+	def _read_data_from_Tfrecord(self,filename):
+		filename_queue = tf.train.string_input_producer([filename])
+		reader = tf.TFRecordReader()
+		_,serialized_example = reader.read(filename_queue)
+		features = tf.parse_single_example(
+		serialized_example,
+		features ={
+			'index': tf.FixedLenFeature([],tf.int64),
+			'record': tf.FixedLenFeature([],tf.string),
+			'result': tf.FixedLenFeature([],tf.string)
+		})
+		index = features['index']
+		record = tf.decode_raw(features['record'],tf.float32)
+		result = tf.decode_raw(features['result'],tf.float32)
+
+		record = tf.reshape(record,[self.input_temporal,
+			self.input_vertical,
+			self.input_horizontal,
+			self.input_channel])
+		result = tf.reshape(result,[self.input_temporal,
+			self.input_vertical,
+			self.input_horizontal,
+			self.input_channel])
+
+		return index,record,result
 	def testing_data(self,sess,input_x,input_y):
 		batch_num = int(input_x.shape[0]/self.batch_size)
 		   
@@ -182,58 +247,63 @@ class CNN_autoencoder:
 		else:
 			batch_len = batch_num
 
-		with tf.device('/cpu:0'):
-			loss =0.
+		with tf.device('/gpu:0'):
+		
+			cum_loss = 0
 			for batch_index in range(batch_len):
-				loss += sess.run(self.cost_OP,feed_dict={
+				
+				loss,predict = sess.run([self.cost_OP,self.endecoder_OP],feed_dict={
 						self.Xs:input_x[batch_index*self.batch_size:(batch_index+1)*self.batch_size],
 						self.Ys:input_y[batch_index*self.batch_size:(batch_index+1)*self.batch_size],
 						self.keep_prob:1,
 						self.norm:0
 				})
+				print('predict:{},real:{}'.format(predict[0,0,50,50,0],input_y[batch_index*self.batch_size,0,50,50,0]))
+				print('predict:{},real:{}'.format(predict[0,0,20,20,0],input_y[batch_index*self.batch_size,0,20,20,0]))
+				print('predict:{},real:{}'.format(predict[0,0,70,70,0],input_y[batch_index*self.batch_size,0,70,70,0]))
+				cum_loss += loss
 			return loss/batch_num
 	def training_data(self,restore=False):
-		def shuffle_data(input_X,input_Y):
-			#print('input_X:',input_X.shape,'input_Y:',input_Y.shape)
-			z = list(zip(input_X,input_Y))
-			np.random.shuffle(z)
-			output_x,output_y = zip(*z)
-			output_x=np.array(output_x)
-			output_y=np.array(output_y) 
-			#print('output_x:',output_x.shape,'output_y:',output_y.shape)
-			return output_x,output_y
+		data = self._read_data_from_Tfrecord(self.training_file)
+		batch_tuple_OP = tf.train.shuffle_batch( data,
+			batch_size =self.batch_size,
+			capacity = self.shuffle_capacity,
+			min_after_dequeue = self.shuffle_min_after_dequeue
+		)
+		
+		
 		with tf.Session() as sess:
+			coord = tf.train.Coordinator()
+			treads = tf.train.start_queue_runners(sess=sess,coord=coord)
+			
 			sess.run(self.init_OP)
-			batch_num = int(self.training_data_number/self.batch_size)
-		   
-			if self.training_data_number % self.batch_size is not 0:
-				batch_len = batch_num + 1
-			else:
-				batch_len = batch_num
-
 			epoch = 1
+			cumulate_loss =0
+
 			while epoch < self.training_iters:
-				#self.training_X,self.training_Y = shuffle_data(self.training_X,self.training_Y)
-				for batch_index in range(batch_len):
-					loss = 0.
-					with tf.device('/gpu:0'):
-						_ = sess.run([self.optimizer_OP], feed_dict={
-										   self.Xs: self.training_X[batch_index * self.batch_size:batch_index * self.batch_size + self.batch_size],
-										   self.Ys: self.training_Y[batch_index * self.batch_size:batch_index * self.batch_size + self.batch_size], 
-										   self.keep_prob: self.dropout, 
-										   self.norm: 1})
-					with tf.device('/cpu:0'):
-						loss = sess.run(self.cost_OP, feed_dict={
-										   self.Xs: self.training_X[batch_index * self.batch_size:batch_index * self.batch_size + self.batch_size],
-										   self.Ys: self.training_Y[batch_index * self.batch_size:batch_index * self.batch_size + self.batch_size], 
-										   self.keep_prob: self.dropout, 
-										   self.norm: 1})
-					print('Epoch:%d batch_index:%d cost:%g'%(epoch, batch_index,loss))
-				if epoch % display_steppython== 0 and epoch != 0:
+				index, batch_x,batch_y = sess.run(batch_tuple_OP)
+				#print('index:{}'.format(index))
+				loss = 0.
+
+				with tf.device('/gpu:0'):
+					_,loss = sess.run([self.optimizer_OP,self.cost_OP], feed_dict={
+									   self.Xs: batch_x,
+									   self.Ys: batch_y, 
+									   self.keep_prob: self.dropout, 
+									   self.norm: 1})
+			
+				print('Epoch:%d  cost:%g'%(epoch,loss))
+				cumulate_loss += loss
+				if epoch % self.display_step == 0 and epoch != 0:
+					average_training_loss = cumulate_loss / self.display_step
 					testing_loss = self.testing_data(sess,self.testing_X,self.testing_Y)
-					print('testing_loss:{}'.format(testing_loss))
+					print('testing_loss:{} average_training_loss:{}'.format(testing_loss,average_training_loss))
+					cumulate_loss = 0
 					self._save_model(sess)
+
 				epoch += 1
+			coord.request_stop()
+			coord.join(treads)
 			print('training finished!')
 			_save_model(sess)
 def list_all_input_file(input_dir):
@@ -276,11 +346,14 @@ def load_data_format(filelist):
 	return X
 
 if __name__ == '__main__':
+	
 	input_dir_list = [
 		"/home/mldp/big_data/openbigdata/milano/SMS/11/data_preproccessing_10/",
-		"/home/mldp/big_data/openbigdata/milano/SMS/12/data_preproccessing_10/"
+		#"/home/mldp/big_data/openbigdata/milano/SMS/12/data_preproccessing_10/"
 		]
+
 	network_parameter = {'conv1': 16, 'conv2': 32}
+	
 	X_array = None
 	for input_dir in input_dir_list:
 		filelist = list_all_input_file(input_dir)
@@ -290,7 +363,8 @@ if __name__ == '__main__':
 			X_array = np.concatenate((X_array,temp),axis=0)
 		except:
 			X_array = temp
-
+	
+	X_array = X_array[:,:,:,:,-1,np.newaxis]
 	train_CNN = CNN_autoencoder(X_array, **network_parameter)
 	del X_array
 	train_CNN.training_data(restore=True)
