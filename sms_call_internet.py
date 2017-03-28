@@ -5,7 +5,7 @@ import numpy as np
 import pytz 
 import pickle 
 import os
-input_dir = "/home/mldp/big_data/openbigdata/trentino/SMS/12/"
+input_dir = "/home/mldp/big_data/openbigdata/milano/SMS/12/"
 #input_file = "sms-call-internet-mi-2013-11-01.txt"
 #ouput_dir = "/home/mldp/big_data/openbigdata/milano/SMS/11/data_preproccessing/"
 #ouput_file = "output_sms-call-internet-mi-2013-11-01"
@@ -83,7 +83,10 @@ def combine_data(Mi_data,Mi_data_proceesed):
 				temp_activity = 0
 	return Mi_data_proceesed
 def process_data_to_mildan_grid(Mi_data_proceesed):
-	grid_size = 11467
+	grid_size = 10001
+	grid_row_num = 100
+	grid_column_num = 100
+	features_num = 7
 	grid_list = [None]*grid_size
 
 	for i in range(len(grid_list)):
@@ -101,7 +104,7 @@ def process_data_to_mildan_grid(Mi_data_proceesed):
 		call_out_activity = float(Mi_data_proceesed['call_out_activity'][i])		
 		internat_traffic_activity = float(Mi_data_proceesed['internat_traffic_activity'][i])
 		
-		feature_element = [sms_in_activity,sms_out_activity,call_in_activity,call_out_activity,internat_traffic_activity]
+		feature_element = [_id,timestamp,sms_in_activity,sms_out_activity,call_in_activity,call_out_activity,internat_traffic_activity]
 		#print(i,square_id,date_time_covert_to_str(date_time),feature_element)
 		grid_list[_id].append(feature_element)
 
@@ -109,21 +112,22 @@ def process_data_to_mildan_grid(Mi_data_proceesed):
 
 
 
-	bach_size = len (grid_list[1])
-	array_size = [bach_size,100,100,5]
+	each_grid_length = len(grid_list[9999])#if 10 minutes in a record ,should be 144 a day
+	print('each_grid_length',each_grid_length)
+	array_size = [each_grid_length,grid_row_num,grid_column_num,features_num]
 	X = np.zeros(array_size)
 	for square_id in range(1,grid_size+1):
-		row = 99- int(square_id/100)
-		column = square_id%100-1
+		row = 99- int(square_id/grid_row_num) #row mapping in milan grid
+		column = square_id%grid_column_num-1 #column mapping in milan grid
 
-		for bach_index in range(bach_size):
+		for bach_index in range(each_grid_length):
 			try:
 				#print('grid list',square_id,bach_index,grid_list[square_id][bach_index])
 				X[bach_index][row][column] = grid_list[square_id][bach_index]
 				#print('X',square_id,bach_index,X[bach_index][row][column])
 
 			except:
-				X[bach_index][row][column] = np.zeros([5])
+				X[bach_index][row][column] = np.zeros([features_num])
 	print(X.shape)
 	return X
 	
@@ -194,7 +198,7 @@ def load_data_from_file(file_path):
 				Mi_data['call_in_activity'].append(call_in_activity)
 				Mi_data['call_out_activity'].append(call_out_activity)
 				Mi_data['internat_traffic_activity'].append(internat_traffic_activity)
-
+			
 				#print(date_time,timestamp,square_id,internat_traffic_activity)
 
 	Mi_data_proceesed = combine_data(Mi_data,Mi_data_proceesed)
