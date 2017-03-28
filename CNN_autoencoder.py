@@ -64,7 +64,7 @@ class CNN_autoencoder:
 											  self.input_channel])
 			deconv2 = deconv3d(deconv1, weights['deconv2'], bias[
 									'deconv2'], output_shape_of_dconv2)
-			deconv2 = tf.nn.relu(deconv2)
+			#deconv2 = tf.nn.relu(deconv2)
 
 			endecoder_output = deconv2
 			print('endecoder_output output shape :%s' %
@@ -110,7 +110,7 @@ class CNN_autoencoder:
 			return x
 		self.learning_rate = 0.001
 		self.training_iters = 20000
-		self.batch_size = 40
+		self.batch_size = 100
 		self.display_step = 50
 		self.dropout = 0.6
 		self.shuffle_capacity = 700
@@ -152,8 +152,8 @@ class CNN_autoencoder:
 				'deconv1': bias_variable([self.conv1], 'deconv1_b'),
 				'deconv2': bias_variable([self.input_channel], 'deconv2_b')
 			}
-			self.mean = tf.Variable(tf.zeros([self.input_channel]),name='mean',trainable=False,)
-			self.std = tf.Variable(tf.zeros([self.input_channel]),name='std',trainable=False,)
+			#self.mean = tf.Variable(tf.zeros([self.input_channel]),name='mean',trainable=False,)
+			#self.std = tf.Variable(tf.zeros([self.input_channel]),name='std',trainable=False,)
 		# operation
 	
 		self.encoder_OP, self.endecoder_OP = net_layer(self,
@@ -166,13 +166,12 @@ class CNN_autoencoder:
 		self.init_OP = tf.global_variables_initializer()
 		self.saver = tf.train.Saver()
 
-	
+
 	def set_training_data(self,input_x):
 		
 		print('input_x shape:{}'.format(input_x.shape))
-		input_x,mean,std = self.feature_normalize_input_data(input_x)
-		self.mean.assign(mean)
-		self.std.assign(std)
+		input_x,self.mean,self.std = self.feature_normalize_input_data(input_x)
+		
 		X_data = input_x[0:-1]
 		Y_data = input_x[1:]
 		
@@ -191,20 +190,25 @@ class CNN_autoencoder:
 		self.training_data_number = training_X.shape[0]
 
 	def feature_normalize_input_data(self,input_x):
-			input_shape = input_x.shape
+		input_shape = input_x.shape
 
-			axis = tuple(range(len(input_shape)-1))
-			mean  = np.mean(input_x,axis=axis)
-			std = np.std(input_x,axis=axis)
-			print('mean:{},std:{}'.format(mean,std))
-			X_normalize =(input_x-mean)/std
-			return X_normalize,mean,std
-	def reload_tfrecord(self,tfrecored_file):
+		axis = tuple(range(len(input_shape)-1))
+		mean  = np.mean(input_x,axis=axis)
+		std = np.std(input_x,axis=axis)
+		print('mean:{},std:{}'.format(mean,std))
+		X_normalize =(input_x-mean)/std
+		return X_normalize,mean,std
+	def un_normalize_data(self,sess,input_x):
+		#mean,std = sess.run([self.mean,self.std])
+		#print('mean:{},std:{}'.format(self.mean,self.std))
+		input_x  = input_x*self.std+self.mean
+		return input_x
+	def reload_tfrecord(self,tfrecored_file,tftesting_file):
 		if not os.path.isfile(tfrecored_file):
 			print('{} not exists'.format(tfrecored_file))
 		else:
 			self.training_file = tfrecored_file
-
+			self.testing_file = tftesting_file
 
 	def predict_data(self,input_x):
 		testing_x = input_x[0:-1]
@@ -212,8 +216,8 @@ class CNN_autoencoder:
 		with tf.Session() as sess:
 			self._reload_model(sess)
 
-			mean,std = sess.run([self.mean,self.std])
-			testing_x = (testing_x-mean)/std
+			#mean,std = sess.run([self.mean,self.std])
+			testing_x = (testing_x-self.mean)/self.std
 			
 			input_x_length = input_x.shape[0]
 			_, predict_list = _testing_data(sess,testing_x,testing_y)
@@ -292,6 +296,34 @@ class CNN_autoencoder:
 			self.input_channel])
 
 		return index,record,result
+	def _read_all_data_from_Tfreoced(self,filename):
+		record_iterator = tf.python_io.tf_record_iterator(path=filename)
+		record_list = []
+		result_list = []
+		for string_record in record_iterator:
+			example = tf.train.Example()
+			example.ParseFromString(string_record)
+			index = example.features.feature['index'].int64_list.value[0]
+			record = example.features.feature['record'].bytes_list.value[0]
+			result = example.features.feature['result'].bytes_list.value[0]
+			record = np.fromstring(record,dtype=np.float32)
+			record = record.reshape((self.input_temporal,
+				self.input_vertical,
+				self.input_horizontal,
+				self.input_channel))
+			
+			result = np.fromstring(record,dtype=np.float32)
+			result = record.reshape((self.input_temporal,
+				self.input_vertical,
+				self.input_horizontal,
+				self.input_channel))
+			record_list.append(record)
+			result_list.append(result)
+
+		record = np.stack(record_list)
+		result = np.stack(result_list)
+		return index,record,result
+
 	def _testing_data(self,sess,input_x,input_y):
 		batch_num = int(input_x.shape[0]/self.batch_size)
 		testing_data_number = input_y.shape[0]
@@ -311,9 +343,11 @@ class CNN_autoencoder:
 						self.keep_prob:1,
 						self.norm:0
 				})
-				print('predict:{},real:{}'.format(predict[0,0,1,1,0],input_y[batch_index*self.batch_size,0,1,1,0]))
-				print('predict:{},real:{}'.format(predict[0,0,10,10,0],input_y[batch_index*self.batch_size,0,10,10,0]))
-				print('predict:{},real:{}'.format(predict[0,0,20,20,0],input_y[batch_index*self.batch_size,0,20,20,0]))
+				predict = self.un_normalize_data(sess,predict)
+				un_normalize_input_y = self.un_normalize_data(sess,input_y[batch_index*self.batch_size:(batch_index+1)*self.batch_size])
+				print('predict:{},real:{}'.format(predict[0,0,1,1,0],un_normalize_input_y[0,0,1,1,0]))
+				print('predict:{},real:{}'.format(predict[0,0,10,20,0],un_normalize_input_y[0,0,10,20,0]))
+				print('predict:{},real:{}'.format(predict[0,0,20,20,0],un_normalize_input_y[0,0,20,20,0]))
 				
 				for predict_element in predict:
 					predict_list.append(predict.tolist)
@@ -357,7 +391,8 @@ class CNN_autoencoder:
 				cumulate_loss += loss
 				if epoch % self.display_step == 0 and epoch != 0:
 					average_training_loss = cumulate_loss / self.display_step
-					testing_loss,_ = self._testing_data(sess,self.testing_X,self.testing_Y)
+					index, testing_X,testing_Y = self._read_all_data_from_Tfreoced(self.testing_file)
+					testing_loss,_ = self._testing_data(sess,testing_X,testing_Y)
 					print('testing_loss:{} average_training_loss:{}'.format(testing_loss,average_training_loss))
 					cumulate_loss = 0
 					self._save_model(sess)
@@ -440,10 +475,10 @@ if __name__ == '__main__':
 	network_parameter = {'conv1': 16, 'conv2': 32}
 	data_shape = [X_array.shape[1],X_array.shape[2],X_array.shape[3],X_array.shape[4]]
 	train_CNN = CNN_autoencoder(*data_shape, **network_parameter)
-	#train_CNN.reload_tfrecord('./training.tfrecoeds')
+	#train_CNN.reload_tfrecord('./training.tfrecoeds','./testing.tfrecoeds')
 	train_CNN.set_model_name('/home/mldp/ML_with_bigdata/output_model/CNN_autoencoder_onlyinternet.ckpt','/home/mldp/ML_with_bigdata/output_model/CNN_autoencoder_onlyinternet.ckpt')
 	train_CNN.set_training_data(X_array)
 	del X_array
-	train_CNN.training_data(restore=False)
+	train_CNN.training_data(restore=True)
 	#train_CNN.predict_data(X_array[int(9*X_array.shape[0]/10):])
 	
