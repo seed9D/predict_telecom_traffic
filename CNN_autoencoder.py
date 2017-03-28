@@ -17,9 +17,16 @@ class CNN_autoencoder:
 	def __init__(self, *data_shape, **network_para):
 		def MSE_loss(self):
 			with tf.variable_scope('loss'):
+
 				#print('endecoder_OP shape:{}, Ys shape{}'.format(self.endecoder_OP[:,5].get_shape(),self.Ys.get_shape()))
 				loss = tf.reduce_mean(tf.pow(self.endecoder_OP - self.Ys, 2))
 				loss = tf.div(loss, 2)
+				#L2 regularization
+				L2 = 0
+				for key, value in self.weights.items():
+					L2 += tf.nn.l2_loss(value)
+				
+				loss += tf.reduce_mean(L2*self.weight_decay)
 			return loss
 
 		def net_layer(self,x, weights, bias, dropout, norm=0):
@@ -37,6 +44,7 @@ class CNN_autoencoder:
 			conv2 = tf.nn.relu(conv2)
 			# conv2 = self.maxpool3d(conv2,**k_size,**strides_size)
 			conv2 = tf.nn.dropout(conv2, dropout)
+
 
 			encode_output = conv2
 			print('encode layer shape:%s' % encode_output.get_shape())
@@ -108,6 +116,38 @@ class CNN_autoencoder:
 		def maxunpool3d( x, shape):
 			pooling_times -= 1
 			return x
+		def batch_normalize(x,scope,norm=0):
+			axes =  list(range(len(x.get_shape())-1))
+			decay = 0.999
+			with tf.variable_scope(scope):
+				pop_mean = tf.get_variable('pop_mean',[x.get_shape()[-1]],
+					trainable=False,
+					dtype=tf.float32,
+					initializer = tf.constant_initializer(0)
+					)
+				pop_var = tf.get_variable('pop_var',[x.get_shape()[-1]],
+					trainable=False,
+					dtype=tf.float32,
+					initializer = tf.constant_initializer(1)
+				)
+				#scale = tf.get_variable(tf.ones([x.get_shape()[-1]]),name='scale')
+				scale=tf.get_variable('scale',[x.get_shape()[-1]],dtype=tf.float32,initializer=tf.constant_initializer(1))
+				#beta = tf.get_variable(tf.zeros([x.get_shape()[-1]]),name='beta')
+				beta=tf.get_variable('beta',[x.get_shape()[-1]],dtype=tf.float32,initializer=tf.constant_initializer(0))
+			if norm is 1:
+				batch_mean, batch_var = tf.nn.moments(x,axes=axes)
+				train_mean = tf.assign(pop_mean,
+						pop_mean * decay + batch_mean * (1 - decay)
+					)
+				train_var = tf.assign(pop_var,
+						pop_var * dacay + batch_var * (1 - decay) 
+					)
+				with tf.control_dependencies([train_mean,train_var]):
+					return tf.nn.batch_normalization(x,batch_mean,batch_var,beta,scale,1e-3)
+			else:
+				return tf.nn.batch_normalization(x,pop_mean,pop_var,beta,scale,1e-3)
+
+
 		self.learning_rate = 0.001
 		self.training_iters = 20000
 		self.batch_size = 100
@@ -115,6 +155,7 @@ class CNN_autoencoder:
 		self.dropout = 0.6
 		self.shuffle_capacity = 700
 		self.shuffle_min_after_dequeue = 500
+		self.weight_decay = 0.01 
 		# self.n_input = 100*100
 
 		# network parameter
@@ -466,12 +507,18 @@ if __name__ == '__main__':
 		except:
 			X_array = temp
 	
+
 	X_array = X_array[:,:,30:70,30:70,-1,np.newaxis]
+
+	
+	
+	
 	
 	save_array(X_array,'./proccessed_raw_data')
 	'''
+	
 	X_array = load_array('./proccessed_raw_data')
-
+	print(np.amax(X_array),np.argmax(X_array) )
 	network_parameter = {'conv1': 16, 'conv2': 32}
 	data_shape = [X_array.shape[1],X_array.shape[2],X_array.shape[3],X_array.shape[4]]
 	train_CNN = CNN_autoencoder(*data_shape, **network_parameter)
@@ -479,6 +526,6 @@ if __name__ == '__main__':
 	train_CNN.set_model_name('/home/mldp/ML_with_bigdata/output_model/CNN_autoencoder_onlyinternet.ckpt','/home/mldp/ML_with_bigdata/output_model/CNN_autoencoder_onlyinternet.ckpt')
 	train_CNN.set_training_data(X_array)
 	del X_array
-	train_CNN.training_data(restore=True)
+	train_CNN.training_data(restore=False)
 	#train_CNN.predict_data(X_array[int(9*X_array.shape[0]/10):])
 	
