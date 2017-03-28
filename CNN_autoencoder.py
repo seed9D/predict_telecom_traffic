@@ -5,6 +5,7 @@ import tensorflow as tf
 import functools as fn
 from glob import glob
 from sys import exit
+from math import sqrt
 '''
 todo:
 	normalization
@@ -72,11 +73,13 @@ class CNN_autoencoder:
 			return encode_output, endecoder_output
 
 		def weight_variable( shape, name):
-			initial = tf.truncated_normal(shape, stddev=0.1)
+			#initial = tf.truncated_normal(shape, stddev=0.1)
+			initial = np.random.randn(*shape)*sqrt(2.0/np.prod(shape))
 			return tf.Variable(initial, dtype=tf.float32, name=name)
 
 		def bias_variable( shape, name):
-			initial = tf.random_normal(shape)
+			#initial = tf.random_normal(shape)
+			initial = np.random.randn(*shape)*sqrt(2.0/np.prod(shape))
 			return tf.Variable(initial, dtype=tf.float32, name=name)
 
 		def conv3d( x, W, b, strides=1):
@@ -105,11 +108,11 @@ class CNN_autoencoder:
 		def maxunpool3d( x, shape):
 			pooling_times -= 1
 			return x
-		self.learning_rate = 0.0007
+		self.learning_rate = 0.001
 		self.training_iters = 20000
-		self.batch_size = 35
+		self.batch_size = 40
 		self.display_step = 50
-		self.dropout = 0.7
+		self.dropout = 0.6
 		self.shuffle_capacity = 700
 		self.shuffle_min_after_dequeue = 500
 		# self.n_input = 100*100
@@ -136,7 +139,7 @@ class CNN_autoencoder:
 			self.norm = tf.placeholder(tf.bool, name='norm')
 			
 
-			# variable control filter size
+			# variable, control filter size
 			self.weights = {
 				'conv1': weight_variable([3, 3, 3, self.input_channel, self.conv1], 'conv1_w'),
 				'conv2': weight_variable([3, 3, 3, self.conv1, self.conv2], 'conv2_w'),
@@ -149,8 +152,8 @@ class CNN_autoencoder:
 				'deconv1': bias_variable([self.conv1], 'deconv1_b'),
 				'deconv2': bias_variable([self.input_channel], 'deconv2_b')
 			}
-			self.mean = tf.Variable(0,name='mean')
-			self.std = tf.Variable(0,name='std')
+			self.mean = tf.Variable(tf.zeros([self.input_channel]),name='mean',trainable=False,)
+			self.std = tf.Variable(tf.zeros([self.input_channel]),name='std',trainable=False,)
 		# operation
 	
 		self.encoder_OP, self.endecoder_OP = net_layer(self,
@@ -167,10 +170,12 @@ class CNN_autoencoder:
 	def set_training_data(self,input_x):
 		
 		print('input_x shape:{}'.format(input_x.shape))
-
+		input_x,mean,std = self.feature_normalize_input_data(input_x)
+		self.mean.assign(mean)
+		self.std.assign(std)
 		X_data = input_x[0:-1]
 		Y_data = input_x[1:]
-		X_data,mean,std = self.feature_normalize_input_data(X_data)
+		
 		
 		#Y_data = Y_data[:,np.newaxis]
 		#print(X_data[1,0,0,0,-1],Y_data[0,0,0,0,-1])
@@ -306,9 +311,9 @@ class CNN_autoencoder:
 						self.keep_prob:1,
 						self.norm:0
 				})
-				print('predict:{},real:{}'.format(predict[0,0,50,50,0],input_y[batch_index*self.batch_size,0,50,50,0]))
+				print('predict:{},real:{}'.format(predict[0,0,1,1,0],input_y[batch_index*self.batch_size,0,1,1,0]))
+				print('predict:{},real:{}'.format(predict[0,0,10,10,0],input_y[batch_index*self.batch_size,0,10,10,0]))
 				print('predict:{},real:{}'.format(predict[0,0,20,20,0],input_y[batch_index*self.batch_size,0,20,20,0]))
-				print('predict:{},real:{}'.format(predict[0,0,70,70,0],input_y[batch_index*self.batch_size,0,70,70,0]))
 				
 				for predict_element in predict:
 					predict_list.append(predict.tolist)
@@ -367,7 +372,13 @@ def list_all_input_file(input_dir):
 		os.path.join(input_dir, f)) and os.path.splitext(f)[1] == ".npy")]
 	return onlyfile
 
-
+def save_array(x_array,out_file):
+	print('saving file to {}...'.format(out_file))
+	np.save(out_file,x_array, allow_pickle=True)
+def load_array(input_file):
+	print('loading file from {}...'.format(input_file))
+	X = np.load(input_file+'.npy')
+	return X
 def load_data_format(filelist):
 	def load_array(input_file):
 		print('loading file from {}...'.format(input_file))
@@ -402,7 +413,7 @@ def load_data_format(filelist):
 	return X
 
 if __name__ == '__main__':
-	
+	'''
 	input_dir_list = [
 		"/home/mldp/big_data/openbigdata/milano/SMS/11/data_preproccessing_10/",
 		"/home/mldp/big_data/openbigdata/milano/SMS/12/data_preproccessing_10/"
@@ -420,14 +431,19 @@ if __name__ == '__main__':
 		except:
 			X_array = temp
 	
-	X_array = X_array[:,:,:,:,-1,np.newaxis]
+	X_array = X_array[:,:,30:70,30:70,-1,np.newaxis]
 	
+	save_array(X_array,'./proccessed_raw_data')
+	'''
+	X_array = load_array('./proccessed_raw_data')
+
 	network_parameter = {'conv1': 16, 'conv2': 32}
-	data_shape = [6,100,100,1]
+	data_shape = [X_array.shape[1],X_array.shape[2],X_array.shape[3],X_array.shape[4]]
 	train_CNN = CNN_autoencoder(*data_shape, **network_parameter)
 	#train_CNN.reload_tfrecord('./training.tfrecoeds')
 	train_CNN.set_model_name('/home/mldp/ML_with_bigdata/output_model/CNN_autoencoder_onlyinternet.ckpt','/home/mldp/ML_with_bigdata/output_model/CNN_autoencoder_onlyinternet.ckpt')
 	train_CNN.set_training_data(X_array)
 	del X_array
-	#train_CNN.predict_data(X_array[int(9*X_array.shape[0]/10):])
 	train_CNN.training_data(restore=False)
+	#train_CNN.predict_data(X_array[int(9*X_array.shape[0]/10):])
+	
