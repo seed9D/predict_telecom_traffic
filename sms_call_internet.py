@@ -5,7 +5,8 @@ import numpy as np
 import pytz 
 import pickle 
 import os
-input_dir = "/home/mldp/big_data/openbigdata/milano/SMS/12/"
+input_dir_list = [ "/home/mldp/big_data/openbigdata/milano/SMS/11/",
+			"/home/mldp/big_data/openbigdata/milano/SMS/12/"]
 #input_file = "sms-call-internet-mi-2013-11-01.txt"
 #ouput_dir = "/home/mldp/big_data/openbigdata/milano/SMS/11/data_preproccessing/"
 #ouput_file = "output_sms-call-internet-mi-2013-11-01"
@@ -51,7 +52,7 @@ def combine_data(Mi_data,Mi_data_proceesed):
 		call_in_activity = float(Mi_data['call_in_activity'][i])
 		call_out_activity = float(Mi_data['call_out_activity'][i])		
 		internat_traffic_activity = float(Mi_data['internat_traffic_activity'][i])
-		
+				
 
 		temp_activity += internat_traffic_activity
 		sms_in_activity += sms_in_activity
@@ -81,6 +82,28 @@ def combine_data(Mi_data,Mi_data_proceesed):
 				#update end_time
 				end_time = end_time + timedelta(minutes = time_interval)
 				temp_activity = 0
+	return Mi_data_proceesed
+def clean_data(Mi_data_proceesed):
+	previous_internat_traffic_activity = 0
+	for i, element in enumerate(Mi_data_proceesed['internat_traffic_activity']):
+		if Mi_data_proceesed['internat_traffic_activity'][i] < previous_internat_traffic_activity*1/100:
+			try:
+				next_value = Mi_data_proceesed['internat_traffic_activity'][i+1]
+				average = (previous_internat_traffic_activity + next_value)/2
+			except:
+				average = previous_internat_traffic_activity
+				pass
+			print('find dirty data!! id:{} timestamp:{} before:{} next:{} origin:{} new value:{}'.format(
+				Mi_data_proceesed['square_id'][i],
+				Mi_data_proceesed['timestamp'][i],
+				previous_internat_traffic_activity,
+				next_value,
+				Mi_data_proceesed['internat_traffic_activity'][i],
+				average))
+			Mi_data_proceesed['internat_traffic_activity'][i] = average
+			
+		previous_internat_traffic_activity = Mi_data_proceesed['internat_traffic_activity'][i]
+
 	return Mi_data_proceesed
 def process_data_to_mildan_grid(Mi_data_proceesed):
 	grid_size = 10001
@@ -202,6 +225,7 @@ def load_data_from_file(file_path):
 				#print(date_time,timestamp,square_id,internat_traffic_activity)
 
 	Mi_data_proceesed = combine_data(Mi_data,Mi_data_proceesed)
+	Mi_data_proceesed = clean_data(Mi_data_proceesed)
 	del Mi_data
 	X_image = process_data_to_mildan_grid(Mi_data_proceesed)
 
@@ -215,12 +239,14 @@ def load_data_from_file(file_path):
 
 
 
-filelist = list_all_input_file(input_dir)
-filelist.sort()
 
-print("filelist length:{}".format(len(filelist)))
-for file_name in filelist:
-	load_data_from_file(input_dir+file_name)
+for input_dir in input_dir_list:
+	filelist = list_all_input_file(input_dir)
+	filelist.sort()
+
+	print("filelist length:{}".format(len(filelist)))
+	for file_name in filelist:
+		load_data_from_file(input_dir+file_name)
 
 
 
