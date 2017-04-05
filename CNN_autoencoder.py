@@ -56,8 +56,7 @@ class CNN_autoencoder:
 			output_shape_of_dconv1 = tf.pack(
 				[tf.shape(x)[0], self.input_temporal, self.input_vertical, self.input_horizontal, self.conv2])
 			deconv1 = batch_normalize(encode_output, 'deconv1', norm)
-			deconv1 = deconv3d(deconv1, weights['deconv1'], bias[
-							   'deconv1'], output_shape_of_dconv1)
+			deconv1 = deconv3d(deconv1, weights['deconv1'], bias['deconv1'], output_shape_of_dconv1)
 			deconv1 = tf.nn.relu(deconv1)
 			# output_shape_of_dconv1_unpool = tf.pack([tf.shape(x)[0],
 			# self.input_temporal/(2**(self.pooling_times-1)),
@@ -97,10 +96,9 @@ class CNN_autoencoder:
 				bias['deconv3'],
 				output_shape_of_dconv3
 			)
-			#deconv3 = tf.nn.tanh(deconv3)
+			# deconv3 = tf.nn.tanh(deconv3)
 			endecoder_output = deconv3
-			print('endecoder_output output shape :%s' %
-				  endecoder_output.get_shape())
+			print('endecoder_output output shape :%s' % endecoder_output.get_shape())
 
 			return encode_output, endecoder_output
 
@@ -136,6 +134,7 @@ class CNN_autoencoder:
 			return x
 
 		def maxpool3d(x, k_size, strides_size):
+
 			x = tf.nn.max_pool3d(x, k=[1, k_size['temporal'], k_size['vertical'], k_size['horizontal'], 1], strides=[
 				1,
 				strides_size['temporal'],
@@ -238,13 +237,13 @@ class CNN_autoencoder:
 	def set_training_data(self, input_x):
 
 		print('input_x shape:{}'.format(input_x.shape))
-		#input_x,self.mean,self.std = self.feature_normalize_input_data(input_x)
+		# input_x,self.mean,self.std = self.feature_normalize_input_data(input_x)
 		self.mean = 0
 		self.std = 1
 		X_data = input_x[0:-1]
 		Y_data = input_x[1:]
 
-		#Y_data = Y_data[:,np.newaxis]
+		# Y_data = Y_data[:,np.newaxis]
 		# print(X_data[1,0,0,0,-1],Y_data[0,0,0,0,-1])
 		training_X = X_data[0:int(9 * X_data.shape[0] / 10)]
 		training_Y = Y_data[0:int(9 * X_data.shape[0] / 10)]
@@ -270,7 +269,7 @@ class CNN_autoencoder:
 		return X_normalize, mean, std
 
 	def un_normalize_data(self, sess, input_x):
-		#mean,std = sess.run([self.mean,self.std])
+		# mean,std = sess.run([self.mean,self.std])
 		# print('mean:{},std:{}'.format(self.mean,self.std))
 		input_x = input_x * self.std + self.mean
 		return input_x
@@ -289,13 +288,13 @@ class CNN_autoencoder:
 		testing_y = input_x[1:]
 		with tf.Session() as sess:
 			self._reload_model(sess)
-			#input_x_length = input_x.shape[0]
+			# input_x_length = input_x.shape[0]
 			loss, predict_y = self._testing_data(sess, testing_x, testing_y)
 
 			print('predict finished!')
 			print('loss:{} predict_y shape{}'.format(loss, predict_y.shape))
 
-			#testing_y = self.un_normalize_data(sess,testing_y)
+			# testing_y = self.un_normalize_data(sess,testing_y)
 			return input_x[0:-1], predict_y
 
 	def set_model_name(self, reload_model_path, save_model_path):
@@ -360,14 +359,16 @@ class CNN_autoencoder:
 		record = tf.decode_raw(features['record'], tf.float32)
 		result = tf.decode_raw(features['result'], tf.float32)
 
-		record = tf.reshape(record, [self.input_temporal,
-									 self.input_vertical,
-									 self.input_horizontal,
-									 self.input_channel])
-		result = tf.reshape(result, [self.input_temporal,
-									 self.input_vertical,
-									 self.input_horizontal,
-									 self.input_channel])
+		record = tf.reshape(record, [
+			self.input_temporal,
+			self.input_vertical,
+			self.input_horizontal,
+			self.input_channel])
+		result = tf.reshape(result, [
+			self.input_temporal,
+			self.input_vertical,
+			self.input_horizontal,
+			self.input_channel])
 
 		return index, record, result
 
@@ -568,7 +569,9 @@ def load_data_format(input_dir, filelist):
 		return new_data_array
 
 	def shift_data(data_array):
-
+		'''
+			generate more data
+		'''
 		array_list = []
 		for shift_index in range(3):
 			shift_array = data_array[shift_index:]
@@ -590,12 +593,11 @@ def load_data_format(input_dir, filelist):
 	shift_data_array_list = shift_data(data_array)
 	for i, array in enumerate(shift_data_array_list):
 		print('data format shape:', array.shape)
-		save_array(array, './npy/' + month + '_' +
-				   str(i))  # saving all shift array
+		save_array(array, './npy/' + month + '_' + str(i))  # saving all shift array
 
 
 def prepare_training_data():
-	'''	
+	'''
 	input_dir_list = [
 			"/home/mldp/big_data/openbigdata/milano/SMS/11/data_preproccessing_10/",
 			"/home/mldp/big_data/openbigdata/milano/SMS/12/data_preproccessing_10/"]
@@ -610,8 +612,7 @@ def prepare_training_data():
 	for i, filename in enumerate(filelist):
 		if filename != 'training_raw_data.npy':
 			data_array = load_array('./npy/' + filename)
-			data_array = data_array[:, :, 0:40, 0:40, -
-									1, np.newaxis]  # only network activity
+			data_array = data_array[:, :, 0:40, 0:40, -1, np.newaxis]  # only network activity
 			print('saving  array shape:{}'.format(data_array.shape))
 			save_array(
 				data_array, './npy/final/training_raw_data' + '_' + str(i))
