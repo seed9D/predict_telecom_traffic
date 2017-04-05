@@ -16,37 +16,42 @@ def set_time_zone(timestamp):
 
 
 def date_time_covert_to_str(date_time):
-	return date_time.strftime('%Y-%m-%d %H:%M:%S')
+	return date_time.strftime('%Y-%m-%d %H:%M')
 
 
 def plot_predict_vs_real(real, predict):
 
 	# grid_id_1 = real[0,0,10,10,0]
 	# grid_id_2 = real[0,0,30,20,0]
-
+	plot_1_row = 10
+	plot_1_col = 10
+	plot_2_row = 20
+	plot_2_col = 3
 	plot_1 = {
-		'grid_id': int(real[0, 0, 10, 10, 0]),
+		'grid_id': int(real[0, 0, plot_1_row, plot_1_col, 0]),
 		'predict': [],
 		'real': []
 	}
 	plot_2 = {
-		'grid_id': int(real[0, 0, 2, 23, 0]),
+		'grid_id': int(real[0, 0, plot_2_row, 23, 0]),
 		'predict': [],
 		'real': []
 	}
 	time_x = []
 	for i in range(24):
 		for j in range(real.shape[1]):
-			plot_1['real'].append(real[i, j, 10, 10, 2])
-			plot_1['predict'].append(predict[i, j, 10, 10])
+			plot_1['real'].append(real[i, j, plot_1_row, plot_1_col, 2])
+			plot_1['predict'].append(predict[i, j, plot_1_row, plot_1_col])
 			# print('id:{},real:{},predict:{}'.format(plot_1['grid_id'],real[i,j,10,10,2],predict[i,j,10,10]))
-			plot_2['real'].append(real[i, j, 2, 23, 2])
-			plot_2['predict'].append(predict[i, j, 2, 23])
-			print('id: {},real: {},predict: {}'.format(plot_2['grid_id'], real[i, j, 2, 23, 2], predict[i, j, 2, 23]))
+			plot_2['real'].append(real[i, j, plot_2_row, plot_2_col, 2])
+			plot_2['predict'].append(predict[i, j, plot_2_row, plot_2_col])
+			print('id: {},real: {},predict: {}'.format(plot_2['grid_id'], real[i, j, plot_2_row, plot_2_col, 2], predict[i, j, plot_2_row, plot_2_col]))
 
-			data_time = set_time_zone(int(real[i, j, 10, 10, 1]))
+			data_time = set_time_zone(int(real[i, j, plot_1_row, plot_1_col, 1]))
 			time_x.append(date_time_covert_to_str(data_time))
 
+	for time_str in time_x:
+		print(time_str)
 	x = range(len(time_x))
 	fig = plt.figure()
 	ax1 = fig.add_subplot(211)
@@ -78,7 +83,8 @@ def plot_predict_vs_real(real, predict):
 
 def compute_loss_rate(real, predict):
 	# print(real.shape, predict.shape)
-	ab_sum = (np.absolute(real - predict).sum()) / real.size
+	# ab_sum = (np.absolute(real - predict).sum()) / real.size
+	ab_sum = (np.absolute(real - predict).mean())
 	print('absolute average:', ab_sum)
 
 
@@ -117,7 +123,9 @@ def check_data(predict_array):
 
 
 def prepare_predict_data():
-
+	'''
+		generate the predict data from original npy format
+	'''
 	filelist = cn.list_all_input_file('./npy/')
 	filelist.sort()
 	for i, filename in enumerate(filelist):
@@ -149,16 +157,19 @@ del testing_data_list
 
 
 predict_array = predict_array[predict_array.shape[0] - 200:]
+# predict_array = predict_array[200:400]
 
-network_parameter = {'conv1': 16, 'conv2': 32, 'conv3': 48}
+network_parameter = {'conv1': 64, 'conv2': 48, 'conv3': 32}
 data_shape = [X_array.shape[1], X_array.shape[2], X_array.shape[3], X_array.shape[4]]
 predict_CNN = cn.CNN_autoencoder(*data_shape, **network_parameter)
-predict_CNN.set_model_name('/home/mldp/ML_with_bigdata/output_model/CNN_autoencoder_onlyinternet_16_32_48.ckpt', '/home/mldp/ML_with_bigdata/output_model/CNN_autoencoder_onlyinternet_16_32_48.ckpt')
+# predict_CNN.set_model_name('/home/mldp/ML_with_bigdata/output_model/CNN_autoencoder_onlyinternet_16_32_48.ckpt', '/home/mldp/ML_with_bigdata/output_model/CNN_autoencoder_onlyinternet_16_32_48.ckpt')
+predict_CNN.set_model_name(
+	'/home/mldp/ML_with_bigdata/output_model/CNN_autoencoder_test_unpooling.ckpt',
+	'/home/mldp/ML_with_bigdata/output_model/CNN_autoencoder_test_unpooling.ckpt')
 predict_CNN.set_training_data(X_array)
 del X_array
 _, predict_y = predict_CNN.predict_data(predict_array[:, :, :, :, 2, np.newaxis])
-
-plot_predict_vs_real(predict_array[0:-1], predict_y)
 compute_loss_rate(predict_array[0:-1, :, :, :, 2, np.newaxis], predict_y)
+plot_predict_vs_real(predict_array[0:-1], predict_y)
 
 # check_data(predict_array)
