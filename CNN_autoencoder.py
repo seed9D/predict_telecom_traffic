@@ -8,34 +8,97 @@ from math import sqrt
 
 
 class CNN_autoencoder:
-	def __init__(self, *data_shape, **network_para):
-		def MSE_loss(self):
-			with tf.variable_scope('loss'):
+	def __init__(self, *data_shape):
 
-				# print('endecoder_OP shape:{}, Ys shape{}'.format(self.endecoder_OP[:,5].get_shape(),self.Ys.get_shape()))
-				loss = tf.reduce_mean(tf.pow(self.endecoder_OP - self.Ys, 2))
-				# loss = tf.div(loss, 2)
-				# L2 regularization
-				L2 = 0
-				for key, value in self.weights.items():
-					L2 += tf.nn.l2_loss(value)
-				loss += tf.reduce_mean(L2 * self.weight_decay)
-			return loss, L2
+		self.learning_rate = 0.0005
+		self.training_iters = 20000
+		self.batch_size = 50
+		self.display_step = 25
+		self.dropout = 0.5
+		self.shuffle_capacity = 800
+		self.shuffle_min_after_dequeue = 300
+		self.weight_decay = 10
+		# self.n_input = 100*100
 
-		def net_layer(self, x, weights, bias, dropout, norm=0):
+		self.input_temporal = data_shape[0]
+		self.input_vertical = data_shape[1]
+		self.input_horizontal = data_shape[2]
+		self.input_channel = data_shape[3]
+
+	def set_train_para(self, **network_para):
+
+		with tf.device('/cpu:0'):
+			self.train_weights ={
+				'fc_1':
+				'fc_2':
+			}
+			self.train_bias ={
+
+			}
+
+	def set_pre_train_para(self, **network_para):
+		# network parameter
+		self.pooling_times = 0
+		conv1 = network_para.get('conv1')
+		conv2 = network_para.get('conv2')
+		conv3 = network_para.get('conv3')
+		with tf.device('/cpu:0'):
+
+			# variable, control filter size
+			self.pre_weights = {
+				'conv1': self.weight_variable([3, 5, 5, self.input_channel, conv1], 'conv1_w'),
+				'conv2': self.weight_variable([3, 5, 5, conv1, conv2], 'conv2_w'),
+				'conv3': self.weight_variable([3, 5, 5, conv2, conv3], 'conv3_w'),
+				'deconv1': self.weight_variable([3, 5, 5, conv2, conv3], 'deconv1_w'),
+				'deconv2': self.weight_variable([3, 5, 5, conv1, conv2], 'deconv2_w'),
+				'deconv3': self.weight_variable([3, 5, 5, self.input_channel, conv1], 'deconv3_w')
+			}
+			self.pre_bias = {
+				'conv1': self.bias_variable([conv1], 'conv1_b'),
+				'conv2': self.bias_variable([conv2], 'conv2_b'),
+				'conv3': self.bias_variable([conv3], 'conv3_b'),
+				'deconv1': self.bias_variable([conv2], 'deconv1_b'),
+				'deconv2': self.bias_variable([conv1], 'deconv2_b'),
+				'deconv3': self.bias_variable([self.input_channel], 'deconv3_b')
+			}
+			# self.mean = tf.Variable(tf.zeros([self.input_channel]),name='mean',trainable=False,)
+			# self.std = tf.Variable(tf.zeros([self.input_channel]),name='std',trainable=False,)
+		# placeholder
+		self.Xs = tf.placeholder(tf.float32, shape=[
+			None, self.input_temporal, self.input_vertical, self.input_horizontal, self.input_channel])
+		self.Ys = tf.placeholder(tf.float32, shape=[
+			None, self.input_temporal, self.input_vertical, self.input_horizontal, self.input_channel])
+		self.keep_prob = tf.placeholder(tf.float32)
+		self.norm = tf.placeholder(tf.bool, name='norm')
+		# operation
+		self.pre_encoder_OP, self.pre_endecoder_OP = self._pre_train_net(
+			self.Xs,
+			self.pre_weights,
+			self.pre_bias,
+			self.keep_prob,
+			self.norm)
+		self.cost_OP, self.L2 = self.MSE_loss(self.pre_endecoder_OP, self.Ys, self.pre_weights)
+		self.absolute_distance = tf.reduce_mean(tf.abs(self.pre_endecoder_OP - self.Ys))
+		self.RMSE = tf.sqrt(tf.reduce_mean(tf.pow(self.pre_endecoder_OP - self.Ys, 2)))
+		self.optimizer_OP = tf.train.AdamOptimizer(
+			learning_rate=self.learning_rate).minimize(self.absolute_distance)
+		self.init_OP = tf.global_variables_initializer()
+		self.saver = tf.train.Saver()
+
+	def _pre_train_net(self, x, weights, bias, dropout, norm=0):
 			k_size = {'temporal': 1, 'vertical': 2, 'horizontal': 2}
 			strides_size = {'temporal': 1, 'vertical': 1, 'horizontal': 1}
 			# layer 1
 			print('x shape :{}'.format(x.get_shape()))
-			conv1 = conv3d(x, weights['conv1'], bias['conv1'], strides_size)
+			conv1 = self.conv3d(x, weights['conv1'], bias['conv1'], strides_size)
 			conv1 = tf.nn.relu(conv1)
 			# conv1 = maxpool3d(conv1, k_size, strides_size)
 			conv1 = tf.nn.dropout(conv1, dropout)
 
 			# layer 2
 			print('conv1 shape :{}'.format(conv1.get_shape()))
-			conv2 = batch_normalize(conv1, 'conv2', norm)
-			conv2 = conv3d(conv2, weights['conv2'], bias['conv2'], strides_size)
+			conv2 = self.batch_normalize(conv1, 'conv2', norm)
+			conv2 = self.conv3d(conv2, weights['conv2'], bias['conv2'], strides_size)
 			conv2 = tf.nn.relu(conv2)
 			# conv2 = maxpool3d(conv2, k_size, strides_size)
 			conv2 = tf.nn.dropout(conv2, dropout)
@@ -80,9 +143,9 @@ class CNN_autoencoder:
 				self.input_horizontal // (2 ** self.pooling_times),
 				self.conv1
 			])
-			deconv2 = batch_normalize(encode_output, 'deconv2', norm)
+			deconv2 = self.batch_normalize(encode_output, 'deconv2', norm)
 			# deconv2 = maxunpool3d(deconv2, k_size)
-			deconv2 = deconv3d(
+			deconv2 = self.deconv3d(
 				deconv2,
 				weights['deconv2'],
 				bias['deconv2'],
@@ -91,7 +154,7 @@ class CNN_autoencoder:
 			deconv2 = tf.nn.relu(deconv2)
 			deconv2 = tf.nn.dropout(deconv2, dropout)
 			# layer 6
-			deconv3 = batch_normalize(deconv2, 'deconv3', norm)
+			deconv3 = self.batch_normalize(deconv2, 'deconv3', norm)
 			# deconv3 = maxunpool3d(deconv3, k_size)
 			output_shape_of_dconv3 = tf.pack([
 				tf.shape(x)[0],
@@ -100,7 +163,7 @@ class CNN_autoencoder:
 				self.input_horizontal // (2 ** self.pooling_times),
 				self.input_channel
 			])
-			deconv3 = deconv3d(
+			deconv3 = self.deconv3d(
 				deconv3,
 				weights['deconv3'],
 				bias['deconv3'],
@@ -113,167 +176,6 @@ class CNN_autoencoder:
 			print('endecoder_output output shape :%s' % endecoder_output.get_shape())
 
 			return encode_output, endecoder_output
-
-		def weight_variable(shape, name):
-			# initial = tf.truncated_normal(shape, stddev=0.1)
-			initial = np.random.randn(*shape) * sqrt(2.0 / np.prod(shape))
-			return tf.Variable(initial, dtype=tf.float32, name=name)
-
-		def bias_variable(shape, name):
-			# initial = tf.random_normal(shape)
-			initial = np.random.randn(*shape) * sqrt(2.0 / np.prod(shape))
-			return tf.Variable(initial, dtype=tf.float32, name=name)
-
-		def conv3d(x, W, b, strides_size):
-			x = tf.nn.conv3d(
-				x, W, strides=[
-					1,
-					strides_size['temporal'],
-					strides_size['vertical'],
-					strides_size['horizontal'],
-					1], padding='SAME')
-			x = tf.nn.bias_add(x, b)
-			return x
-
-		def deconv3d(x, W, b, output_shape, strides_size):
-			'''
-				filter shape:[depth, height, width, output_channels, in_channels]
-			'''
-			print('input shape:{} filter shape:{} output_shape:{}'.format(
-				x.get_shape(), W.get_shape(), output_shape.get_shape()))
-			x = tf.nn.conv3d_transpose(x, W, output_shape, strides=[
-				1,
-				strides_size['temporal'],
-				strides_size['vertical'],
-				strides_size['horizontal'],
-				1], padding='SAME')
-			x = tf.nn.bias_add(x, b)
-			return x
-
-		def maxpool3d(x, k_size, strides_size):
-
-			x = tf.nn.max_pool3d(x, ksize=[1, k_size['temporal'], k_size['vertical'], k_size['horizontal'], 1], strides=[
-				1,
-				strides_size['temporal'],
-				strides_size['vertical'],
-				strides_size['horizontal'], 1], padding='SAME')
-			self.pooling_times += 1
-			return x
-
-		def maxunpool3d(x, k_size):
-			input_shape = tf.shape(x, out_type=tf.int32)
-			output_shape = (
-				input_shape[0],
-				input_shape[1] * k_size['temporal'],
-				input_shape[2] * k_size['vertical'],
-				input_shape[3] * k_size['horizontal'],
-				input_shape[4])
-			'''
-			dim = len(input_shape[1:-2])
-			out = (tf.reshape(x, ))
-			for i in range(dim, 0, -1):
-				out = tf.concat([out, tf.zeros_like(out, dtype=tf.int32)], i)
-			x = tf.reshape(out, output_shape)
-			'''
-			print('x shape {}'.format(x.get_shape()))
-			out = tf.concat(4, [x, tf.zeros_like(x)])
-			out = tf.concat(3, [out, tf.zeros_like(out)])
-			out = tf.concat(2, [out, tf.zeros_like(out)])
-			x = tf.reshape(out, output_shape)
-			self.pooling_times -= 1
-			return x
-
-		def batch_normalize(x, scope, norm=0):
-			axes = list(range(len(x.get_shape()) - 1))
-			decay = 0.999
-			with tf.variable_scope(scope):
-				pop_mean = tf.get_variable('pop_mean', [x.get_shape(
-				)[-1]], trainable=False, dtype=tf.float32, initializer=tf.constant_initializer(0))
-				pop_var = tf.get_variable('pop_var', [x.get_shape(
-				)[-1]], trainable=False, dtype=tf.float32, initializer=tf.constant_initializer(1))
-				# scale = tf.get_variable(tf.ones([x.get_shape()[-1]]),name='scale')
-				scale = tf.get_variable('scale', [x.get_shape(
-				)[-1]], dtype=tf.float32, initializer=tf.constant_initializer(1))
-				# beta = tf.get_variable(tf.zeros([x.get_shape()[-1]]),name='beta')
-				beta = tf.get_variable('beta', [x.get_shape(
-				)[-1]], dtype=tf.float32, initializer=tf.constant_initializer(0))
-			if norm is 1:
-				batch_mean, batch_var = tf.nn.moments(x, axes=axes)
-				train_mean = tf.assign(
-					pop_mean, pop_mean * decay + batch_mean * (1 - decay))
-				train_var = tf.assign(
-					pop_var, pop_var * decay + batch_var * (1 - decay))
-				with tf.control_dependencies([train_mean, train_var]):
-					return tf.nn.batch_normalization(x, batch_mean, batch_var, beta, scale, 1e-3)
-			else:
-				return tf.nn.batch_normalization(x, pop_mean, pop_var, beta, scale, 1e-3)
-
-		self.learning_rate = 0.0005
-		self.training_iters = 20000
-		self.batch_size = 50
-		self.display_step = 25
-		self.dropout = 0.5
-		self.shuffle_capacity = 800
-		self.shuffle_min_after_dequeue = 300
-		self.weight_decay = 10
-		# self.n_input = 100*100
-
-		# network parameter
-		self.pooling_times = 0
-		# self.deconv1 = network_para.get('deconv1')
-		# self.deconv2 = network_para.get('deconv2')
-
-		self.input_temporal = data_shape[0]
-		self.input_vertical = data_shape[1]
-		self.input_horizontal = data_shape[2]
-		self.input_channel = data_shape[3]
-		self.conv1 = network_para.get('conv1')
-		self.conv2 = network_para.get('conv2')
-		self.conv3 = network_para.get('conv3')
-		# placeholder
-		with tf.device('/cpu:0'):
-			self.Xs = tf.placeholder(tf.float32, shape=[
-				None, self.input_temporal, self.input_vertical, self.input_horizontal, self.input_channel])
-			self.Ys = tf.placeholder(tf.float32, shape=[
-				None, self.input_temporal, self.input_vertical, self.input_horizontal, self.input_channel])
-			self.keep_prob = tf.placeholder(tf.float32)
-			self.norm = tf.placeholder(tf.bool, name='norm')
-
-			# variable, control filter size
-			self.weights = {
-				'conv1': weight_variable([3, 5, 5, self.input_channel, self.conv1], 'conv1_w'),
-				'conv2': weight_variable([3, 5, 5, self.conv1, self.conv2], 'conv2_w'),
-				'conv3': weight_variable([3, 5, 5, self.conv2, self.conv3], 'conv3_w'),
-				'deconv1': weight_variable([3, 5, 5, self.conv2, self.conv3], 'deconv1_w'),
-				'deconv2': weight_variable([3, 5, 5, self.conv1, self.conv2], 'deconv2_w'),
-				'deconv3': weight_variable([3, 5, 5, self.input_channel, self.conv1], 'deconv3_w')
-			}
-			self.bias = {
-				'conv1': bias_variable([self.conv1], 'conv1_b'),
-				'conv2': bias_variable([self.conv2], 'conv2_b'),
-				'conv3': bias_variable([self.conv3], 'conv3_b'),
-				'deconv1': bias_variable([self.conv2], 'deconv1_b'),
-				'deconv2': bias_variable([self.conv1], 'deconv2_b'),
-				'deconv3': bias_variable([self.input_channel], 'deconv3_b')
-			}
-			# self.mean = tf.Variable(tf.zeros([self.input_channel]),name='mean',trainable=False,)
-			# self.std = tf.Variable(tf.zeros([self.input_channel]),name='std',trainable=False,)
-		# operation
-
-		self.encoder_OP, self.endecoder_OP = net_layer(
-			self,
-			self.Xs,
-			self.weights,
-			self.bias,
-			self.keep_prob,
-			self.norm)
-		self.cost_OP, self.L2 = MSE_loss(self)
-		self.absolute_distance = tf.reduce_mean(tf.abs(self.endecoder_OP - self.Ys))
-		self.RMSE = tf.sqrt(tf.reduce_mean(tf.pow(self.endecoder_OP - self.Ys, 2)))
-		self.optimizer_OP = tf.train.AdamOptimizer(
-			learning_rate=self.learning_rate).minimize(self.absolute_distance)
-		self.init_OP = tf.global_variables_initializer()
-		self.saver = tf.train.Saver()
 
 	def set_training_data(self, input_x):
 
@@ -297,6 +199,113 @@ class CNN_autoencoder:
 		self._write_to_Tfrecord(training_X, training_Y, self.training_file)
 		self._write_to_Tfrecord(self.testing_X, self.testing_Y, self.testing_file)
 		self.training_data_number = training_X.shape[0]
+
+	def MSE_loss(self, real, predict, weights):
+			with tf.variable_scope('MSE_loss'):
+
+				# print('endecoder_OP shape:{}, Ys shape{}'.format(self.endecoder_OP[:,5].get_shape(),self.Ys.get_shape()))
+				loss = tf.reduce_mean(tf.pow(predict - real, 2))
+				# loss = tf.div(loss, 2)
+				# L2 regularization
+				L2 = 0
+				for key, value in weights.items():
+					L2 += tf.nn.l2_loss(value)
+				loss += tf.reduce_mean(L2 * self.weight_decay)
+			return loss, L2
+
+	def weight_variable(self, shape, name):
+		# initial = tf.truncated_normal(shape, stddev=0.1)
+		initial = np.random.randn(*shape) * sqrt(2.0 / np.prod(shape))
+		return tf.Variable(initial, dtype=tf.float32, name=name)
+
+	def bias_variable(self, shape, name):
+		# initial = tf.random_normal(shape)
+		initial = np.random.randn(*shape) * sqrt(2.0 / np.prod(shape))
+		return tf.Variable(initial, dtype=tf.float32, name=name)
+
+	def conv3d(self, x, W, b, strides_size):
+		x = tf.nn.conv3d(
+			x, W, strides=[
+				1,
+				strides_size['temporal'],
+				strides_size['vertical'],
+				strides_size['horizontal'],
+				1], padding='SAME')
+		x = tf.nn.bias_add(x, b)
+		return x
+
+	def deconv3d(self, x, W, b, output_shape, strides_size):
+		'''
+			filter shape:[depth, height, width, output_channels, in_channels]
+		'''
+		print('input shape:{} filter shape:{} output_shape:{}'.format(
+			x.get_shape(), W.get_shape(), output_shape.get_shape()))
+		x = tf.nn.conv3d_transpose(x, W, output_shape, strides=[
+			1,
+			strides_size['temporal'],
+			strides_size['vertical'],
+			strides_size['horizontal'],
+			1], padding='SAME')
+		x = tf.nn.bias_add(x, b)
+		return x
+
+	def maxpool3d(self, x, k_size, strides_size):
+
+		x = tf.nn.max_pool3d(x, ksize=[1, k_size['temporal'], k_size['vertical'], k_size['horizontal'], 1], strides=[
+			1,
+			strides_size['temporal'],
+			strides_size['vertical'],
+			strides_size['horizontal'], 1], padding='SAME')
+		self.pooling_times += 1
+		return x
+
+	def maxunpool3d(self, x, k_size):
+		input_shape = tf.shape(x, out_type=tf.int32)
+		output_shape = (
+			input_shape[0],
+			input_shape[1] * k_size['temporal'],
+			input_shape[2] * k_size['vertical'],
+			input_shape[3] * k_size['horizontal'],
+			input_shape[4])
+		'''
+		dim = len(input_shape[1:-2])
+		out = (tf.reshape(x, ))
+		for i in range(dim, 0, -1):
+			out = tf.concat([out, tf.zeros_like(out, dtype=tf.int32)], i)
+		x = tf.reshape(out, output_shape)
+		'''
+		print('x shape {}'.format(x.get_shape()))
+		out = tf.concat(4, [x, tf.zeros_like(x)])
+		out = tf.concat(3, [out, tf.zeros_like(out)])
+		out = tf.concat(2, [out, tf.zeros_like(out)])
+		x = tf.reshape(out, output_shape)
+		self.pooling_times -= 1
+		return x
+
+	def batch_normalize(self, x, scope, norm=0):
+		axes = list(range(len(x.get_shape()) - 1))
+		decay = 0.999
+		with tf.variable_scope(scope):
+			pop_mean = tf.get_variable('pop_mean', [x.get_shape(
+			)[-1]], trainable=False, dtype=tf.float32, initializer=tf.constant_initializer(0))
+			pop_var = tf.get_variable('pop_var', [x.get_shape(
+			)[-1]], trainable=False, dtype=tf.float32, initializer=tf.constant_initializer(1))
+			# scale = tf.get_variable(tf.ones([x.get_shape()[-1]]),name='scale')
+			scale = tf.get_variable('scale', [x.get_shape(
+			)[-1]], dtype=tf.float32, initializer=tf.constant_initializer(1))
+			# beta = tf.get_variable(tf.zeros([x.get_shape()[-1]]),name='beta')
+			beta = tf.get_variable('beta', [x.get_shape(
+			)[-1]], dtype=tf.float32, initializer=tf.constant_initializer(0))
+		if norm is 1:
+			batch_mean, batch_var = tf.nn.moments(x, axes=axes)
+			train_mean = tf.assign(
+				pop_mean, pop_mean * decay + batch_mean * (1 - decay))
+			train_var = tf.assign(
+				pop_var, pop_var * decay + batch_var * (1 - decay))
+			with tf.control_dependencies([train_mean, train_var]):
+				return tf.nn.batch_normalization(x, batch_mean, batch_var, beta, scale, 1e-3)
+		else:
+			return tf.nn.batch_normalization(x, pop_mean, pop_var, beta, scale, 1e-3)
 
 	def feature_normalize_input_data(self, input_x):
 		input_shape = input_x.shape
@@ -337,7 +346,7 @@ class CNN_autoencoder:
 			# testing_y = self.un_normalize_data(sess,testing_y)
 			return input_x[0:-1], predict_y
 
-	def set_model_name(self, reload_model_path, save_model_path):
+	def set_pre_model_name(self, reload_model_path, save_model_path):
 
 		if not glob(reload_model_path + '.*'):
 			print('{} not exists'.format(reload_model_path))
@@ -452,7 +461,7 @@ class CNN_autoencoder:
 			predict_list = []
 			cum_loss = 0
 			for batch_index in range(batch_len):
-				loss, predict = sess.run([self.cost_OP, self.endecoder_OP], feed_dict={
+				loss, predict = sess.run([self.cost_OP, self.pre_endecoder_OP], feed_dict={
 					self.Xs: input_x[batch_index * self.batch_size:(batch_index + 1) * self.batch_size],
 					self.Ys: input_y[batch_index * self.batch_size:(batch_index + 1) * self.batch_size],
 					self.keep_prob: 1,
@@ -479,21 +488,65 @@ class CNN_autoencoder:
 				'epoch', 'training_lostt', 'testing_loss', 'absolute_distance', 'RMSE'))
 			for i, epoch in enumerate(input_data['epoch']):
 				f.write('{}\t{}\t{}\t{}\t{}\n'.format(
-						input_data['epoch'][i],
-						input_data['training_loss_his'][i],
-						input_data['testting_loss_hist'][i],
-						input_data['absolute_distance'][i],
-						input_data['RMSE'][i])
-						)
+					input_data['epoch'][i],
+					input_data['training_loss_his'][i],
+					input_data['testting_loss_hist'][i],
+					input_data['absolute_distance'][i],
+					input_data['RMSE'][i]))
 
-	def training_data(self, restore=False):
+	def start_pre_training(self, restore=False):
+		fig = plt.figure()
+		ax = fig.add_subplot(3, 1, 1)
+		ax2 = fig.add_subplot(3, 1, 2)
+		ax3 = fig.add_subplot(3, 1, 3)
+
+		def plot_history(history_data):
+			plt.ion()
+
+			plt.xlabel('epoch')
+			plt.ylabel('training and testing loss')
+
+			try:
+				ax.lines.pop(0).remove()
+				ax2.lines.pop(0).remove()
+				ax3.lines.pop(0).remove()
+			except Exception:
+				pass
+			ax.plot(
+				history_data['epoch'],
+				history_data['training_loss_his'],
+				'g-',
+				lw=0.5,
+				label='training loss')
+			ax.plot(
+				history_data['epoch'],
+				history_data['testting_loss_hist'],
+				'r-',
+				lw=0.5,
+				label='testing loss')
+			# ax.legend()
+			ax2.plot(
+				history_data['epoch'],
+				history_data['absolute_distance'],
+				'b-',
+				lw=0.5,
+				label='absolute_distance loss')
+			# ax2.legend()
+			ax3.plot(
+				history_data['epoch'],
+				history_data['RMSE'],
+				'r-',
+				lw=0.5,
+				label='RMSE loss')
+			# ax3.legend()
+			plt.pause(1)
 
 		data = self._read_data_from_Tfrecord(self.training_file)
-		batch_tuple_OP = tf.train.shuffle_batch(data,
-												batch_size=self.batch_size,
-												capacity=self.shuffle_capacity,
-												min_after_dequeue=self.shuffle_min_after_dequeue
-												)
+		batch_tuple_OP = tf.train.shuffle_batch(
+			data,
+			batch_size=self.batch_size,
+			capacity=self.shuffle_capacity,
+			min_after_dequeue=self.shuffle_min_after_dequeue)
 		history_data = {
 			'training_loss_his': [],
 			'testting_loss_hist': [],
@@ -501,16 +554,6 @@ class CNN_autoencoder:
 			'RMSE': [],
 			'epoch': []
 		}
-		fig = plt.figure()
-		ax = fig.add_subplot(3, 1, 1)
-		ax2 = fig.add_subplot(3, 1, 2)
-		ax3 = fig.add_subplot(3, 1, 3)
-		plt.xlabel('epoch')
-		plt.ylabel('training and testing loss')
-		#t = np.arange(0.0, 1.0, 0.01)
-		#s = np.sin(2*np.pi*t)
-		#line, = ax.plot(t,s,color='blue',lw=2)
-		plt.ion()
 		with tf.Session() as sess:
 			if restore:
 				print('reloading model....')
@@ -554,7 +597,7 @@ class CNN_autoencoder:
 						self.testing_file)
 					testing_loss, _ = self._testing_data(
 						sess, testing_X, testing_Y)
-					print('testing_loss:{} average_training_loss:{} average absolute distance {} average RMSE'.format(
+					print('testing_loss:{} average_training_loss:{} average absolute distance {} average RMSE {}'.format(
 						testing_loss, average_training_loss, average_cumulate_abd, average_RMSE))
 
 					history_data['epoch'].append(epoch)
@@ -565,47 +608,13 @@ class CNN_autoencoder:
 					cumulate_loss = 0
 					cumulate_RMSE = 0
 					cumulate_abd = 0
+					plot_history(history_data)
 					self._save_model(sess)
-
-					try:
-						ax.lines.pop(0).remove()
-						ax2.lines.pop(0).remove()
-						ax3.lines.pop(0).remove()
-					except Exception:
-						pass
-					ax.plot(
-						history_data['epoch'],
-						history_data['training_loss_his'],
-						'g-',
-						lw=0.5,
-						label='training loss')
-					ax.plot(
-						history_data['epoch'],
-						history_data['testting_loss_hist'],
-						'r-',
-						lw=0.5,
-						label='testing loss')
-					# ax.legend()
-					ax2.plot(
-						history_data['epoch'],
-						history_data['absolute_distance'],
-						'b-',
-						lw=0.5,
-						label='absolute_distance loss')
-					# ax2.legend()
-					ax3.plot(
-						history_data['epoch'],
-						history_data['RMSE'],
-						'r-',
-						lw=0.5,
-						label='RMSE loss')
-					# ax3.legend()
-					plt.pause(1)
 					self._save_history(history_data)
 
 				epoch += 1
 			coord.request_stop()
 			coord.join(treads)
 			print('training finished!')
-			plt.ioff()
+			self.plt.ioff()
 			self._save_model(sess)
