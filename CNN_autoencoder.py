@@ -215,7 +215,7 @@ class CNN_autoencoder:
 		self.dropout = 0.5
 		self.shuffle_capacity = 800
 		self.shuffle_min_after_dequeue = 300
-		self.weight_decay = 0.1
+		self.weight_decay = 10
 		# self.n_input = 100*100
 
 		# network parameter
@@ -268,10 +268,10 @@ class CNN_autoencoder:
 			self.keep_prob,
 			self.norm)
 		self.cost_OP, self.L2 = MSE_loss(self)
-		self.absolute_distance = tf.reduce_mean(tf.abs(self.endecoder_OP - self.Xs))
+		self.absolute_distance = tf.reduce_mean(tf.abs(self.endecoder_OP - self.Ys))
 		self.RMSE = tf.sqrt(tf.reduce_mean(tf.pow(self.endecoder_OP - self.Ys, 2)))
 		self.optimizer_OP = tf.train.AdamOptimizer(
-			learning_rate=self.learning_rate).minimize(self.RMSE)
+			learning_rate=self.learning_rate).minimize(self.absolute_distance)
 		self.init_OP = tf.global_variables_initializer()
 		self.saver = tf.train.Saver()
 
@@ -295,8 +295,7 @@ class CNN_autoencoder:
 		print('training X shape:{}, training Y shape:{}'.format(
 			training_X.shape, training_Y.shape))
 		self._write_to_Tfrecord(training_X, training_Y, self.training_file)
-		self._write_to_Tfrecord(
-			self.testing_X, self.testing_Y, self.testing_file)
+		self._write_to_Tfrecord(self.testing_X, self.testing_Y, self.testing_file)
 		self.training_data_number = training_X.shape[0]
 
 	def feature_normalize_input_data(self, input_x):
@@ -524,6 +523,8 @@ class CNN_autoencoder:
 
 			epoch = 1
 			cumulate_loss = 0
+			cumulate_RMSE = 0
+			cumulate_abd = 0
 
 			while epoch < self.training_iters:
 				index, batch_x, batch_y = sess.run(batch_tuple_OP)
@@ -543,30 +544,33 @@ class CNN_autoencoder:
 						self.norm: 1})
 				print('Epoch:%d  cost:%g absolute_distance:%g L2:%g RMSE:%g' % (epoch, loss, absolute_distance, L2, RMSE))
 				cumulate_loss += loss
+				cumulate_RMSE += RMSE
+				cumulate_abd += absolute_distance
 				if epoch % self.display_step == 0 and epoch != 0:
 					average_training_loss = cumulate_loss / self.display_step
+					average_RMSE = cumulate_RMSE / self.display_step
+					average_cumulate_abd = cumulate_abd / self.display_step
 					index, testing_X, testing_Y = self._read_all_data_from_Tfreoced(
 						self.testing_file)
 					testing_loss, _ = self._testing_data(
 						sess, testing_X, testing_Y)
-					print('testing_loss:{} average_training_loss:{}'.format(
-						testing_loss, average_training_loss))
+					print('testing_loss:{} average_training_loss:{} average absolute distance {} average RMSE'.format(
+						testing_loss, average_training_loss, average_cumulate_abd, average_RMSE))
 
 					history_data['epoch'].append(epoch)
 					history_data['training_loss_his'].append(average_training_loss)
 					history_data['testting_loss_hist'].append(testing_loss)
-					history_data['absolute_distance'].append(absolute_distance)
-					history_data['RMSE'].append(RMSE)
+					history_data['absolute_distance'].append(cumulate_abd)
+					history_data['RMSE'].append(average_RMSE)
 					cumulate_loss = 0
+					cumulate_RMSE = 0
+					cumulate_abd = 0
 					self._save_model(sess)
 
 					try:
 						ax.lines.pop(0).remove()
 						ax2.lines.pop(0).remove()
 						ax3.lines.pop(0).remove()
-						ax.legned.remove()
-						ax2.legned.remove()
-						ax3.legned.remove()
 					except Exception:
 						pass
 					ax.plot(
@@ -581,21 +585,21 @@ class CNN_autoencoder:
 						'r-',
 						lw=0.5,
 						label='testing loss')
-					ax.legend()
+					# ax.legend()
 					ax2.plot(
 						history_data['epoch'],
 						history_data['absolute_distance'],
 						'b-',
 						lw=0.5,
-						label='training loss')
-					ax2.legend()
+						label='absolute_distance loss')
+					# ax2.legend()
 					ax3.plot(
 						history_data['epoch'],
 						history_data['RMSE'],
 						'r-',
 						lw=0.5,
 						label='RMSE loss')
-					ax3.legend()
+					# ax3.legend()
 					plt.pause(1)
 					self._save_history(history_data)
 

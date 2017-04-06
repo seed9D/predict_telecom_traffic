@@ -1,9 +1,12 @@
 import numpy as np
 import os
+
+
 def list_all_input_file(input_dir):
 	onlyfile = [f for f in os.listdir(input_dir) if (os.path.isfile(
 		os.path.join(input_dir, f)) and os.path.splitext(f)[1] == ".npy")]
 	return onlyfile
+
 
 def save_array(x_array, out_file):
 	print('saving file to {}...'.format(out_file))
@@ -14,6 +17,7 @@ def load_array(input_file):
 	print('loading file from {}...'.format(input_file))
 	X = np.load(input_file)
 	return X
+
 
 def load_data_format(input_dir, filelist):
 	def load_array(input_file):
@@ -64,3 +68,4 @@ def load_data_format(input_dir, filelist):
 	for i, array in enumerate(shift_data_array_list):
 		print('data format shape:', array.shape)
 		save_array(array, './npy/' + month + '_' + str(i))  # saving all shift array
+		

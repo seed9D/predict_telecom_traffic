@@ -50,9 +50,10 @@ def plot_predict_vs_real(real, predict):
 
 			data_time = set_time_zone(int(real[i, j, plot_1_row, plot_1_col, 1]))
 			time_x.append(date_time_covert_to_str(data_time))
-
+	'''
 	for time_str in time_x:
 		print(time_str)
+	'''
 	x = range(len(time_x))
 	fig = plt.figure()
 	ax1 = fig.add_subplot(211)
@@ -132,10 +133,10 @@ def prepare_predict_data():
 	for i, filename in enumerate(filelist):
 		if filename != 'training_raw_data.npy':
 			data_array = du.load_array('./npy/' + filename)
-			print(' 0 grid id {}'.format(data_array[0, 0, 10, 10, 0]))
-			print(' 60 grid id {}'.format(data_array[0, 0, 70, 70, 0]))
-			data_array = data_array[:, :, 60:100, 60:100, (0, 1, -1)]
-			print('savin array shape:', data_array.shape)
+			# print(' 0 grid id {}'.format(data_array[0, 0, 10, 10, 0]))
+			# print(' 60 grid id {}'.format(data_array[0, 0, 70, 70, 0]))
+			data_array = data_array[:, :, 0:40, 0:40, (0, 1, -1)]
+			print('saving array shape:', data_array.shape)
 			du.save_array(data_array, './npy/final/testing_raw_data/' + 'testing_' + str(i))
 
 
@@ -168,8 +169,8 @@ data_shape = [predict_array.shape[1], predict_array.shape[2], predict_array.shap
 predict_CNN = cn.CNN_autoencoder(*data_shape, **network_parameter)
 # predict_CNN.set_model_name('/home/mldp/ML_with_bigdata/output_model/CNN_autoencoder_onlyinternet_16_32_48.ckpt', '/home/mldp/ML_with_bigdata/output_model/CNN_autoencoder_onlyinternet_16_32_48.ckpt')
 predict_CNN.set_model_name(
-	'/home/mldp/ML_with_bigdata/output_model/CNN_autoencoder_64_64_AE.ckpt',
-	'/home/mldp/ML_with_bigdata/output_model/CNN_autoencoder_64_64_AE.ckpt')
+	'/home/mldp/ML_with_bigdata/output_model/CNN_autoencoder_64_64_AE_self.ckpt',
+	'/home/mldp/ML_with_bigdata/output_model/CNN_autoencoder_64_64_AE_self.ckpt')
 predict_CNN.set_training_data(predict_array)
 
 _, predict_y = predict_CNN.predict_data(predict_array[:, :, :, :, 2, np.newaxis])
