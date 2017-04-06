@@ -273,8 +273,9 @@ class CNN_autoencoder:
 			self.norm)
 		self.cost_OP, self.L2 = MSE_loss(self)
 		self.absolute_distance = tf.reduce_mean(tf.abs(self.endecoder_OP - self.Xs))
+		self.RMSE = tf.sqrt(tf.reduce_mean(tf.pow(self.endecoder_OP - self.Ys, 2)))
 		self.optimizer_OP = tf.train.AdamOptimizer(
-			learning_rate=self.learning_rate).minimize(self.cost_OP)
+			learning_rate=self.learning_rate).minimize(self.RMSE)
 		self.init_OP = tf.global_variables_initializer()
 		self.saver = tf.train.Saver()
 
@@ -479,14 +480,15 @@ class CNN_autoencoder:
 	def _save_history(self, input_data):
 
 		with open('history.txt', 'w') as f:
-			f.write('{}\t{}\t{}\n'.format(
-				'epoch', 'training_lostt', 'testing_loss'))
+			f.write('{}\t{}\t{}\t{}\t{}\n'.format(
+				'epoch', 'training_lostt', 'testing_loss', 'absolute_distance', 'RMSE'))
 			for i, epoch in enumerate(input_data['epoch']):
-				f.write('{}\t{}\t{}\t{}\n'.format(
+				f.write('{}\t{}\t{}\t{}\t{}\n'.format(
 						input_data['epoch'][i],
 						input_data['training_loss_his'][i],
 						input_data['testting_loss_hist'][i],
-						input_data['absolute_distance'][i])
+						input_data['absolute_distance'][i],
+						input_data['RMSE'][i])
 						)
 
 	def training_data(self, restore=False):
@@ -501,12 +503,13 @@ class CNN_autoencoder:
 			'training_loss_his': [],
 			'testting_loss_hist': [],
 			'absolute_distance': [],
+			'RMSE': [],
 			'epoch': []
 		}
 		fig = plt.figure()
-		ax = fig.add_subplot(2, 1, 1)
-		ax2 = fig.add_subplot(2, 1, 2)
-
+		ax = fig.add_subplot(3, 1, 1)
+		ax2 = fig.add_subplot(3, 1, 2)
+		ax3 = fig.add_subplot(3, 1, 3)
 		plt.xlabel('epoch')
 		plt.ylabel('training and testing loss')
 		#t = np.arange(0.0, 1.0, 0.01)
@@ -532,12 +535,17 @@ class CNN_autoencoder:
 				loss = 0.
 
 				with tf.device('/gpu:0'):
-					_, loss, absolute_distance, L2 = sess.run([self.optimizer_OP, self.cost_OP, self.absolute_distance, self.L2], feed_dict={
+					_, loss, absolute_distance, L2, RMSE = sess.run([
+						self.optimizer_OP,
+						self.cost_OP,
+						self.absolute_distance,
+						self.L2, self.RMSE],
+						feed_dict={
 						self.Xs: batch_x,
 						self.Ys: batch_y,
 						self.keep_prob: self.dropout,
 						self.norm: 1})
-				print('Epoch:%d  cost:%g absolute_distance:%g L2:%g' % (epoch, loss, absolute_distance, L2))
+				print('Epoch:%d  cost:%g absolute_distance:%g L2:%g RMSE:%g' % (epoch, loss, absolute_distance, L2, RMSE))
 				cumulate_loss += loss
 				if epoch % self.display_step == 0 and epoch != 0:
 					average_training_loss = cumulate_loss / self.display_step
@@ -552,12 +560,14 @@ class CNN_autoencoder:
 					history_data['training_loss_his'].append(average_training_loss)
 					history_data['testting_loss_hist'].append(testing_loss)
 					history_data['absolute_distance'].append(absolute_distance)
+					history_data['RMSE'].append(RMSE)
 					cumulate_loss = 0
 					self._save_model(sess)
 
 					try:
 						ax.lines.pop(0).remove()
 						ax2.lines.pop(0).remove()
+						ax3.lines.pop(0).remove()
 					except Exception:
 						pass
 					ax.plot(
@@ -572,12 +582,21 @@ class CNN_autoencoder:
 						'r-',
 						lw=0.5,
 						label='testing loss')
+					ax.legend()
 					ax2.plot(
 						history_data['epoch'],
 						history_data['absolute_distance'],
 						'b-',
 						lw=0.5,
 						label='training loss')
+					ax2.legend()
+					ax3.plot(
+						history_data['epoch'],
+						history_data['RMSE'],
+						'r-',
+						lw=0.5,
+						label='RMSE loss')
+					ax3.legend()
 					plt.pause(1)
 					self._save_history(history_data)
 
@@ -696,8 +715,8 @@ if __name__ == '__main__':
 	train_CNN = CNN_autoencoder(*data_shape, **network_parameter)
 	# train_CNN.reload_tfrecord('./training.tfrecoeds','./testing.tfrecoeds')
 	train_CNN.set_model_name(
-		'/home/mldp/ML_with_bigdata/output_model/CNN_autoencoder_64_64_SE_normalize.ckpt',
-		'/home/mldp/ML_with_bigdata/output_model/CNN_autoencoder_64_64_SE_normalize.ckpt')
+		'/home/mldp/ML_with_bigdata/output_model/CNN_autoencoder_64_64_RMSE.ckpt',
+		'/home/mldp/ML_with_bigdata/output_model/CNN_autoencoder_64_64_RMSE.ckpt')
 	train_CNN.set_training_data(X_array)
 	del X_array
 	train_CNN.training_data(restore=False)
