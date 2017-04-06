@@ -33,7 +33,7 @@ def plot_predict_vs_real(real, predict):
 		'real': []
 	}
 	plot_2 = {
-		'grid_id': int(real[0, 0, plot_2_row, 23, 0]),
+		'grid_id': int(real[0, 0, plot_2_row, plot_2_col, 0]),
 		'predict': [],
 		'real': []
 	}
@@ -45,7 +45,7 @@ def plot_predict_vs_real(real, predict):
 			# print('id:{},real:{},predict:{}'.format(plot_1['grid_id'],real[i,j,10,10,2],predict[i,j,10,10]))
 			plot_2['real'].append(real[i, j, plot_2_row, plot_2_col, 2])
 			plot_2['predict'].append(predict[i, j, plot_2_row, plot_2_col])
-			print('id: {},real: {},predict: {}'.format(plot_2['grid_id'], real[i, j, plot_2_row, plot_2_col, 2], predict[i, j, plot_2_row, plot_2_col]))
+			# print('id: {},real: {},predict: {}'.format(plot_2['grid_id'], real[i, j, plot_2_row, plot_2_col, 2], predict[i, j, plot_2_row, plot_2_col]))
 
 			data_time = set_time_zone(int(real[i, j, plot_1_row, plot_1_col, 1]))
 			time_x.append(date_time_covert_to_str(data_time))
@@ -131,21 +131,24 @@ def prepare_predict_data():
 	for i, filename in enumerate(filelist):
 		if filename != 'training_raw_data.npy':
 			data_array = cn.load_array('./npy/' + filename)
-			data_array = data_array[:, :, 0:40, 0:40, (0, 1, -1)]
+			print(' 0 grid id {}'.format(data_array[0, 0, 10, 10, 0]))
+			print(' 60 grid id {}'.format(data_array[0, 0, 70, 70, 0]))
+			data_array = data_array[:, :, 60:100, 60:100, (0, 1, -1)]
 			print('savin array shape:', data_array.shape)
 			cn.save_array(data_array, './npy/final/testing_raw_data/' + 'testing_' + str(i))
 
 
 # prepare_predict_data()
-
+'''
 training_data_list = cn.list_all_input_file('./npy/final/')
 training_data_list.sort()
 X_array_list = []
 for filename in training_data_list:
 	X_array_list.append(cn.load_array('./npy/final/' + filename))
 X_array = np.concatenate(X_array_list, axis=0)
+# X_array = X_array[:, :, 0:21,0:21, :]
 del X_array_list
-
+'''
 
 testing_data_list = cn.list_all_input_file('./npy/final/testing_raw_data/')
 testing_data_list.sort()
@@ -157,19 +160,20 @@ del testing_data_list
 
 
 predict_array = predict_array[predict_array.shape[0] - 200:]
-# predict_array = predict_array[200:400]
+# predict_array = predict_array[0:400]
 
-network_parameter = {'conv1': 64, 'conv2': 48, 'conv3': 32}
-data_shape = [X_array.shape[1], X_array.shape[2], X_array.shape[3], X_array.shape[4]]
+network_parameter = {'conv1': 64, 'conv2': 64, 'conv3': 0}
+data_shape = [predict_array.shape[1], predict_array.shape[2], predict_array.shape[3], 1]
 predict_CNN = cn.CNN_autoencoder(*data_shape, **network_parameter)
 # predict_CNN.set_model_name('/home/mldp/ML_with_bigdata/output_model/CNN_autoencoder_onlyinternet_16_32_48.ckpt', '/home/mldp/ML_with_bigdata/output_model/CNN_autoencoder_onlyinternet_16_32_48.ckpt')
 predict_CNN.set_model_name(
-	'/home/mldp/ML_with_bigdata/output_model/CNN_autoencoder_test_unpooling.ckpt',
-	'/home/mldp/ML_with_bigdata/output_model/CNN_autoencoder_test_unpooling.ckpt')
-predict_CNN.set_training_data(X_array)
-del X_array
+	'/home/mldp/ML_with_bigdata/output_model/CNN_autoencoder_64_64_AE.ckpt',
+	'/home/mldp/ML_with_bigdata/output_model/CNN_autoencoder_64_64_AE.ckpt')
+predict_CNN.set_training_data(predict_array)
+
 _, predict_y = predict_CNN.predict_data(predict_array[:, :, :, :, 2, np.newaxis])
 compute_loss_rate(predict_array[0:-1, :, :, :, 2, np.newaxis], predict_y)
 plot_predict_vs_real(predict_array[0:-1], predict_y)
 
+# print('grid id {}'.format(predict_array[0, 0, 10, 10, 0]))
 # check_data(predict_array)
