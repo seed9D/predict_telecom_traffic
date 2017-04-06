@@ -18,7 +18,7 @@ class CNN_autoencoder:
 
 				# print('endecoder_OP shape:{}, Ys shape{}'.format(self.endecoder_OP[:,5].get_shape(),self.Ys.get_shape()))
 				loss = tf.reduce_mean(tf.pow(self.endecoder_OP - self.Ys, 2))
-				loss = tf.div(loss, 2)
+				# loss = tf.div(loss, 2)
 				# L2 regularization
 				L2 = 0
 				for key, value in self.weights.items():
@@ -43,7 +43,8 @@ class CNN_autoencoder:
 			conv2 = tf.nn.relu(conv2)
 			# conv2 = maxpool3d(conv2, k_size, strides_size)
 			conv2 = tf.nn.dropout(conv2, dropout)
-
+			encode_output = conv2
+			'''
 			# layer 3
 			print('conv2 shape :{}'.format(conv2.get_shape()))
 			conv3 = batch_normalize(conv2, 'conv3', norm)
@@ -74,7 +75,7 @@ class CNN_autoencoder:
 			# self.input_horizontal/(2**(self.pooling_times-1)),
 			# self.conv2])
 			# deconv1 = self.maxpool3d(deconv1,output_shape_of_dconv1_unpool)
-
+			'''
 			# layer 5
 			output_shape_of_dconv2 = tf.pack([
 				tf.shape(x)[0],
@@ -83,7 +84,7 @@ class CNN_autoencoder:
 				self.input_horizontal // (2 ** self.pooling_times),
 				self.conv1
 			])
-			deconv2 = batch_normalize(deconv1, 'deconv2', norm)
+			deconv2 = batch_normalize(encode_output, 'deconv2', norm)
 			# deconv2 = maxunpool3d(deconv2, k_size)
 			deconv2 = deconv3d(
 				deconv2,
@@ -211,20 +212,17 @@ class CNN_autoencoder:
 			else:
 				return tf.nn.batch_normalization(x, pop_mean, pop_var, beta, scale, 1e-3)
 
-		self.learning_rate = 0.001
+		self.learning_rate = 0.0005
 		self.training_iters = 20000
 		self.batch_size = 50
 		self.display_step = 25
-		self.dropout = 0.7
+		self.dropout = 0.5
 		self.shuffle_capacity = 800
 		self.shuffle_min_after_dequeue = 300
-		self.weight_decay = 10
+		self.weight_decay = 0.1
 		# self.n_input = 100*100
 
 		# network parameter
-		self.conv1 = network_para.get('conv1')
-		self.conv2 = network_para.get('conv2')
-		self.conv3 = network_para.get('conv3')
 		self.pooling_times = 0
 		# self.deconv1 = network_para.get('deconv1')
 		# self.deconv2 = network_para.get('deconv2')
@@ -233,6 +231,9 @@ class CNN_autoencoder:
 		self.input_vertical = data_shape[1]
 		self.input_horizontal = data_shape[2]
 		self.input_channel = data_shape[3]
+		self.conv1 = network_para.get('conv1')
+		self.conv2 = network_para.get('conv2')
+		self.conv3 = network_para.get('conv3')
 		# placeholder
 		with tf.device('/cpu:0'):
 			self.Xs = tf.placeholder(tf.float32, shape=[
@@ -259,8 +260,8 @@ class CNN_autoencoder:
 				'deconv2': bias_variable([self.conv1], 'deconv2_b'),
 				'deconv3': bias_variable([self.input_channel], 'deconv3_b')
 			}
-			#self.mean = tf.Variable(tf.zeros([self.input_channel]),name='mean',trainable=False,)
-			#self.std = tf.Variable(tf.zeros([self.input_channel]),name='std',trainable=False,)
+			# self.mean = tf.Variable(tf.zeros([self.input_channel]),name='mean',trainable=False,)
+			# self.std = tf.Variable(tf.zeros([self.input_channel]),name='std',trainable=False,)
 		# operation
 
 		self.encoder_OP, self.endecoder_OP = net_layer(
@@ -271,17 +272,16 @@ class CNN_autoencoder:
 			self.keep_prob,
 			self.norm)
 		self.cost_OP, self.L2 = MSE_loss(self)
-
+		self.absolute_distance = tf.reduce_mean(tf.abs(self.endecoder_OP - self.Xs))
 		self.optimizer_OP = tf.train.AdamOptimizer(
 			learning_rate=self.learning_rate).minimize(self.cost_OP)
-		self.absolute_distance = tf.reduce_mean(tf.abs(self.endecoder_OP - self.Xs))
 		self.init_OP = tf.global_variables_initializer()
 		self.saver = tf.train.Saver()
 
 	def set_training_data(self, input_x):
 
 		print('input_x shape:{}'.format(input_x.shape))
-		# input_x,self.mean,self.std = self.feature_normalize_input_data(input_x)
+		# input_x, self.mean, self.std = self.feature_normalize_input_data(input_x)
 		self.mean = 0
 		self.std = 1
 		X_data = input_x[0:-1]
@@ -360,7 +360,7 @@ class CNN_autoencoder:
 		try:
 			self.saver.restore(sess, self.model_path)
 		except Exception:
-			print('model {} doesnt exists'.format(self.model_path))
+			print('model {} may not exists'.format(self.model_path))
 
 	def _save_model(self, sess):
 		print('saving model.....')
@@ -482,10 +482,11 @@ class CNN_autoencoder:
 			f.write('{}\t{}\t{}\n'.format(
 				'epoch', 'training_lostt', 'testing_loss'))
 			for i, epoch in enumerate(input_data['epoch']):
-				f.write('{}\t{}\t{}\n'.format(
+				f.write('{}\t{}\t{}\t{}\n'.format(
 						input_data['epoch'][i],
 						input_data['training_loss_his'][i],
-						input_data['testting_loss_hist'][i])
+						input_data['testting_loss_hist'][i],
+						input_data['absolute_distance'][i])
 						)
 
 	def training_data(self, restore=False):
@@ -688,13 +689,15 @@ if __name__ == '__main__':
 		X_array_list.append(load_array('./npy/final/' + filename))
 
 	X_array = np.concatenate(X_array_list, axis=0)
+	# X_array = X_array[:, :, 0:21, 0:21, :]
 	del X_array_list
-	network_parameter = {'conv1': 64, 'conv2': 48, 'conv3': 32}
+	network_parameter = {'conv1': 64, 'conv2': 64, 'conv3': 0}
 	data_shape = [X_array.shape[1], X_array.shape[2], X_array.shape[3], X_array.shape[4]]
 	train_CNN = CNN_autoencoder(*data_shape, **network_parameter)
 	# train_CNN.reload_tfrecord('./training.tfrecoeds','./testing.tfrecoeds')
-	train_CNN.set_model_name('/home/mldp/ML_with_bigdata/output_model/CNN_autoencoder_test_unpooling.ckpt',
-							 '/home/mldp/ML_with_bigdata/output_model/CNN_autoencoder_test_unpooling.ckpt')
+	train_CNN.set_model_name(
+		'/home/mldp/ML_with_bigdata/output_model/CNN_autoencoder_64_64_SE_normalize.ckpt',
+		'/home/mldp/ML_with_bigdata/output_model/CNN_autoencoder_64_64_SE_normalize.ckpt')
 	train_CNN.set_training_data(X_array)
 	del X_array
-	train_CNN.training_data(restore=True)
+	train_CNN.training_data(restore=False)
