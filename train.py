@@ -47,11 +47,12 @@ if __name__ == '__main__':
 		# '/home/mldp/ML_with_bigdata/output_model/CNN_autoencoder_64_64_AE_self.ckpt',
 		# '/home/mldp/ML_with_bigdata/output_model/CNN_autoencoder_64_64_AE_self.ckpt')
 	model_path = {
-		'pretrain_save': '/home/mldp/ML_with_bigdata/output_model/pretraion_test.ckpt',
-		'prtraion_reload': '/home/mldp/ML_with_bigdata/output_model/pretraion_test.ckpt',
-		'reload': '/home/mldp/ML_with_bigdata/output_model/test.ckpt',
-		'save': '/home/mldp/ML_with_bigdata/output_model/test.ckpt'
+		'pretrain_save': '/home/mldp/ML_with_bigdata/output_model/pre_test.ckpt',
+		'pretrain_reload': '/home/mldp/ML_with_bigdata/output_model/pre_test.ckpt',
+		'reload': '/home/mldp/ML_with_bigdata/output_model/train_test.ckpt',
+		'save': '/home/mldp/ML_with_bigdata/output_model/train_test.ckpt'
 	}
 	train_CNN.set_training_data(X_array)
 	del X_array
 	train_CNN.start_pre_training(model_path, restore=False)
+	# train_CNN.start_train(model_path, restore=False)

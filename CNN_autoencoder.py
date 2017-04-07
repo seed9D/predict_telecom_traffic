@@ -9,7 +9,7 @@ from math import sqrt
 
 class CNN_autoencoder:
 	def __init__(self, *data_shape, **network_para):
-
+		self.network_para = network_para
 		self.learning_rate = 0.0005
 		self.training_iters = 20000
 		self.batch_size = 50
@@ -24,18 +24,18 @@ class CNN_autoencoder:
 		self.input_vertical = data_shape[1]
 		self.input_horizontal = data_shape[2]
 		self.input_channel = data_shape[3]
-		# placeholder
-		self.Xs = tf.placeholder(tf.float32, shape=[
-			None, self.input_temporal, self.input_vertical, self.input_horizontal, self.input_channel])
-		self.Ys = tf.placeholder(tf.float32, shape=[
-			None, self.input_temporal, self.input_vertical, self.input_horizontal, self.input_channel])
-		self.keep_prob = tf.placeholder(tf.float32)
-		self.norm = tf.placeholder(tf.bool, name='norm')
-		self._set_pre_train_para(**network_para)
-		# self._set_train_para(**network_para)
-		self.saver = tf.train.Saver()
 
 	def _set_train_para(self, **network_para):
+		tf.reset_default_graph()
+		pre_train_saver = tf.train.import_meta_graph('/home/mldp/ML_with_bigdata/output_model/pre_test.ckpt.meta')
+		pre_train_graph = tf.get_default_graph()
+		self.pre_traion_output = pre_train_graph.get_tensor_by_name('pre_train/pre_train_output:0')
+		self.pre_train_abs = pre_train_graph.get_tensor_by_name('pre_train/pre_traion_abs:0')
+		# placeholder
+		self.Xs = pre_train_graph.get_tensor_by_name('pre_train/pre_input_x:0')
+		self.Ys = pre_train_graph.get_tensor_by_name('pre_train/pre_input_y:0')
+		self.keep_prob = pre_train_graph.get_tensor_by_name('pre_train/pre_keep_prob:0')
+		self.norm = pre_train_graph.get_tensor_by_name('pre_train/pre_norm:0')
 		self.fc1 = network_para.get('fc1')
 		fc1_input = self.input_temporal * self.input_vertical * self.input_horizontal * self.input_channel
 		with tf.device('/cpu:0'):
@@ -47,37 +47,50 @@ class CNN_autoencoder:
 				'fc1': self.bias_variable([self.fc1], 'fc1_b'),
 				'fc2': self.bias_variable([fc1_input], 'fc2_b')
 			}
-		self.pre_encoder_OP, self.pre_endecoder_OP = self._pre_train_net(
-			self.Xs,
-			self.pre_weights,
-			self.pre_bias,
-			self.keep_prob,
-			self.norm)
-		self.train_predict = self._train_net(self.pre_endecoder_OP, self.train_weights, self.train_bias, self.keep_prob, self.norm)
-		self.train_cost = self.MSE_loss(self.Ys, self.train_predict, self.train_weights)
+		'''
+		with tf.variable_scope("pre_train") as scope:
+			self._set_pre_train_para(**self.network_para)
+			scope.reuse_variables()
+			self.pre_encoder_OP, self.pre_endecoder_OP = self._pre_train_net(
+				self.Xs,
+				self.pre_weights,
+				self.pre_bias,
+				self.keep_prob,
+				self.norm)
+		'''
+		self.train_predict = self._train_net(self.pre_traion_output, self.train_weights, self.train_bias, self.keep_prob, self.norm)
+		self.train_cost, _ = self.MSE_loss(self.Ys, self.train_predict, self.train_weights)
 		self.train_optimization = tf.train.AdamOptimizer(
 			learning_rate=self.learning_rate).minimize(self.train_cost)
+		self.saver = tf.train.Saver()
 
 	def _train_net(self, x, weights, bias, dropout, norm=0):
 		input_shape = x.get_shape()
 		print('x:', input_shape)
 		train_net_input = tf.reshape(x, [-1, weights['fc1'].get_shape().as_list()[0]])
 		print('train_net_input:', train_net_input.get_shape())
-		fc1 = tf.add(tf.matmul(train_net_input, weights['fc1'], bias['fc1']))
+		fc1 = tf.add(tf.matmul(train_net_input, weights['fc1']), bias['fc1'])
 		# fc1 = self.batch_normalize(fc1, 'fc1', norm)
 		fc1 = tf.nn.relu(fc1)
 		fc1 = tf.nn.dropout(fc1, dropout)
 		print('fc1:', fc1.get_shape())
 
 		fc2 = self.batch_normalize(fc1, 'fc2', norm)
-		fc2 = tf.add(tf.matmul(fc2, weights['fc2'], bias['fc2']))
+		fc2 = tf.add(tf.matmul(fc2, weights['fc2']), bias['fc2'])
 		# fc2 = tf.nn.relu(fc2)
 		print('fc2: {}'.format(fc2.get_shape()))
-		train_output = tf.reshape(fc2, input_shape.as_list())
+		train_output = tf.reshape(fc2, [-1, self.input_temporal, self.input_vertical, self.input_horizontal, self.input_channel])
 		print('train_output {}'.format(train_output.get_shape()))
 		return train_output
 
 	def _set_pre_train_para(self, **network_para):
+		# placeholder
+		self.Xs = tf.placeholder(tf.float32, shape=[
+			None, self.input_temporal, self.input_vertical, self.input_horizontal, self.input_channel], name='pre_input_x')
+		self.Ys = tf.placeholder(tf.float32, shape=[
+			None, self.input_temporal, self.input_vertical, self.input_horizontal, self.input_channel], name='pre_input_y')
+		self.keep_prob = tf.placeholder(tf.float32, name='pre_keep_prob')
+		self.norm = tf.placeholder(tf.bool, name='pre_norm')
 		# network parameter
 		self.pooling_times = 0
 		self.conv1 = network_para.get('conv1')
@@ -111,8 +124,11 @@ class CNN_autoencoder:
 			self.pre_bias,
 			self.keep_prob,
 			self.norm)
+		self.pre_encoder_OP = tf.identity(self.pre_encoder_OP, name='pre_train_encoder')
+		self.pre_endecoder_OP = tf.identity(self.pre_endecoder_OP, name='pre_train_output')
 		self.cost_OP, self.L2 = self.MSE_loss(self.pre_endecoder_OP, self.Ys, self.pre_weights)
 		self.absolute_distance = self._absolute_error(self.Ys, self.pre_endecoder_OP)
+		self.absolute_distance = tf.identity(self.absolute_distance, name='pre_traion_abs')
 		self.RMSE = self._RMSE_loss(self.Ys, self.pre_endecoder_OP)
 		self.optimizer_OP = tf.train.AdamOptimizer(
 			learning_rate=self.learning_rate).minimize(self.absolute_distance)
@@ -129,6 +145,7 @@ class CNN_autoencoder:
 			'deconv2_b': self.pre_bias['deconv2'],
 			'deconv3_b': self.pre_bias['deconv3']})
 		# self.init_OP = tf.global_variables_initializer()
+		self.saver = tf.train.Saver()
 
 	def _pre_train_net(self, x, weights, bias, dropout, norm=0):
 			k_size = {'temporal': 1, 'vertical': 2, 'horizontal': 2}
@@ -381,15 +398,17 @@ class CNN_autoencoder:
 			self.training_file = tfrecored_file
 			self.testing_file = tftesting_file
 
-	def predict_data(self, input_x):
+	def predict_data(self, input_x, model_path):
+		with tf.variable_scope("pre_train"):
+			self._set_pre_train_para(**self.network_para)
 		input_x = (input_x - self.mean) / self.std
 		print('input_x shape:', input_x.shape)
 		testing_x = input_x[0:-1]
 		testing_y = input_x[1:]
 		with tf.Session() as sess:
-			self._reload_model(sess)
+			self._reload_model(sess, model_path['pretrain_reload'])
 			# input_x_length = input_x.shape[0]
-			loss, predict_y = self._testing_data(sess, testing_x, testing_y)
+			loss, predict_y = self._testing_data(sess, testing_x, testing_x)  # testing x itself
 
 			print('predict finished!')
 			print('loss:{} predict_y shape{}'.format(loss, predict_y.shape))
@@ -410,13 +429,10 @@ class CNN_autoencoder:
 			os.makedirs(output_dir)
 		self.save_model = save_model_path
 	'''
-	def _reload_model(self, sess):
-		print('reloading model {}.....'.format(self.model_path))
+	def _reload_model(self, sess, model_path):
+		print('reloading model {}.....'.format(model_path))
 
-		try:
-			self.saver.restore(sess, self.model_path)
-		except Exception:
-			print('model {} may not exists'.format(self.model_path))
+		self.saver.restore(sess, model_path)
 
 	def _save_model(self, sess, model_path):
 		print('saving model.....')
@@ -546,6 +562,8 @@ class CNN_autoencoder:
 					input_data['RMSE'][i]))
 
 	def start_pre_training(self, model_path, restore=False):
+		with tf.variable_scope("pre_train"):
+			self._set_pre_train_para(**self.network_para)
 		fig = plt.figure()
 		ax = fig.add_subplot(3, 1, 1)
 		ax2 = fig.add_subplot(3, 1, 2)
@@ -633,7 +651,7 @@ class CNN_autoencoder:
 						self.L2, self.RMSE],
 						feed_dict={
 						self.Xs: batch_x,
-						self.Ys: batch_y,
+						self.Ys: batch_x,  # batch_x it_self
 						self.keep_prob: self.dropout,
 						self.norm: 1})
 				print('Epoch:%d  cost:%g absolute_distance:%g L2:%g RMSE:%g' % (epoch, loss, absolute_distance, L2, RMSE))
@@ -647,7 +665,7 @@ class CNN_autoencoder:
 					index, testing_X, testing_Y = self._read_all_data_from_Tfreoced(
 						self.testing_file)
 					testing_loss, _ = self._testing_data(
-						sess, testing_X, testing_Y)
+						sess, testing_X, testing_X)   # batch_x it_self
 					print('testing_loss:{} average_training_loss:{} average absolute distance {} average RMSE {}'.format(
 						testing_loss, average_training_loss, average_cumulate_abd, average_RMSE))
 
@@ -672,25 +690,29 @@ class CNN_autoencoder:
 			self._save_model(sess)
 
 	def start_train(self, model_path, restore=False):
+		self._set_train_para(**self.network_para)
 		data = self._read_data_from_Tfrecord(self.training_file)
 		batch_tuple_OP = tf.train.shuffle_batch(
 			data,
 			batch_size=self.batch_size,
 			capacity=self.shuffle_capacity,
 			min_after_dequeue=self.shuffle_min_after_dequeue)
-		with tf.session() as sess:
+		with tf.Session() as sess:
 			epoch = 1
 			# restore pre-train model
-			print('reloading pre_train model....')
-			self._reload_model(sess, model_path['reload_pretrain'])
 			if restore:
 				print('reloading model....')
 				self._reload_model(sess, model_path['reload'])
 			else:
 				sess.run(tf.global_variables_initializer())
+				print('reloading pre_train model....')
+				self._reload_model(sess, model_path['pretrain_reload'])
+			coord = tf.train.Coordinator()
+			treads = tf.train.start_queue_runners(sess=sess, coord=coord)
 			with tf.device('/gpu:0'):
 				while epoch < self.training_iters:
 					index, batch_x, batch_y = sess.run(batch_tuple_OP)
+					'''
 					_, loss = sess.run([
 						self.train_optimization,
 						self.train_cost],
@@ -699,6 +721,15 @@ class CNN_autoencoder:
 							self.Ys: batch_y,
 							self.keep_prob: self.dropout,
 							self.norm: 1})
-					print('epoch: {} loss: {}'.format(epoch, loss))
+					'''
+					testing_loss = sess.run([self.pre_train_abs], feed_dict={
+						self.Xs: batch_x,
+						self.Ys: batch_x,
+						self.keep_prob: self.dropout,
+						self.norm: 1})
+					print('epoch: {} loss: {}'.format(epoch, testing_loss))
+					epoch += 1
+			coord.request_stop()
+			coord.join(treads)
 			print('training finished!')
 

@@ -20,13 +20,69 @@ def date_time_covert_to_str(date_time):
 	return date_time.strftime('%Y-%m-%d %H:%M')
 
 
+def random_generate_data():
+	fake = np.random.randint(0, 100, size=(200, 6, 40, 40, 1))
+	fake_point = np.random.randn(200, 6, 40, 40, 1)
+	return fake + fake_point
+
+
+def plot_predict_vs_real2(real, predict):
+	print('real shape:{} predict shape:{}'.format(real.shape, predict.shape))
+	plot_1_row = 9
+	plot_1_col = 10
+	plot_2_row = 20
+	plot_2_col = 3
+	plot_1 = {
+		'grid_id': int(real[0, 0, plot_1_row, plot_1_col, 0]),
+		'predict': [],
+		'real': []
+	}
+	plot_2 = {
+		'grid_id': int(real[0, 0, plot_2_row, plot_2_col, 0]),
+		'predict': [],
+		'real': []
+	}
+	x_length = 0
+	for i in range(24):
+		for j in range(real.shape[1]):
+			plot_1['real'].append(real[i, j, plot_1_row, plot_1_col, 0])
+			plot_1['predict'].append(predict[i, j, plot_1_row, plot_1_col])
+			# print('id:{},real:{},predict:{}'.format(plot_1['grid_id'],real[i,j,10,10,2],predict[i,j,10,10]))
+			plot_2['real'].append(real[i, j, plot_2_row, plot_2_col, 0])
+			plot_2['predict'].append(predict[i, j, plot_2_row, plot_2_col])
+			# print('id: {},real: {},predict: {}'.format(plot_2['grid_id'], real[i, j, plot_2_row, plot_2_col, 2], predict[i, j, plot_2_row, plot_2_col]))
+			x_length += 1
+	x = range(x_length)
+	fig = plt.figure()
+	ax1 = fig.add_subplot(211)
+	ax2 = fig.add_subplot(212)
+
+	plt.xlabel('time sequence')
+	plt.ylabel('activity strength')
+
+	ax1.plot(x, plot_1['real'], label='real', marker='.')
+	ax1.plot(x, plot_1['predict'], label='predict', marker='.')
+	ax1.grid()
+	# ax1.set_ylabel('time sequence')
+	# ax1.set_xlabel('activity strength')
+	ax1.legend()
+
+	ax2.plot(x, plot_2['real'], label='real', marker='.')
+	ax2.plot(x, plot_2['predict'], label='predict', marker='.')
+	ax2.grid()
+	# ax2.set_ylabel('time sequence')
+	# ax2.set_xlabel('activity strength')
+	ax2.legend()
+
+	plt.show()
+
 def plot_predict_vs_real(real, predict):
 
 	# grid_id_1 = real[0,0,10,10,0]
 	# grid_id_2 = real[0,0,30,20,0]
-	plot_1_row = 10
+	plot_1_row = 25
 	plot_1_col = 10
-	plot_2_row = 20
+	plot_2_row = 24
 	plot_2_col = 3
 	plot_1 = {
 		'grid_id': int(real[0, 0, plot_1_row, plot_1_col, 0]),
@@ -151,6 +207,7 @@ X_array = np.concatenate(X_array_list, axis=0)
 # X_array = X_array[:, :, 0:21,0:21, :]
 del X_array_list
 '''
+fake_data = random_generate_data()
 
 testing_data_list = du.list_all_input_file('./npy/final/testing_raw_data/')
 testing_data_list.sort()
@@ -164,17 +221,23 @@ del testing_data_list
 predict_array = predict_array[predict_array.shape[0] - 200:]
 # predict_array = predict_array[0:400]
 
-network_parameter = {'conv1': 64, 'conv2': 64, 'conv3': 0}
+network_parameter = {'conv1': 64, 'conv2': 64, 'conv3': 0, 'fc1': 512, 'fc2': 256}
 data_shape = [predict_array.shape[1], predict_array.shape[2], predict_array.shape[3], 1]
 predict_CNN = cn.CNN_autoencoder(*data_shape, **network_parameter)
 # predict_CNN.set_model_name('/home/mldp/ML_with_bigdata/output_model/CNN_autoencoder_onlyinternet_16_32_48.ckpt', '/home/mldp/ML_with_bigdata/output_model/CNN_autoencoder_onlyinternet_16_32_48.ckpt')
-predict_CNN.set_model_name(
-	'/home/mldp/ML_with_bigdata/output_model/CNN_autoencoder_64_64_AE_self.ckpt',
-	'/home/mldp/ML_with_bigdata/output_model/CNN_autoencoder_64_64_AE_self.ckpt')
-predict_CNN.set_training_data(predict_array)
+model_path = {
+	'pretrain_save': '/home/mldp/ML_with_bigdata/output_model/pre_test.ckpt',
+	'pretrain_reload': '/home/mldp/ML_with_bigdata/output_model/pre_test.ckpt',
+	'reload': '/home/mldp/ML_with_bigdata/output_model/train_test.ckpt',
+	'save': '/home/mldp/ML_with_bigdata/output_model/train_test.ckpt'
+}
+predict_CNN.set_training_data(fake_data)
 
-_, predict_y = predict_CNN.predict_data(predict_array[:, :, :, :, 2, np.newaxis])
+_, predict_y = predict_CNN.predict_data(predict_array[:, :, :, :, 2, np.newaxis], model_path)
 compute_loss_rate(predict_array[0:-1, :, :, :, 2, np.newaxis], predict_y)
 plot_predict_vs_real(predict_array[0:-1], predict_y)
 
+# _, fake_predict_y = predict_CNN.predict_data(fake_data, model_path)
+# plot_predict_vs_real2(fake_data[0:-1], fake_predict_y)
+# compute_loss_rate(fake_data[0:-1], fake_predict_y)
 # check_data(predict_array)
