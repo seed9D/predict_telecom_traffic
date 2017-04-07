@@ -399,6 +399,10 @@ class CNN_autoencoder:
 			self.testing_file = tftesting_file
 
 	def predict_data(self, input_x, model_path):
+		try:
+			tf.reset_default_graph()
+		except Exception:
+			pass
 		with tf.variable_scope("pre_train"):
 			self._set_pre_train_para(**self.network_para)
 		input_x = (input_x - self.mean) / self.std

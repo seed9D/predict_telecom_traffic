@@ -21,16 +21,20 @@ def date_time_covert_to_str(date_time):
 
 
 def random_generate_data():
-	fake = np.random.randint(0, 100, size=(200, 6, 40, 40, 1))
-	fake_point = np.random.randn(200, 6, 40, 40, 1)
-	return fake + fake_point
+	shape = [200, 6, 40, 40, 1]
+	fake = np.random.randint(0, 100, size=shape)
+	fake_point = np.random.randn(*shape)
+	fake_zero = np.zeros_like(fake)
 
+	return fake + fake_point
+	# return np.random.rand(*shape)
+	# return np.random.uniform(0, 100, size=shape)
 
 def plot_predict_vs_real2(real, predict):
 	print('real shape:{} predict shape:{}'.format(real.shape, predict.shape))
 	plot_1_row = 9
 	plot_1_col = 10
-	plot_2_row = 20
+	plot_2_row = 3
 	plot_2_col = 3
 	plot_1 = {
 		'grid_id': int(real[0, 0, plot_1_row, plot_1_col, 0]),
@@ -73,16 +77,16 @@ def plot_predict_vs_real2(real, predict):
 	# ax2.set_ylabel('time sequence')
 	# ax2.set_xlabel('activity strength')
 	ax2.legend()
-
 	plt.show()
+
 
 def plot_predict_vs_real(real, predict):
 
 	# grid_id_1 = real[0,0,10,10,0]
 	# grid_id_2 = real[0,0,30,20,0]
-	plot_1_row = 25
-	plot_1_col = 10
-	plot_2_row = 24
+	plot_1_row = 9
+	plot_1_col = 5
+	plot_2_row = 30
 	plot_2_col = 3
 	plot_1 = {
 		'grid_id': int(real[0, 0, plot_1_row, plot_1_col, 0]),
@@ -221,13 +225,13 @@ del testing_data_list
 predict_array = predict_array[predict_array.shape[0] - 200:]
 # predict_array = predict_array[0:400]
 
-network_parameter = {'conv1': 64, 'conv2': 64, 'conv3': 0, 'fc1': 512, 'fc2': 256}
+network_parameter = {'conv1': 32, 'conv2': 32, 'conv3': 0, 'fc1': 512, 'fc2': 256}
 data_shape = [predict_array.shape[1], predict_array.shape[2], predict_array.shape[3], 1]
 predict_CNN = cn.CNN_autoencoder(*data_shape, **network_parameter)
 # predict_CNN.set_model_name('/home/mldp/ML_with_bigdata/output_model/CNN_autoencoder_onlyinternet_16_32_48.ckpt', '/home/mldp/ML_with_bigdata/output_model/CNN_autoencoder_onlyinternet_16_32_48.ckpt')
 model_path = {
-	'pretrain_save': '/home/mldp/ML_with_bigdata/output_model/pre_test.ckpt',
-	'pretrain_reload': '/home/mldp/ML_with_bigdata/output_model/pre_test.ckpt',
+	'pretrain_save': '/home/mldp/ML_with_bigdata/output_model/AE_pre_32_32.ckpt',
+	'pretrain_reload': '/home/mldp/ML_with_bigdata/output_model/AE_pre_32_32.ckpt',
 	'reload': '/home/mldp/ML_with_bigdata/output_model/train_test.ckpt',
 	'save': '/home/mldp/ML_with_bigdata/output_model/train_test.ckpt'
 }
