@@ -39,7 +39,7 @@ if __name__ == '__main__':
 	del X_array_list
 
 	# parameter
-	network_parameter = {'conv1': 32, 'conv2': 32, 'conv3': 0, 'fc1': 512, 'fc2': 256}
+	network_parameter = {'conv1': 32, 'conv2': 32, 'conv3': 0, 'fc1': 1024, 'fc2': 512}
 	data_shape = [X_array.shape[1], X_array.shape[2], X_array.shape[3], X_array.shape[4]]
 	train_CNN = cn.CNN_autoencoder(*data_shape, **network_parameter)
 	# train_CNN.reload_tfrecord('./training.tfrecoeds','./testing.tfrecoeds')

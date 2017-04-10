@@ -200,7 +200,20 @@ def prepare_predict_data():
 			du.save_array(data_array, './npy/final/testing_raw_data/' + 'testing_' + str(i))
 
 
+def predict_pre_train(CNN, predict_array, model_path):
+	_, predict_y = CNN.predict_data(predict_array[:, :, :, :, 2, np.newaxis], model_path, 'pre_train')
+	compute_loss_rate(predict_array[0:-1, :, :, :, 2, np.newaxis], predict_y)
+	plot_predict_vs_real(predict_array[0:-1], predict_y)
+
+
+def predict_train(CNN, predict_array, model_path):
+	_, predict_y = CNN.predict_data(predict_array[:, :, :, :, 2, np.newaxis], model_path, 'train')
+	compute_loss_rate(predict_array[1:, :, :, :, 2, np.newaxis], predict_y)
+	plot_predict_vs_real(predict_array[1:], predict_y)
+
 # prepare_predict_data()
+
+
 '''
 training_data_list = cn.list_all_input_file('./npy/final/')
 training_data_list.sort()
@@ -222,24 +235,23 @@ predict_array = np.concatenate(predict_array_list, axis=0)
 del testing_data_list
 
 
-predict_array = predict_array[predict_array.shape[0] - 200:]
+predict_array = predict_array[predict_array.shape[0] - 400:]
 # predict_array = predict_array[0:400]
 
-network_parameter = {'conv1': 32, 'conv2': 64, 'conv3': 0, 'fc1': 512, 'fc2': 256}
+network_parameter = {'conv1': 32, 'conv2': 32, 'conv3': 0, 'fc1': 1024, 'fc2': 512}
 data_shape = [predict_array.shape[1], predict_array.shape[2], predict_array.shape[3], 1]
 predict_CNN = cn.CNN_autoencoder(*data_shape, **network_parameter)
-# predict_CNN.set_model_name('/home/mldp/ML_with_bigdata/output_model/CNN_autoencoder_onlyinternet_16_32_48.ckpt', '/home/mldp/ML_with_bigdata/output_model/CNN_autoencoder_onlyinternet_16_32_48.ckpt')
 model_path = {
 	'pretrain_save': '/home/mldp/ML_with_bigdata/output_model/AE_pre_32_32_test.ckpt',
 	'pretrain_reload': '/home/mldp/ML_with_bigdata/output_model/AE_pre_32_32_test.ckpt',
 	'reload': '/home/mldp/ML_with_bigdata/output_model/train_test.ckpt',
 	'save': '/home/mldp/ML_with_bigdata/output_model/train_test.ckpt'
 }
-predict_CNN.set_training_data(fake_data)
+predict_CNN.set_training_data(predict_array[:, :, :, :, 2, np.newaxis])
 
-_, predict_y = predict_CNN.predict_data(predict_array[:, :, :, :, 2, np.newaxis], model_path)
-compute_loss_rate(predict_array[0:-1, :, :, :, 2, np.newaxis], predict_y)
-plot_predict_vs_real(predict_array[0:-1], predict_y)
+# predict_pre_train(predict_CNN, predict_array, model_path)
+predict_train(predict_CNN, predict_array, model_path)
+
 
 # _, fake_predict_y = predict_CNN.predict_data(fake_data, model_path)
 # plot_predict_vs_real2(fake_data[0:-1], fake_predict_y)
