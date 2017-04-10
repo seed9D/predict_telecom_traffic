@@ -225,13 +225,13 @@ del testing_data_list
 predict_array = predict_array[predict_array.shape[0] - 200:]
 # predict_array = predict_array[0:400]
 
-network_parameter = {'conv1': 32, 'conv2': 32, 'conv3': 0, 'fc1': 512, 'fc2': 256}
+network_parameter = {'conv1': 32, 'conv2': 64, 'conv3': 0, 'fc1': 512, 'fc2': 256}
 data_shape = [predict_array.shape[1], predict_array.shape[2], predict_array.shape[3], 1]
 predict_CNN = cn.CNN_autoencoder(*data_shape, **network_parameter)
 # predict_CNN.set_model_name('/home/mldp/ML_with_bigdata/output_model/CNN_autoencoder_onlyinternet_16_32_48.ckpt', '/home/mldp/ML_with_bigdata/output_model/CNN_autoencoder_onlyinternet_16_32_48.ckpt')
 model_path = {
-	'pretrain_save': '/home/mldp/ML_with_bigdata/output_model/AE_pre_32_32.ckpt',
-	'pretrain_reload': '/home/mldp/ML_with_bigdata/output_model/AE_pre_32_32.ckpt',
+	'pretrain_save': '/home/mldp/ML_with_bigdata/output_model/AE_pre_32_32_test.ckpt',
+	'pretrain_reload': '/home/mldp/ML_with_bigdata/output_model/AE_pre_32_32_test.ckpt',
 	'reload': '/home/mldp/ML_with_bigdata/output_model/train_test.ckpt',
 	'save': '/home/mldp/ML_with_bigdata/output_model/train_test.ckpt'
 }
