@@ -37,9 +37,8 @@ def prepare_data():
 
 	i_len = data_array.shape[0]
 	j_len = data_array.shape[1]
-	row = 50
-	col = 50
-
+	row = 39
+	col = 39
 	data_frame = {
 		'date': [],
 		'internet': []
@@ -163,7 +162,7 @@ def ARIMA_model(train, test):
 		diff = differenc(history)
 		yhat = history[-1] + predict(ac_coef, diff) + predict(ma_coef, resid)
 		predictions.append(yhat)
-		obs = test[t * predict_step: (t + 1) * predict_step]
+		obs = test[t]
 		history.append(obs)
 		print('{} predcition:{} expected:{}'.format(t, yhat, obs))
 	rmse = sqrt(mean_squared_error(test, predictions))
@@ -207,5 +206,5 @@ train, test = data_internet[:int(data_internet_len - 144)], data_internet[int(da
 
 # AR_model(train, test)
 # MA_model(train, test)
-# AR_MA_model(train, test)
-ARIMA_model(train, test)
+AR_MA_model(train, test)
+# ARIMA_model(train, test)

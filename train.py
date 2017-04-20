@@ -39,7 +39,7 @@ if __name__ == '__main__':
 	del X_array_list
 
 	# parameter
-	network_parameter = {'conv1': 32, 'conv2': 32, 'conv3': 0, 'fc1': 1024, 'fc2': 512}
+	network_parameter = {'conv1': 64, 'conv2': 32, 'conv3': 32, 'fc1': 1024, 'fc2': 512}
 	data_shape = [X_array.shape[1], X_array.shape[2], X_array.shape[3], X_array.shape[4]]
 	train_CNN = cn.CNN_autoencoder(*data_shape, **network_parameter)
 	# train_CNN.reload_tfrecord('./training.tfrecoeds','./testing.tfrecoeds')
@@ -47,12 +47,12 @@ if __name__ == '__main__':
 		# '/home/mldp/ML_with_bigdata/output_model/CNN_autoencoder_64_64_AE_self.ckpt',
 		# '/home/mldp/ML_with_bigdata/output_model/CNN_autoencoder_64_64_AE_self.ckpt')
 	model_path = {
-		'pretrain_save': '/home/mldp/ML_with_bigdata/output_model/AE_pre_32_32_test.ckpt',
-		'pretrain_reload': '/home/mldp/ML_with_bigdata/output_model/AE_pre_32_32_test.ckpt',
+		'pretrain_save': '/home/mldp/ML_with_bigdata/output_model/AE_pre_64_32_32_test.ckpt',
+		'pretrain_reload': '/home/mldp/ML_with_bigdata/output_model/AE_pre_64_32_32_test.ckpt',
 		'reload': '/home/mldp/ML_with_bigdata/output_model/train_test.ckpt',
 		'save': '/home/mldp/ML_with_bigdata/output_model/train_test.ckpt'
 	}
 	train_CNN.set_training_data(X_array)
 	del X_array
-	# train_CNN.start_pre_training(model_path, restore=False)
-	train_CNN.start_train(model_path, restore=False)
+	train_CNN.start_pre_training(model_path, restore=False)
+	# train_CNN.start_train(model_path, restore=False)

@@ -86,8 +86,8 @@ def plot_predict_vs_real(real, predict):
 	# grid_id_2 = real[0,0,30,20,0]
 	plot_1_row = 9
 	plot_1_col = 5
-	plot_2_row = 30
-	plot_2_col = 3
+	plot_2_row = 39
+	plot_2_col = 39
 	plot_1 = {
 		'grid_id': int(real[0, 0, plot_1_row, plot_1_col, 0]),
 		'predict': [],
@@ -139,7 +139,9 @@ def plot_predict_vs_real(real, predict):
 	# ax2.set_ylabel('time sequence')
 	# ax2.set_xlabel('activity strength')
 	ax2.legend()
-
+	print('grid error:')
+	compute_loss_rate(np.array(plot_1['real']), np.array(plot_1['predict']))
+	compute_loss_rate(np.array(plot_2['real']), np.array(plot_2['predict']))
 	plt.show()
 
 
@@ -148,6 +150,9 @@ def compute_loss_rate(real, predict):
 	# ab_sum = (np.absolute(real - predict).sum()) / real.size
 	ab_sum = (np.absolute(real - predict).mean())
 	print('absolute average:', ab_sum)
+
+	rmse_sum = np.sqrt(((real - predict) ** 2).mean())
+	print('rmse:', rmse_sum)
 
 
 def check_data(predict_array):
@@ -195,15 +200,15 @@ def prepare_predict_data():
 			data_array = du.load_array('./npy/' + filename)
 			# print(' 0 grid id {}'.format(data_array[0, 0, 10, 10, 0]))
 			# print(' 60 grid id {}'.format(data_array[0, 0, 70, 70, 0]))
-			data_array = data_array[:, :, 0:40, 0:40, (0, 1, -1)]
+			data_array = data_array[:, :, :40, :40, (0, 1, -1)]
 			print('saving array shape:', data_array.shape)
 			du.save_array(data_array, './npy/final/testing_raw_data/' + 'testing_' + str(i))
 
 
 def predict_pre_train(CNN, predict_array, model_path):
 	_, predict_y = CNN.predict_data(predict_array[:, :, :, :, 2, np.newaxis], model_path, 'pre_train')
-	compute_loss_rate(predict_array[0:-1, :, :, :, 2, np.newaxis], predict_y)
-	plot_predict_vs_real(predict_array[0:-1], predict_y)
+	compute_loss_rate(predict_array[1:, :, :, :, 2, np.newaxis], predict_y)
+	plot_predict_vs_real(predict_array[1:], predict_y)
 
 
 def predict_train(CNN, predict_array, model_path):
@@ -234,23 +239,22 @@ for filename in testing_data_list:
 predict_array = np.concatenate(predict_array_list, axis=0)
 del testing_data_list
 
-
-predict_array = predict_array[predict_array.shape[0] - 400:]
+predict_array = predict_array[719 - 24:720]
 # predict_array = predict_array[0:400]
 
-network_parameter = {'conv1': 32, 'conv2': 32, 'conv3': 0, 'fc1': 1024, 'fc2': 512}
+network_parameter = {'conv1': 64, 'conv2': 32, 'conv3': 32, 'fc1': 1024, 'fc2': 512}
 data_shape = [predict_array.shape[1], predict_array.shape[2], predict_array.shape[3], 1]
 predict_CNN = cn.CNN_autoencoder(*data_shape, **network_parameter)
 model_path = {
-	'pretrain_save': '/home/mldp/ML_with_bigdata/output_model/AE_pre_32_32_test.ckpt',
-	'pretrain_reload': '/home/mldp/ML_with_bigdata/output_model/AE_pre_32_32_test.ckpt',
+	'pretrain_save': '/home/mldp/ML_with_bigdata/output_model/AE_pre_64_32_32_test.ckpt',
+	'pretrain_reload': '/home/mldp/ML_with_bigdata/output_model/AE_pre_64_32_32_test.ckpt',
 	'reload': '/home/mldp/ML_with_bigdata/output_model/train_test.ckpt',
 	'save': '/home/mldp/ML_with_bigdata/output_model/train_test.ckpt'
 }
 predict_CNN.set_training_data(predict_array[:, :, :, :, 2, np.newaxis])
 
-# predict_pre_train(predict_CNN, predict_array, model_path)
-predict_train(predict_CNN, predict_array, model_path)
+predict_pre_train(predict_CNN, predict_array, model_path)
+# predict_train(predict_CNN, predict_array, model_path)
 
 
 # _, fake_predict_y = predict_CNN.predict_data(fake_data, model_path)
