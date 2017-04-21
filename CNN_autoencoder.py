@@ -18,6 +18,9 @@ class CNN_autoencoder:
 		self.shuffle_capacity = 800
 		self.shuffle_min_after_dequeue = 300
 		self.weight_decay = 10
+		self.Kl_beta = 7.5e-6
+		self.kl_sparsity_parameter = 0.2
+
 		# self.n_input = 100*100
 
 		self.input_temporal = data_shape[0]
@@ -130,7 +133,7 @@ class CNN_autoencoder:
 				# self.mean = tf.Variable(tf.zeros([self.input_channel]),name='mean',trainable=False,)
 				# self.std = tf.Variable(tf.zeros([self.input_channel]),name='std',trainable=False,)
 			# operation
-			self.pre_encoder_OP, self.pre_endecoder_OP = self._pre_train_net(
+			self.pre_encoder_OP, self.pre_endecoder_OP, kl_divergence_OP = self._pre_train_net(
 				self.Xs,
 				self.pre_weights,
 				self.pre_bias,
@@ -138,12 +141,18 @@ class CNN_autoencoder:
 				self.norm)
 			self.pre_encoder_OP = tf.identity(self.pre_encoder_OP, name='pre_train_encoder')
 			self.pre_endecoder_OP = tf.identity(self.pre_endecoder_OP, name='pre_train_output')
-			self.pre_cost_OP, self.pre_L2 = self.MSE_loss(self.pre_endecoder_OP, self.Ys, self.pre_weights)
+
+			self.pre_MSE = self.MSE_loss(self.pre_endecoder_OP, self.Ys)
+
 			absolute_distance = self._absolute_error(self.Ys, self.pre_endecoder_OP)
 			self.pre_absolute_distance = tf.identity(absolute_distance, name='pre_traion_abs')
+
 			self.pre_RMSE = self._RMSE_loss(self.Ys, self.pre_endecoder_OP)
+			self.pre_L2 = self._L2_norm(self.pre_weights)
+
+			self.pre_cost_OP = self.pre_MSE + self.weight_decay * self.pre_L2 + self.Kl_beta * kl_divergence_OP
 			self.pre_optimizer_OP = tf.train.AdamOptimizer(
-				learning_rate=self.learning_rate).minimize(self.pre_RMSE)
+				learning_rate=self.learning_rate).minimize(self.pre_cost_OP)
 			'''
 			self.pre_weight_bias = tf.train.Saver({
 				'conv1_w': self.pre_weights['conv2'],
@@ -164,6 +173,7 @@ class CNN_autoencoder:
 			self.saver = tf.train.Saver()
 
 	def _pre_train_net(self, x, weights, bias, dropout, norm=0):
+			kl_list = []
 			k_size = {'temporal': 1, 'vertical': 2, 'horizontal': 2}
 			strides_size = {'temporal': 1, 'vertical': 1, 'horizontal': 1}
 			# layer 1
@@ -172,6 +182,7 @@ class CNN_autoencoder:
 			conv1 = tf.nn.relu(conv1)
 			# conv1 = maxpool3d(conv1, k_size, strides_size)
 			conv1 = tf.nn.dropout(conv1, dropout)
+			kl_list.append(conv1)
 
 			# layer 2
 			print('conv1 shape :{}'.format(conv1.get_shape()))
@@ -180,6 +191,7 @@ class CNN_autoencoder:
 			conv2 = tf.nn.relu(conv2)
 			# conv2 = maxpool3d(conv2, k_size, strides_size)
 			conv2 = tf.nn.dropout(conv2, dropout)
+			kl_list.append(conv2)
 			# encode_output = conv2
 			# layer 3
 			print('conv2 shape :{}'.format(conv2.get_shape()))
@@ -188,7 +200,7 @@ class CNN_autoencoder:
 			conv3 = tf.nn.relu(conv3)
 			# conv3 = maxpool3d(conv3, k_size, strides_size)
 			conv3 = tf.nn.dropout(conv3, dropout)
-
+			kl_list.append(conv3)
 			encode_output = conv3
 			print('encode layer shape:%s' % encode_output.get_shape())
 
@@ -251,7 +263,9 @@ class CNN_autoencoder:
 			endecoder_output = deconv3
 			print('endecoder_output output shape :%s' % endecoder_output.get_shape())
 
-			return encode_output, endecoder_output
+			sum_of_kl = self._sum_Kl_div(kl_list)
+			print('sum_of_kl {}'.format(sum_of_kl))
+			return encode_output, endecoder_output, sum_of_kl
 
 	def set_training_data(self, input_x):
 
@@ -276,24 +290,61 @@ class CNN_autoencoder:
 		self._write_to_Tfrecord(self.testing_X, self.testing_Y, self.testing_file)
 		self.training_data_number = training_X.shape[0]
 
-	def MSE_loss(self, real, predict, weights):
+	def MSE_loss(self, real, predict):
 			with tf.variable_scope('MSE_loss'):
 
 				# print('endecoder_OP shape:{}, Ys shape{}'.format(self.endecoder_OP[:,5].get_shape(),self.Ys.get_shape()))
-				loss = tf.reduce_mean(tf.pow(predict - real, 2))
+				# loss = tf.reduce_mean(tf.pow(predict - real, 2))
 				# loss = tf.div(loss, 2)
-				# L2 regularization
+				'''
 				L2 = 0
 				for key, value in weights.items():
 					L2 += tf.nn.l2_loss(value)
 				loss += tf.reduce_mean(L2 * self.weight_decay)
-			return loss, L2
+				'''
+			return tf.reduce_mean(tf.pow(predict - real, 2))
+
+	def _L2_norm(self, weights):
+		L2 = 0
+		for key, value in weights.items():
+			L2 += tf.nn.l2_loss(value)
+		return tf.reduce_mean(L2)
 
 	def _absolute_error(self, real, predict):
 		return tf.reduce_mean(tf.abs(predict - real))
 
 	def _RMSE_loss(self, real, predict):
 		return tf.sqrt(tf.reduce_mean(tf.pow(predict - real, 2)))
+
+	def _sum_Kl_div(self, KL_list):
+		def kl_log(x):
+			x = tf.clip_by_value(x, 1e-40, 100)  # avoid negative value
+			x = tf.log(x + 1e-40)
+			x = tf.clip_by_value(x, 1e-40, 1000)  # avlid inf value
+			return x
+
+		def kl_div(rho_head, rho):
+			invers_rho_head = tf.sub(1., rho_head)
+			invers_rho = tf.sub(1., rho)
+			first_term = tf.mul(rho, kl_log(tf.div(rho, rho_head)))
+			second_term = tf.mul(invers_rho, kl_log(tf.div(invers_rho, invers_rho_head)))
+			kl_diver = tf.add(first_term, second_term)  # each hidden unit j, it's an array
+			kl_div_sum = tf.reduce_sum(kl_diver)  # a value
+			return kl_div_sum
+		# following is for sparse auto encoder operation
+		# each layer's average output
+		# calculate each hidden unit's average output from total training data in each layer
+		average_output_elayer = []
+		for conv_layer in KL_list:
+			average_output_elayer.append(tf.reduce_mean(conv_layer, axis=0))
+
+		# each layer's sum of each hiiden unit KL divergence
+		kl_encode_layer = []
+		for average_output in average_output_elayer:
+			kl_encode_layer.append(self._kl_div(average_output, self.kl_sparsity_parameter))
+		sum_of_kl = kl_encode_layer.sum()
+
+		return sum_of_kl
 
 	def weight_variable(self, shape, name):
 		# initial = tf.truncated_normal(shape, stddev=0.1)

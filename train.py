@@ -67,6 +67,6 @@ if __name__ == '__main__':
 		'save': '/home/mldp/ML_with_bigdata/output_model/train_test.ckpt'
 	}
 	train_CNN.set_training_data(X_array)
-	del X_array
+	del X_array, Y_array
 	train_CNN.start_pre_training(model_path, restore=False)
 	# train_CNN.start_train(model_path, restore=False)
