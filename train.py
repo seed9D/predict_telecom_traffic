@@ -39,11 +39,11 @@ def get_X_and_Y_array():
 	# X_array = X_array[:, :, 0:21, 0:21, :]
 	del X_array_list
 
-	Y_data_list = du.list_all_input_filt('./npy/final/one_hour_max_value/')
+	Y_data_list = du.list_all_input_file('./npy/final/one_hour_max_value/')
 	Y_data_list.sort()
 	Y_array_list = []
 	for filename in Y_data_list:
-		Y_array_list.append(du.load_array('./npy/final/' + filename))
+		Y_array_list.append(du.load_array('./npy/final/one_hour_max_value/' + filename))
 	Y_array = np.concatenate(Y_array_list, axis=0)
 	del Y_array_list
 	return X_array, Y_array
@@ -53,7 +53,7 @@ if __name__ == '__main__':
 	# prepare_training_data()
 	X_array, Y_array = get_X_and_Y_array()
 	# parameter
-	network_parameter = {'conv1': 64, 'conv2': 32, 'conv3': 32, 'fc1': 1024, 'fc2': 512}
+	network_parameter = {'conv1': 128, 'conv2': 32, 'conv3': 32, 'fc1': 1024, 'fc2': 512}
 	data_shape = [X_array.shape[1], X_array.shape[2], X_array.shape[3], X_array.shape[4]]
 	train_CNN = cn.CNN_autoencoder(*data_shape, **network_parameter)
 	# train_CNN.reload_tfrecord('./training.tfrecoeds','./testing.tfrecoeds')
@@ -66,7 +66,7 @@ if __name__ == '__main__':
 		'reload': '/home/mldp/ML_with_bigdata/output_model/train_test.ckpt',
 		'save': '/home/mldp/ML_with_bigdata/output_model/train_test.ckpt'
 	}
-	train_CNN.set_training_data(X_array)
+	train_CNN.set_training_data(X_array, Y_array)
 	del X_array, Y_array
 	train_CNN.start_pre_training(model_path, restore=False)
 	# train_CNN.start_train(model_path, restore=False)
