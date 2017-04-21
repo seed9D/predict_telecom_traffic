@@ -19,6 +19,26 @@ def load_array(input_file):
 	return X
 
 
+def get_MAX_internet_array(internet_input_array):
+	# print('input array shape {}'.format(internet_input_array.shape))
+	output_shape = [
+		internet_input_array.shape[0],
+		1,
+		internet_input_array.shape[2],
+		internet_input_array.shape[3],
+		internet_input_array.shape[4]]
+	output_array = np.zeros(output_shape, dtype=np.float32)
+	for i in range(internet_input_array.shape[0]):
+		for row in range(internet_input_array.shape[2]):
+			for col in range(internet_input_array.shape[3]):
+				max_value = np.amax(internet_input_array[i, :, row, col])
+				# print('record {} row {} col {} max {}'.format(i, row, col, max_value))
+				output_array[i, 0, row, col, 0] = max_value
+
+	# print('output array shape {}'.format(output_array.shape))
+	return output_array
+
+
 def load_data_format(input_dir, filelist):
 	def load_array(input_file):
 		print('loading file from {}...'.format(input_file))

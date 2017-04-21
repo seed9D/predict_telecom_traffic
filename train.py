@@ -24,10 +24,11 @@ def prepare_training_data():
 			du.save_array(
 				data_array, './npy/final/training_raw_data' + '_' + str(i))
 
+			max_array = du.get_MAX_internet_array(data_array)
+			du.save_array(max_array, './npy/final/one_hour_max_value/one_hour_max' + '_' + str(i))
 
-if __name__ == '__main__':
-	# prepare_training_data()
 
+def get_X_and_Y_array():
 	training_data_list = du.list_all_input_file('./npy/final/')
 	training_data_list.sort()
 	X_array_list = []
@@ -38,6 +39,19 @@ if __name__ == '__main__':
 	# X_array = X_array[:, :, 0:21, 0:21, :]
 	del X_array_list
 
+	Y_data_list = du.list_all_input_filt('./npy/final/one_hour_max_value/')
+	Y_data_list.sort()
+	Y_array_list = []
+	for filename in Y_data_list:
+		Y_array_list.append(du.load_array('./npy/final/' + filename))
+	Y_array = np.concatenate(Y_array_list, axis=0)
+	del Y_array_list
+	return X_array, Y_array
+
+
+if __name__ == '__main__':
+	# prepare_training_data()
+	X_array, Y_array = get_X_and_Y_array()
 	# parameter
 	network_parameter = {'conv1': 64, 'conv2': 32, 'conv3': 32, 'fc1': 1024, 'fc2': 512}
 	data_shape = [X_array.shape[1], X_array.shape[2], X_array.shape[3], X_array.shape[4]]
