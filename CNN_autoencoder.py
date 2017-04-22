@@ -13,15 +13,15 @@ class CNN_autoencoder:
 	def __init__(self, *data_shape, **network_para):
 		self.network_para = network_para
 		self.learning_rate = 0.0005
-		self.training_iters = 20000
+		self.training_iters = 500
 		self.batch_size = 50
 		self.display_step = 25
 		self.dropout = 0.7
 		self.shuffle_capacity = 800
 		self.shuffle_min_after_dequeue = 300
-		self.weight_decay = 100
-		self.Kl_beta = 7.5e-7
-		self.kl_sparsity_parameter = 0.2
+		self.weight_decay = 10
+		self.Kl_beta = 1e-3
+		self.kl_sparsity_parameter = 0.4
 
 		# self.n_input = 100*100
 
@@ -119,7 +119,7 @@ class CNN_autoencoder:
 		return train_output
 
 	def _set_pre_train_para(self, **network_para):
-		def train_layer(input_array, weight, bias, var_name, dropout, norm=0):
+		def train_layer(input_array, weight, bias, var_name, dropout, norm=0, loss_func = 'RMSE'):
 			def build_network(input_array, weight, bias, var_name, dropout, norm=0):
 				print('input shape :{}'.format(input_array.get_shape()))
 				strides_size = {'temporal': 1, 'vertical': 1, 'horizontal': 1}
@@ -140,29 +140,49 @@ class CNN_autoencoder:
 					self.input_horizontal,
 					input_array.get_shape().as_list()[-1]])
 				deconv = self.deconv3d(conv, deconv_w, deconv_b, output_shape_of_deconv, strides_size)
-				deconv = tf.nn.relu(deconv)
+				# deconv = tf.nn.relu(deconv)
 				deconv = tf.nn.dropout(deconv, dropout)
 
 				return conv, deconv
 			conv, deconv = build_network(input_array, weight, bias, var_name, dropout, norm)
 
 			# layer operation
-			kl_divergence = self._sum_Kl_div(conv)
+			kl_divergence, temp_term = self._sum_Kl_div(conv)
 			pre_MSE = self.MSE_loss(deconv, input_array)
-			pre_absolute_distance = self._absolute_error(input_array, deconv)
+			pre_MAE = self._absolute_error(input_array, deconv)
 			pre_RMSE = self._RMSE_loss(input_array, deconv)
 			pre_L2 = self._L2_norm(weight)
-			pre_cost_OP = pre_RMSE + pre_L2 * self.weight_decay # + kl_divergence * self.Kl_beta
+
+			if loss_func == 'MAE':
+				pre_cost_OP = pre_MAE + pre_L2 * self.weight_decay  # + kl_divergence * self.Kl_beta
+			elif loss_func == 'MSE':
+				pre_cost_OP = pre_MSE + pre_L2 * self.weight_decay  # + kl_divergence * self.Kl_beta
+			else:
+				pre_cost_OP = pre_RMSE + pre_L2 * self.weight_decay  # + kl_divergence * self.Kl_beta
 			opt_vars = [v for v in tf.trainable_variables() if v.name.startswith("pre_train/" + var_name)]
+			for v in tf.trainable_variables():
+				print(v)
+			print()
+			'''
 			pre_optimizer_OP = tf.train.AdamOptimizer(
 				learning_rate=self.learning_rate).minimize(pre_cost_OP, var_list=opt_vars)
+			'''
+			optimizer = tf.train.AdamOptimizer(learning_rate=self.learning_rate)
+			gvs = optimizer.compute_gradients(pre_cost_OP, var_list=opt_vars)
+
+			for grad, var in gvs:
+				if grad is not None:
+					print(grad, var)
+			capped_gvs = [(tf.clip_by_value(grad, -1., 1.), var) for grad, var in gvs if grad is not None]
+			pre_optimizer_OP = optimizer.apply_gradients(capped_gvs)
 			loss = {
 				'cost': pre_cost_OP,
 				'L2': pre_L2,
 				'RMSE': pre_RMSE,
-				'MAE': pre_absolute_distance,
+				'MAE': pre_MAE,
 				'MSE': pre_MSE,
-				'kl_diver': kl_divergence
+				'kl_diver': kl_divergence,
+				'temp': conv
 			}
 			return pre_optimizer_OP, conv, deconv, loss
 
@@ -194,26 +214,34 @@ class CNN_autoencoder:
 
 				# self.mean = tf.Variable(tf.zeros([self.input_channel]),name='mean',trainable=False,)
 				# self.std = tf.Variable(tf.zeros([self.input_channel]),name='std',trainable=False,)
-			self.pre_optimizer_OP_layer_1, en_conv_1, de_conv_1, self.pre_loss_1 = train_layer(
+			pre_optimizer_OP_layer_1, en_conv_1, self.de_conv_1, self.pre_loss_1 = train_layer(
 				self.Xs,
 				self.pre_weights['conv1'],
 				self.pre_bias['conv1'],
 				'conv1',
 				self.keep_prob,
-				self.norm)
-			self.pre_optimizer_OP_layer_2, en_conv_2, de_conv_2, self.pre_loss_2 = train_layer(
+				self.norm,
+				'MAE')
+			self.weight_decay = 1
+			pre_optimizer_OP_layer_2, en_conv_2, de_conv_2, pre_loss_2 = train_layer(
 				en_conv_1,
 				self.pre_weights['conv2'],
 				self.pre_bias['conv2'],
-				'conv2', self.keep_prob,
-				self.norm)
-			self.pre_optimizer_OP_layer_3, en_conv_3, de_conv_3, self.pre_loss_3 = train_layer(
+				'conv2',
+				self.keep_prob,
+				self.norm,
+				'RMSE')
+			self.weight_decay = 0.1
+			pre_optimizer_OP_layer_3, en_conv_3, de_conv_3, pre_loss_3 = train_layer(
 				en_conv_2,
 				self.pre_weights['conv3'],
 				self.pre_bias['conv3'],
 				'conv3',
 				self.keep_prob,
-				self.norm)
+				self.norm,
+				'RMSE')
+			self.pre_optimizer_list = [pre_optimizer_OP_layer_1, pre_optimizer_OP_layer_2, pre_optimizer_OP_layer_3]
+			self.pre_loss = [self.pre_loss_1, pre_loss_2, pre_loss_3]
 			self.pre_train_output = en_conv_3
 			'''
 			# operation
@@ -367,9 +395,9 @@ class CNN_autoencoder:
 		# Y_data = Y_data[:,np.newaxis]
 		# print(X_data[1,0,0,0,-1],Y_data[0,0,0,0,-1])
 		training_X = X_data[0:int(9 * X_data.shape[0] / 10)]
-		training_Y = Y_data[0:int(9 * X_data.shape[0] / 10)]
+		training_Y = Y_data[0:int(9 * Y_data.shape[0] / 10)]
 		self.testing_X = X_data[int(9 * X_data.shape[0] / 10):]
-		self.testing_Y = Y_data[int(9 * X_data.shape[0] / 10):]
+		self.testing_Y = Y_data[int(9 * Y_data.shape[0] / 10):]
 		self.training_file = 'training.tfrecoeds'
 		self.testing_file = 'testing.tfrecoeds'
 		print('training X shape:{}, training Y shape:{}'.format(
@@ -420,8 +448,8 @@ class CNN_autoencoder:
 			first_term = tf.mul(rho, kl_log(tf.div(rho, rho_head)))
 			second_term = tf.mul(invers_rho, kl_log(tf.div(invers_rho, invers_rho_head)))
 			kl_diver = tf.add(first_term, second_term)  # each hidden unit j, it's an array
-			kl_div_sum = tf.reduce_sum(kl_diver)  # a value
-			return kl_div_sum
+			kl_div_mean = tf.reduce_mean(kl_diver)  # a value
+			return kl_div_mean, rho_head
 		# following is for sparse auto encoder operation
 		# each layer's average output
 		# calculate each hidden unit's average output from total training data in each layer
@@ -441,8 +469,8 @@ class CNN_autoencoder:
 			kl_encode_layer.append(kl_div(average_output, self.kl_sparsity_parameter))
 		sum_of_kl = sum(kl for kl in kl_encode_layer)
 		'''
-		sum_of_kl = kl_div(average_output, self.kl_sparsity_parameter)
-		return sum_of_kl
+		mean_of_kl, first_term = kl_div(average_output, self.kl_sparsity_parameter)
+		return mean_of_kl, first_term
 
 	def weight_variable(self, shape, name):
 		# initial = tf.truncated_normal(shape, stddev=0.1)
@@ -672,8 +700,8 @@ class CNN_autoencoder:
 				self.input_horizontal,
 				self.input_channel))
 
-			result = np.fromstring(record, dtype=np.float32)
-			result = record.reshape((
+			result = np.fromstring(result, dtype=np.float32)
+			result = result.reshape((
 				self.output_temporal,
 				self.output_vertical,
 				self.output_horizontal,
@@ -700,9 +728,9 @@ class CNN_autoencoder:
 				predict = 0
 				loss = 0
 				if stage == 'pre_train':
-					loss, predict = sess.run([self.pre_cost_OP, self.pre_endecoder_OP], feed_dict={
+					loss, predict = sess.run([self.pre_loss_1['MAE'], self.de_conv_1], feed_dict={
 						self.Xs: input_x[batch_index * self.batch_size:(batch_index + 1) * self.batch_size],
-						self.Ys: input_y[batch_index * self.batch_size:(batch_index + 1) * self.batch_size],
+						# self.Ys: input_y[batch_index * self.batch_size:(batch_index + 1) * self.batch_size],
 						self.keep_prob: 1,
 						self.norm: 0
 					})
@@ -746,14 +774,9 @@ class CNN_autoencoder:
 		with tf.variable_scope("pre_train"):
 			self._set_pre_train_para(**self.network_para)
 		'''
-		fig = plt.figure()
-		ax = fig.add_subplot(3, 1, 1)
-		ax2 = fig.add_subplot(3, 1, 2)
-		ax3 = fig.add_subplot(3, 1, 3)
+		fig = None
 
-		def plot_history(history_data):
-			plt.ion()
-
+		def plot_history(axs, history_data):
 			plt.xlabel('epoch')
 			plt.ylabel('training and testing loss')
 
@@ -800,13 +823,7 @@ class CNN_autoencoder:
 			batch_size=self.batch_size,
 			capacity=self.shuffle_capacity,
 			min_after_dequeue=self.shuffle_min_after_dequeue)
-		history_data = {
-			'training_loss_his': [],
-			'testting_loss_hist': [],
-			'absolute_distance': [],
-			'RMSE': [],
-			'epoch': []
-		}
+
 		with tf.Session() as sess:
 			if restore:
 				print('reloading model....')
@@ -816,68 +833,81 @@ class CNN_autoencoder:
 			coord = tf.train.Coordinator()
 			treads = tf.train.start_queue_runners(sess=sess, coord=coord)
 
-			epoch = 1
-			cumulate_loss = 0
-			cumulate_RMSE = 0
-			cumulate_abd = 0
+			for i, optimizer in enumerate(self.pre_optimizer_list):
+				history_data = {
+					'training_loss_his': [],
+					'testting_loss_hist': [],
+					'absolute_distance': [],
+					'RMSE': [],
+					'epoch': []
+				}
+				fig = plt.figure()
+				plt.ion()
+				ax = fig.add_subplot(3, 1, 1)
+				ax2 = fig.add_subplot(3, 1, 2)
+				ax3 = fig.add_subplot(3, 1, 3)
+				axs = [ax, ax2, ax3]
+				epoch = 1
+				cumulate_loss = 0
+				cumulate_RMSE = 0
+				cumulate_abd = 0
+				loss_set = self.pre_loss[i]
+				while epoch < self.training_iters:
+					index, batch_x, batch_y = sess.run(batch_tuple_OP)
+					# print('index:{}'.format(index))
+					loss = 0.
 
-			while epoch < self.training_iters:
-				index, batch_x, batch_y = sess.run(batch_tuple_OP)
-				# print('index:{}'.format(index))
-				loss = 0.
+					with tf.device('/gpu:0'):
+						_, loss, absolute_distance, L2, kl, RMSE, temp, MSE = sess.run([
+							optimizer,
+							loss_set['cost'],
+							loss_set['MAE'],
+							loss_set['L2'],
+							loss_set['kl_diver'],
+							loss_set['RMSE'],
+							loss_set['temp'],
+							loss_set['MSE']],
+							feed_dict={
+							self.Xs: batch_x,
+							self.Ys: batch_y,
+							self.keep_prob: self.dropout,
+							self.norm: 1})
+					print('i:%d Epoch:%d  cost:%g absolute_distance:%g L2:%g kl:%g RMSE:%g MSE:%g' % (i, epoch, loss, absolute_distance, L2, kl, RMSE, MSE))
+					# print(temp)
+					cumulate_loss += loss
+					cumulate_RMSE += RMSE
+					cumulate_abd += absolute_distance
 
-				with tf.device('/gpu:0'):
-					_, loss, absolute_distance, L2, kl, RMSE, temp, MSE = sess.run([
-						self.pre_optimizer_OP_layer_1,
-						self.pre_loss_1['cost'],
-						self.pre_loss_1['MAE'],
-						self.pre_loss_1['L2'],
-						self.pre_loss_1['kl_diver'],
-						self.pre_loss_1['RMSE'],
-						self.pre_weights['conv1'],
-						self.pre_loss_1['MSE']],
-						feed_dict={
-						self.Xs: batch_x,
-						self.Ys: batch_y,
-						self.keep_prob: self.dropout,
-						self.norm: 1})
-				print('Epoch:%d  cost:%g absolute_distance:%g L2:%g kl:%g RMSE:%g MSE:%g' % (epoch, loss, absolute_distance, L2, kl, RMSE, MSE))
-				# print(temp)
-				cumulate_loss += loss
-				cumulate_RMSE += RMSE
-				cumulate_abd += absolute_distance
+					if epoch % self.display_step == 0 and epoch != 0:
+						average_training_loss = cumulate_loss / self.display_step
+						average_RMSE = cumulate_RMSE / self.display_step
+						average_cumulate_abd = cumulate_abd / self.display_step
 
-				if epoch % self.display_step == 0 and epoch != 0:
-					average_training_loss = cumulate_loss / self.display_step
-					average_RMSE = cumulate_RMSE / self.display_step
-					average_cumulate_abd = cumulate_abd / self.display_step
-					'''
-					index, testing_X, testing_Y = self._read_all_data_from_Tfreoced(
-						self.testing_file)
-					testing_loss, _ = self._testing_data(
-						sess, testing_X, testing_Y, 'pre_train')   # batch_x it_self
-					print('testing_loss:{} average_training_loss:{} average absolute distance {} average RMSE {}'.format(
-						testing_loss, average_training_loss, average_cumulate_abd, average_RMSE))
-					'''
+						index, testing_X, testing_Y = self._read_all_data_from_Tfreoced(
+							self.testing_file)
+						testing_loss, _ = self._testing_data(
+							sess, testing_X, testing_X, 'pre_train')   # batch_x it_self
+						print('testing_loss:{} average_training_loss:{} average absolute distance {} average RMSE {}'.format(
+							testing_loss, average_training_loss, average_cumulate_abd, average_RMSE))
 
-					history_data['epoch'].append(epoch)
-					history_data['training_loss_his'].append(average_training_loss)
-					history_data['testting_loss_hist'].append(0)
-					history_data['absolute_distance'].append(average_cumulate_abd)
-					history_data['RMSE'].append(average_RMSE)
-					cumulate_loss = 0
-					cumulate_RMSE = 0
-					cumulate_abd = 0
-					plot_history(history_data)
-					self._save_model(sess, model_path['pretrain_save'])
-					# self._save_model(sess, model_path['save_weight_bias'])
-					self._save_history(history_data)
+						history_data['epoch'].append(epoch)
+						history_data['training_loss_his'].append(average_training_loss)
+						history_data['testting_loss_hist'].append(0)
+						history_data['absolute_distance'].append(average_cumulate_abd)
+						history_data['RMSE'].append(average_RMSE)
+						cumulate_loss = 0
+						cumulate_RMSE = 0
+						cumulate_abd = 0
+						plot_history(axs, history_data)
+						self._save_model(sess, model_path['pretrain_save'])
+						# self._save_model(sess, model_path['save_weight_bias'])
+						self._save_history(history_data)
 
-				epoch += 1
+					epoch += 1
 			coord.request_stop()
 			coord.join(treads)
 			print('pre training finished!')
-			self.plt.ioff()
+			plt.ioff()
 			self._save_model(sess)
 
 	def start_train(self, model_path, restore=False):
