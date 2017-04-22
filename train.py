@@ -19,7 +19,7 @@ def prepare_training_data():
 	for i, filename in enumerate(filelist):
 		if filename != 'training_raw_data.npy':
 			data_array = du.load_array('./npy/' + filename)
-			data_array = data_array[:, :, 0:40, 0:40, -1, np.newaxis]  # only network activity
+			data_array = data_array[:, :, 40:65, 40:65, -1, np.newaxis]  # only network activity
 			print('saving  array shape:{}'.format(data_array.shape))
 			du.save_array(
 				data_array, './npy/final/training_raw_data' + '_' + str(i))
@@ -53,7 +53,7 @@ if __name__ == '__main__':
 	# prepare_training_data()
 	X_array, Y_array = get_X_and_Y_array()
 	# parameter
-	network_parameter = {'conv1': 64, 'conv2': 64, 'conv3': 32, 'fc1': 1024, 'fc2': 512}
+	network_parameter = {'conv1': 128, 'conv2': 128, 'conv3': 64, 'fc1': 1024, 'fc2': 512}
 	data_shape = [X_array.shape[1], X_array.shape[2], X_array.shape[3], X_array.shape[4]]
 	train_CNN = cn.CNN_autoencoder(*data_shape, **network_parameter)
 	# train_CNN.reload_tfrecord('./training.tfrecoeds','./testing.tfrecoeds')
@@ -61,12 +61,12 @@ if __name__ == '__main__':
 		# '/home/mldp/ML_with_bigdata/output_model/CNN_autoencoder_64_64_AE_self.ckpt',
 		# '/home/mldp/ML_with_bigdata/output_model/CNN_autoencoder_64_64_AE_self.ckpt')
 	model_path = {
-		'pretrain_save': '/home/mldp/ML_with_bigdata/output_model/AE_pre_64_64_32_test.ckpt',
-		'pretrain_reload': '/home/mldp/ML_with_bigdata/output_model/AE_pre_64_64_32_test.ckpt',
-		'reload': '/home/mldp/ML_with_bigdata/output_model/train_test.ckpt',
-		'save': '/home/mldp/ML_with_bigdata/output_model/train_test.ckpt'
+		'pretrain_save': '/home/mldp/ML_with_bigdata/output_model/test2.ckpt',
+		'pretrain_reload': '/home/mldp/ML_with_bigdata/output_model/test2.ckpt',
+		'reload': '/home/mldp/ML_with_bigdata/output_model/train_test2.ckpt',
+		'save': '/home/mldp/ML_with_bigdata/output_model/train_test2.ckpt'
 	}
 	train_CNN.set_training_data(X_array, Y_array)
 	del X_array, Y_array
 	train_CNN.start_pre_training(model_path, restore=False)
-	# train_CNN.start_train(model_path, restore=False)
+	train_CNN.start_train(model_path, restore=False)
