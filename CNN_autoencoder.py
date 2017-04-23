@@ -14,7 +14,7 @@ class CNN_autoencoder:
 		self.network_para = network_para
 		self.learning_rate = 0.0005
 		self.training_iters = 1000
-		self.batch_size = 60
+		self.batch_size = 100
 		self.display_step = 25
 		self.dropout = 0.7
 		self.shuffle_capacity = 800
@@ -89,6 +89,7 @@ class CNN_autoencoder:
 			RMSE_loss = self._RMSE_loss(self.Ys, self.train_predictor)
 			MAE_loss = self._absolute_error(self.Ys, self.train_predictor)
 			L2_norm = self._L2_norm(self.predictor_weights)
+			L2_norm += self._L2_norm(self.pre_weights)
 			train_cost = RMSE_loss + L2_norm * self.weight_decay
 
 			self.predictor_loss = {
@@ -110,7 +111,7 @@ class CNN_autoencoder:
 		train_net_input = tf.reshape(x, [-1, weights['fc1'].get_shape().as_list()[0]])
 		print('train_net_input:', train_net_input.get_shape())
 		fc1 = self.batch_normalize(train_net_input, 'fc1', norm)
-		fc1 = tf.nn.relu(fc1)
+		# fc1 = tf.nn.relu(fc1)
 		fc1 = tf.add(tf.matmul(fc1, weights['fc1']), bias['fc1'])
 		fc1 = tf.nn.relu(fc1)
 		fc1 = tf.nn.dropout(fc1, dropout)
@@ -126,7 +127,8 @@ class CNN_autoencoder:
 		return train_output
 
 	def _set_pre_train_para(self, **network_para):
-		def train_layer(input_array, weight, bias, var_name, dropout, norm=0, loss_func = 'RMSE'):
+
+		def train_layer(input_array, weight, bias, var_name, dropout, norm=0, loss_func='RMSE', weight_decay=self.weight_decay):
 			def build_network(input_array, weight, bias, var_name, dropout, norm=0):
 				print('input shape :{}'.format(input_array.get_shape()))
 				strides_size = {'temporal': 1, 'vertical': 1, 'horizontal': 1}
@@ -161,11 +163,11 @@ class CNN_autoencoder:
 			pre_L2 = self._L2_norm({var_name: weight})
 
 			if loss_func == 'MAE':
-				pre_cost_OP = pre_MAE + pre_L2 * self.weight_decay  # + kl_divergence * self.Kl_beta
+				pre_cost_OP = pre_MAE + pre_L2 * weight_decay  # + kl_divergence * self.Kl_beta
 			elif loss_func == 'MSE':
-				pre_cost_OP = pre_MSE + pre_L2 * self.weight_decay  # + kl_divergence * self.Kl_beta
+				pre_cost_OP = pre_MSE + pre_L2 * weight_decay  # + kl_divergence * self.Kl_beta
 			else:
-				pre_cost_OP = pre_RMSE + pre_L2 * self.weight_decay + kl_divergence * self.Kl_beta
+				pre_cost_OP = pre_RMSE + pre_L2 * weight_decay  # + kl_divergence * self.Kl_beta
 			opt_vars = [v for v in tf.trainable_variables() if v.name.startswith("pre_train/" + var_name)]
 			for v in tf.trainable_variables():
 				print(v)
@@ -180,7 +182,7 @@ class CNN_autoencoder:
 			for grad, var in gvs:
 				if grad is not None:
 					print(grad, var)
-			capped_gvs = [(tf.clip_by_value(grad, -1., 1.), var) for grad, var in gvs if grad is not None]
+			capped_gvs = [(tf.clip_by_value(grad, -15., 15.), var) for grad, var in gvs if grad is not None]
 			pre_optimizer_OP = optimizer.apply_gradients(capped_gvs)
 			loss = {
 				'cost': pre_cost_OP,
@@ -221,7 +223,6 @@ class CNN_autoencoder:
 
 				# self.mean = tf.Variable(tf.zeros([self.input_channel]),name='mean',trainable=False,)
 				# self.std = tf.Variable(tf.zeros([self.input_channel]),name='std',trainable=False,)
-			self.weight_decay = 10
 			pre_optimizer_OP_layer_1, en_conv_1, self.de_conv_1, self.pre_loss_1 = train_layer(
 				self.Xs,
 				self.pre_weights['conv1'],
@@ -229,8 +230,8 @@ class CNN_autoencoder:
 				'conv1',
 				self.keep_prob,
 				self.norm,
-				'MAE')
-			self.weight_decay = 100
+				'MAE',
+				weight_decay=100)
 			pre_optimizer_OP_layer_2, en_conv_2, de_conv_2, pre_loss_2 = train_layer(
 				en_conv_1,
 				self.pre_weights['conv2'],
@@ -238,8 +239,8 @@ class CNN_autoencoder:
 				'conv2',
 				self.keep_prob,
 				self.norm,
-				'RMSE')
-			self.weight_decay = 10
+				'RMSE',
+				weight_decay=100)
 			pre_optimizer_OP_layer_3, en_conv_3, de_conv_3, pre_loss_3 = train_layer(
 				en_conv_2,
 				self.pre_weights['conv3'],
@@ -735,7 +736,7 @@ class CNN_autoencoder:
 				predict = 0
 				loss = 0
 				if stage == 'pre_train':
-					loss, predict = sess.run([self.pre_loss_1['MAE'], self.de_conv_1], feed_dict={
+					loss, predict = sess.run([self.pre_loss_1['cost'], self.de_conv_1], feed_dict={
 						self.Xs: input_x[batch_index * self.batch_size:(batch_index + 1) * self.batch_size],
 						# self.Ys: input_y[batch_index * self.batch_size:(batch_index + 1) * self.batch_size],
 						self.keep_prob: 1,
@@ -854,7 +855,7 @@ class CNN_autoencoder:
 			treads = tf.train.start_queue_runners(sess=sess, coord=coord)
 			tf.summary.FileWriter('logs/', sess.graph)
 			for i, optimizer in enumerate(self.pre_optimizer_list):
-				if i not in [2]:
+				if i not in [0, 1, 2]:
 					continue
 				history_data = {
 					'training_loss_his': [],

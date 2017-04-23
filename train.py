@@ -53,7 +53,7 @@ if __name__ == '__main__':
 	# prepare_training_data()
 	X_array, Y_array = get_X_and_Y_array()
 	# parameter
-	network_parameter = {'conv1': 128, 'conv2': 128, 'conv3': 64, 'fc1': 1024, 'fc2': 512}
+	network_parameter = {'conv1': 128, 'conv2': 64, 'conv3': 32, 'fc1': 512, 'fc2': 512}
 	data_shape = [X_array.shape[1], X_array.shape[2], X_array.shape[3], X_array.shape[4]]
 	train_CNN = cn.CNN_autoencoder(*data_shape, **network_parameter)
 	# train_CNN.reload_tfrecord('./training.tfrecoeds','./testing.tfrecoeds')
@@ -68,5 +68,5 @@ if __name__ == '__main__':
 	}
 	train_CNN.set_training_data(X_array, Y_array)
 	del X_array, Y_array
-	train_CNN.start_pre_training(model_path, restore=False)
+	# train_CNN.start_pre_training(model_path, restore=False)
 	train_CNN.start_train(model_path, restore=False)
