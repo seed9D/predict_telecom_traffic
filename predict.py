@@ -17,7 +17,7 @@ def set_time_zone(timestamp):
 
 
 def date_time_covert_to_str(date_time):
-	return date_time.strftime('%Y-%m-%d %H:%M')
+	return date_time.strftime('%m-%d %H')
 
 
 def random_generate_data():
@@ -29,6 +29,7 @@ def random_generate_data():
 	return fake + fake_point
 	# return np.random.rand(*shape)
 	# return np.random.uniform(0, 100, size=shape)
+
 
 def plot_predict_vs_real2(real, predict):
 	print('real shape:{} predict shape:{}'.format(real.shape, predict.shape))
@@ -86,8 +87,8 @@ def plot_predict_vs_real(real, predict):
 	# grid_id_2 = real[0,0,30,20,0]
 	plot_1_row = 9
 	plot_1_col = 5
-	plot_2_row = 39
-	plot_2_col = 39
+	plot_2_row = 10
+	plot_2_col = 20
 	plot_1 = {
 		'grid_id': int(real[0, 0, plot_1_row, plot_1_col, 0]),
 		'predict': [],
@@ -99,7 +100,7 @@ def plot_predict_vs_real(real, predict):
 		'real': []
 	}
 	time_x = []
-	for i in range(24):
+	for i in range(300):
 		for j in range(real.shape[1]):
 			plot_1['real'].append(real[i, j, plot_1_row, plot_1_col, 2])
 			plot_1['predict'].append(predict[i, j, plot_1_row, plot_1_col])
@@ -124,7 +125,8 @@ def plot_predict_vs_real(real, predict):
 
 	ax1.plot(x, plot_1['real'], label='real', marker='.')
 	ax1.plot(x, plot_1['predict'], label='predict', marker='.')
-	ax1.set_xticks(x, time_x)
+	ax1.set_xticks(list(range(0, 300, 12)))
+	ax1.set_xticklabels(time_x[0:300:12], rotation=45)
 	ax1.set_title(plot_1['grid_id'])
 	ax1.grid()
 	# ax1.set_ylabel('time sequence')
@@ -133,7 +135,8 @@ def plot_predict_vs_real(real, predict):
 
 	ax2.plot(x, plot_2['real'], label='real', marker='.')
 	ax2.plot(x, plot_2['predict'], label='predict', marker='.')
-	ax2.set_xticks(x, time_x)
+	ax2.set_xticks(list(range(0, 300, 12)))
+	ax2.set_xticklabels(time_x[0:300:12], rotation=45)
 	ax2.set_title(plot_2['grid_id'])
 	ax2.grid()
 	# ax2.set_ylabel('time sequence')
@@ -148,11 +151,12 @@ def plot_predict_vs_real(real, predict):
 def compute_loss_rate(real, predict):
 	# print(real.shape, predict.shape)
 	# ab_sum = (np.absolute(real - predict).sum()) / real.size
+	print('real shape {} predict shape {}'.format(real.shape, predict.shape))
 	ab_sum = (np.absolute(real - predict).mean())
-	print('absolute average:', ab_sum)
+	print('AE:', ab_sum)
 
 	rmse_sum = np.sqrt(((real - predict) ** 2).mean())
-	print('rmse:', rmse_sum)
+	print('RMSE:', rmse_sum)
 
 
 def check_data(predict_array):
@@ -200,9 +204,48 @@ def prepare_predict_data():
 			data_array = du.load_array('./npy/' + filename)
 			# print(' 0 grid id {}'.format(data_array[0, 0, 10, 10, 0]))
 			# print(' 60 grid id {}'.format(data_array[0, 0, 70, 70, 0]))
-			data_array = data_array[:, :, :40, :40, (0, 1, -1)]
+			data_array = data_array[:, :, 40:65, 40:65, (0, 1, -1)]
 			print('saving array shape:', data_array.shape)
 			du.save_array(data_array, './npy/final/testing_raw_data/' + 'testing_' + str(i))
+
+			# prepare y
+			max_array = du.get_MAX_internet_array(data_array[:, :, :, :, -1, np.newaxis])
+			new_max_array_shape = [max_array.shape[0], max_array.shape[1], max_array.shape[2], max_array.shape[2], 3]
+			new_max_array = np.zeros(new_max_array_shape, dtype=np.float32)
+			for index in range(max_array.shape[0]):
+				for row in range(max_array.shape[2]):
+					for col in range(max_array.shape[3]):
+						new_max_array[index, 0, row, col, 0] = data_array[index, 0, row, col, 0]  # gird id
+						new_max_array[index, 0, row, col, 1] = data_array[index, 3, row, col, 1]  # timestamp
+						new_max_array[index, 0, row, col, 2] = max_array[index, 0, row, col, 0]  # internet
+						'''
+						print('id:{} date:{} internet:{}'.format(
+							new_max_array[index, 0, row, col, 0],
+							date_time_covert_to_str(set_time_zone(new_max_array[index, 0, row, col, 1])),
+							new_max_array[index, 0, row, col, 2]))
+						'''
+			du.save_array(new_max_array, './npy/final/testing_raw_data/one_hour_max_value/one_hour_max' + '_' + str(i))
+
+
+def get_X_and_Y_array():
+	training_data_list = du.list_all_input_file('./npy/final/testing_raw_data/')
+	training_data_list.sort()
+	X_array_list = []
+	for filename in training_data_list:
+		X_array_list.append(du.load_array('./npy/final/testing_raw_data/' + filename))
+
+	X_array = np.concatenate(X_array_list, axis=0)
+	# X_array = X_array[:, :, 0:21, 0:21, :]
+	del X_array_list
+
+	Y_data_list = du.list_all_input_file('./npy/final/testing_raw_data/one_hour_max_value/')
+	Y_data_list.sort()
+	Y_array_list = []
+	for filename in Y_data_list:
+		Y_array_list.append(du.load_array('./npy/final/testing_raw_data/one_hour_max_value/' + filename))
+	Y_array = np.concatenate(Y_array_list, axis=0)
+	del Y_array_list
+	return X_array, Y_array
 
 
 def predict_pre_train(CNN, predict_array, model_path):
@@ -211,50 +254,39 @@ def predict_pre_train(CNN, predict_array, model_path):
 	plot_predict_vs_real(predict_array[1:], predict_y)
 
 
-def predict_train(CNN, predict_array, model_path):
-	_, predict_y = CNN.predict_data(predict_array[:, :, :, :, 2, np.newaxis], model_path, 'train')
-	compute_loss_rate(predict_array[1:, :, :, :, 2, np.newaxis], predict_y)
-	plot_predict_vs_real(predict_array[1:], predict_y)
+def predict_train(CNN, predict_array, Y_array, model_path):
+	_, predict_y = CNN.predict_data(
+		predict_array[:, :, :, :, 2, np.newaxis],
+		Y_array[:, :, :, :, 2, np.newaxis],
+		model_path,
+		'train')
+	# compute_loss_rate(predict_array[1:, :, :, :, 2, np.newaxis], predict_y)
+	compute_loss_rate(Y_array[1:, :, :, :, 2, np.newaxis], predict_y)
+	plot_predict_vs_real(Y_array[1:], predict_y)
+
 
 # prepare_predict_data()
+# fake_data = random_generate_data()
 
-
-'''
-training_data_list = cn.list_all_input_file('./npy/final/')
-training_data_list.sort()
-X_array_list = []
-for filename in training_data_list:
-	X_array_list.append(cn.load_array('./npy/final/' + filename))
-X_array = np.concatenate(X_array_list, axis=0)
-# X_array = X_array[:, :, 0:21,0:21, :]
-del X_array_list
-'''
-fake_data = random_generate_data()
-
-testing_data_list = du.list_all_input_file('./npy/final/testing_raw_data/')
-testing_data_list.sort()
-predict_array_list = []
-for filename in testing_data_list:
-	predict_array_list.append(du.load_array('./npy/final/testing_raw_data/' + str(filename)))
-predict_array = np.concatenate(predict_array_list, axis=0)
-del testing_data_list
-
-predict_array = predict_array[719 - 24:720]
+predict_array, Y_array = get_X_and_Y_array()
+predict_array = predict_array[0:400]
+Y_array = Y_array[0:400]
+# print(Y_array[0, 0, 10, 20, -1])
 # predict_array = predict_array[0:400]
 
-network_parameter = {'conv1': 64, 'conv2': 32, 'conv3': 32, 'fc1': 1024, 'fc2': 512}
+network_parameter = {'conv1': 128, 'conv2': 64, 'conv3': 32, 'fc1': 512, 'fc2': 512}
 data_shape = [predict_array.shape[1], predict_array.shape[2], predict_array.shape[3], 1]
 predict_CNN = cn.CNN_autoencoder(*data_shape, **network_parameter)
 model_path = {
 	'pretrain_save': '/home/mldp/ML_with_bigdata/output_model/AE_pre_64_32_32_test.ckpt',
 	'pretrain_reload': '/home/mldp/ML_with_bigdata/output_model/AE_pre_64_32_32_test.ckpt',
-	'reload': '/home/mldp/ML_with_bigdata/output_model/train_test.ckpt',
-	'save': '/home/mldp/ML_with_bigdata/output_model/train_test.ckpt'
+	'reload': '/home/mldp/ML_with_bigdata/output_model/train_test2.ckpt',
+	'save': '/home/mldp/ML_with_bigdata/output_model/train_test2.ckpt'
 }
-predict_CNN.set_training_data(predict_array[:, :, :, :, 2, np.newaxis])
+predict_CNN.set_training_data(predict_array[:, :, :, :, 2, np.newaxis], Y_array[:, :, :, :, 2, np.newaxis])
 
-predict_pre_train(predict_CNN, predict_array, model_path)
-# predict_train(predict_CNN, predict_array, model_path)
+# predict_pre_train(predict_CNN, predict_array, model_path)
+predict_train(predict_CNN, predict_array, Y_array, model_path)
 
 
 # _, fake_predict_y = predict_CNN.predict_data(fake_data, model_path)

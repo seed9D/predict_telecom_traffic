@@ -597,11 +597,12 @@ class CNN_autoencoder:
 			self.training_file = tfrecored_file
 			self.testing_file = tftesting_file
 
-	def predict_data(self, input_x, model_path, stage):
+	def predict_data(self, input_x, input_y, model_path, stage):
 		input_x = (input_x - self.mean) / self.std
 		print('input_x shape:', input_x.shape)
+		print('input_y shape {}'.format(input_y.shape))
 		testing_x = input_x[0:-1]
-		testing_y = input_x[1:]
+		testing_y = input_y[1:]
 		with tf.Session() as sess:
 			loss = 0
 			predict_y = None
@@ -612,7 +613,7 @@ class CNN_autoencoder:
 			elif stage == 'train':
 				self._reload_model(sess, model_path['reload'])
 				# input_x_length = input_x.shape[0]
-				loss, predict_y = self._testing_data(sess, testing_x, testing_y, stage)  # testing x itself
+				loss, predict_y = self._testing_data(sess, testing_x, testing_y, stage)
 			print('predict finished!')
 			print('loss:{} predict_y shape {}'.format(loss, predict_y.shape))
 
@@ -752,11 +753,11 @@ class CNN_autoencoder:
 				predict = self.un_normalize_data(sess, predict)
 				un_normalize_input_y = self.un_normalize_data(
 					sess, input_y[batch_index * self.batch_size:(batch_index + 1) * self.batch_size])
-
 				for i in range(3):
 					for j in range(predict.shape[1]):
 						print('predict:{},real:{}'.format(
-							predict[i, j, 10, 20, 0], un_normalize_input_y[i, j, 10, 20, 0]))
+							predict[i, j, 10, 20, 0],
+							un_normalize_input_y[i, j, 10, 20, 0]))
 
 				for predict_element in predict:
 					predict_list.append(predict_element)
