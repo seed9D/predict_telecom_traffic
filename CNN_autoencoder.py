@@ -1,6 +1,7 @@
 import numpy as np
 import os
 import tensorflow as tf
+import tensorlayer as tl
 import functools as fn
 # import matplotlib
 # matplotlib.use('Agg')
@@ -46,6 +47,7 @@ class CNN_autoencoder:
 		# operation
 		self._set_pre_train_para(**network_para)
 		self._set_predictior_para(**network_para)
+		self.saver = tf.train.Saver()
 
 	def _set_predictior_para(self, **network_para):
 		# tf.reset_default_graph()
@@ -91,7 +93,6 @@ class CNN_autoencoder:
 			# self.predictor_optimization = tf.train.AdamOptimizer(learning_rate=self.learning_rate).minimize(self.predictor_cost_OP, var_list=opt_vars)
 			self.predictor_optimization = tf.train.AdamOptimizer(
 				learning_rate=self.learning_rate).minimize(train_cost)
-		self.saver = tf.train.Saver()
 
 	def _predictor_net(self, x, weight, bias, dropout, norm=0):
 		input_shape = x.get_shape()
@@ -99,7 +100,8 @@ class CNN_autoencoder:
 		predictor = self.batch_normalize(x, 'predictor', norm)
 		predictor = tf.add(tf.matmul(predictor, weight), bias)
 		predictor = tf.nn.dropout(predictor, dropout)
-		predictor = tf.nn.tanh(predictor)
+		# predictor = tf.nn.tanh(predictor)
+		predictor = tl.act.lrelu(predictor, 0.1)
 		print('predictor shape: {}'.format(predictor.get_shape()))
 		predictor_output = tf.reshape(predictor, [-1, self.output_temporal, self.output_vertical, self.output_horizontal, self.output_channel])
 		print('train_output {}'.format(predictor_output.get_shape()))
@@ -142,7 +144,8 @@ class CNN_autoencoder:
 				print('train_net_input:', train_net_input.get_shape())
 				fc_encode = self.batch_normalize(train_net_input, var_name, norm)
 				fc_encode = tf.add(tf.matmul(fc_encode, weight), bias)
-				fc_encode = tf.nn.tanh(fc_encode)
+				# fc_encode = tf.nn.relu(fc_encode)
+				fc_encode = tl.act.lrelu(fc_encode, 0.1)
 				fc_encode = tf.nn.dropout(fc_encode, dropout)
 				print('fc encode shape:', fc_encode.get_shape())
 
@@ -150,7 +153,8 @@ class CNN_autoencoder:
 				defc_w = self.weight_variable([weight.get_shape().as_list()[1], weight.get_shape().as_list()[0]], 'temp')
 				defc_b = self.bias_variable([weight.get_shape().as_list()[0]], 'temp')
 				fc_decoder = tf.add(tf.matmul(fc_encode, defc_w), defc_b)
-				fc_decoder = tf.nn.tanh(fc_decoder)
+				fc_decoder = tf.nn.relu(fc_decoder)
+				fc_decoder = tl.act.lrelu(fc_decoder, 0.1)
 				fc_decoder = tf.nn.dropout(fc_decoder, dropout)
 
 				return fc_encode, fc_decoder
@@ -332,7 +336,7 @@ class CNN_autoencoder:
 			self.pre_traion_output = self.pre_endecoder_OP
 			self.pre_train_saver = tf.train.Saver([v for v in tf.all_variables() if 'pre_train' in v.name])
 			'''
-			self.saver = tf.train.Saver()
+			
 
 	def _pre_train_net(self, x, weights, bias, dropout, norm=0):
 			kl_list = []

@@ -314,8 +314,8 @@ model_path = {
 }
 predict_CNN.set_training_data(predict_array[:, :, :, :, 2, np.newaxis], Y_array[:, :, :, :, 2, np.newaxis])
 
-# predict_pre_train(predict_CNN, predict_array, model_path)
-predict_train(predict_CNN, predict_array, Y_array, model_path)
+predict_pre_train(predict_CNN, predict_array, model_path)
+# predict_train(predict_CNN, predict_array, Y_array, model_path)
 
 
 # _, fake_predict_y = predict_CNN.predict_data(fake_data, model_path)
