@@ -47,7 +47,6 @@ class CNN_autoencoder:
 		self._set_pre_train_para(**network_para)
 		self._set_predictior_para(**network_para)
 
-
 	def _set_predictior_para(self, **network_para):
 		# tf.reset_default_graph()
 		# pre_train_saver = tf.train.import_meta_graph('/home/mldp/ML_with_bigdata/output_model/AE_pre_32_32_test.ckpt_part.meta')
@@ -63,30 +62,17 @@ class CNN_autoencoder:
 		'''
 		with tf.variable_scope("predictior"):
 			self.fc1 = network_para.get('fc1')
-			# fc1_input = self.input_temporal * self.input_vertical * self.input_horizontal * self.input_channel
-			fc1_input = self.input_temporal * self.input_vertical * self.input_horizontal * self.input_channel * network_para.get('conv3')
-			fc2_output = self.output_temporal * self.output_vertical * self.output_horizontal * self.output_channel
+			# fc1_input = self.input_temporal * self.input_vertical * self.input_horizontal * self.input_channel * network_para.get('conv3')
+			predictor_output = self.output_temporal * self.output_vertical * self.output_horizontal * self.output_channel
 			with tf.device('/cpu:0'):
 				self.predictor_weights = {
-					'fc1': self.weight_variable([fc1_input, self.fc1], 'fc1_w'),
-					'fc2': self.weight_variable([self.fc1, fc2_output], 'fc2_w')
+					'predictor': self.weight_variable([self.fc1, predictor_output], 'predictor_w')
 				}
 				self.predictor_bias = {
-					'fc1': self.bias_variable([self.fc1], 'fc1_b'),
-					'fc2': self.bias_variable([fc2_output], 'fc2_b')
+					'predictor': self.bias_variable([predictor_output], 'predictor_b')
 				}
-			'''
-			with tf.variable_scope("pre_train") as scope:
-				self._set_pre_train_para(**self.network_para)
-				scope.reuse_variables()
-				self.pre_encoder_OP, self.pre_endecoder_OP = self._pre_train_net(
-					self.Xs,
-					self.pre_weights,
-					self.pre_bias,
-					self.keep_prob,
-					self.norm)
-			'''
-			self.train_predictor = self._predictor_net(self.pre_train_output, self.predictor_weights, self.predictor_bias, self.keep_prob, self.norm)
+
+			self.train_predictor = self._predictor_net(self.pre_train_output, self.predictor_weights['predictor'], self.predictor_bias['predictor'], self.keep_prob, self.norm)
 			MSE_loss = self.MSE_loss(self.Ys, self.train_predictor)
 			RMSE_loss = self._RMSE_loss(self.Ys, self.train_predictor)
 			MAE_loss = self._absolute_error(self.Ys, self.train_predictor)
@@ -107,31 +93,22 @@ class CNN_autoencoder:
 				learning_rate=self.learning_rate).minimize(train_cost)
 		self.saver = tf.train.Saver()
 
-	def _predictor_net(self, x, weights, bias, dropout, norm=0):
+	def _predictor_net(self, x, weight, bias, dropout, norm=0):
 		input_shape = x.get_shape()
 		print('x:', input_shape)
-		train_net_input = tf.reshape(x, [-1, weights['fc1'].get_shape().as_list()[0]])
-		print('train_net_input:', train_net_input.get_shape())
-		fc1 = self.batch_normalize(train_net_input, 'fc1', norm)
-		# fc1 = tf.nn.relu(fc1)
-		fc1 = tf.add(tf.matmul(fc1, weights['fc1']), bias['fc1'])
-		fc1 = tf.nn.relu(fc1)
-		fc1 = tf.nn.dropout(fc1, dropout)
-		print('fc1:', fc1.get_shape())
-
-		fc2 = self.batch_normalize(fc1, 'fc2', norm)
-		fc2 = tf.add(tf.matmul(fc2, weights['fc2']), bias['fc2'])
-		fc2 = tf.nn.dropout(fc2, dropout)
-		fc2 = tf.nn.relu(fc2)
-		print('fc2: {}'.format(fc2.get_shape()))
-		train_output = tf.reshape(fc2, [-1, self.output_temporal, self.output_vertical, self.output_horizontal, self.output_channel])
+		predictor = self.batch_normalize(x, 'predictor', norm)
+		predictor = tf.add(tf.matmul(predictor, weight), bias)
+		predictor = tf.nn.dropout(predictor, dropout)
+		predictor = tf.nn.tanh(predictor)
+		print('predictor: {}'.format(predictor.get_shape()))
+		train_output = tf.reshape(predictor, [-1, self.output_temporal, self.output_vertical, self.output_horizontal, self.output_channel])
 		print('train_output {}'.format(train_output.get_shape()))
 		return train_output
 
 	def _set_pre_train_para(self, **network_para):
 
-		def train_layer(input_array, weight, bias, var_name, dropout, norm=0, loss_func='RMSE', weight_decay=self.weight_decay):
-			def build_network(input_array, weight, bias, var_name, dropout, norm=0):
+		def train_layer(input_array, weight, bias, var_name, dropout, norm=0, layer_type='flat', loss_func='RMSE', weight_decay=self.weight_decay):
+			def build_conv_network(input_array, weight, bias, var_name, dropout, norm=0):
 				print('input shape :{}'.format(input_array.get_shape()))
 				# k_size = {'temporal': 6, 'vertical': 5, 'horizontal': 5}
 				strides_size = {'temporal': 1, 'vertical': 1, 'horizontal': 1}
@@ -158,13 +135,40 @@ class CNN_autoencoder:
 
 				return conv, deconv
 
-			conv, deconv = build_network(input_array, weight, bias, var_name, dropout, norm)
+			def build_flat_network(input_array, weight, bias, var_name, dropout, norm=0):
+				input_shape = input_array.get_shape()
+				print('input shape :{}'.format(input_shape))
+				train_net_input = tf.reshape(input_array, [-1, weight.get_shape().as_list()[0]])
+				print('train_net_input:', train_net_input.get_shape())
+				fc_encode = self.batch_normalize(train_net_input, var_name, norm)
+				fc_encode = tf.add(tf.matmul(fc_encode, weight), bias)
+				fc_encode = tf.nn.tanh(fc_encode)
+				fc_encode = tf.nn.dropout(fc_encode, dropout)
+				print('fc encode shape:', fc_encode.get_shape())
+
+				# decoder
+				defc_w = self.weight_variable([weight.get_shape().as_list()[1], weight.get_shape().as_list()[0]], 'temp')
+				defc_b = self.bias_variable([weight.get_shape().as_list()[0]], 'temp')
+				fc_decoder = tf.add(tf.matmul(fc_encode, defc_w), defc_b)
+				fc_decoder = tf.nn.tanh(fc_decoder)
+				fc_decoder = tf.nn.dropout(fc_decoder, dropout)
+
+				return fc_encode, fc_decoder
+
+			if layer_type == 'flat':
+				input_array = tf.reshape(input_array, [-1, weight.get_shape().as_list()[0]])
+				encode, decode = build_flat_network(input_array, weight, bias, var_name, dropout, norm)
+			elif layer_type == 'conv':
+				encode, decode = build_conv_network(input_array, weight, bias, var_name, dropout, norm)
+			else:
+				print('no these type')
+				return
 
 			# layer operation
-			kl_divergence, temp_term = self._sum_Kl_div(conv)
-			pre_MSE = self.MSE_loss(deconv, input_array)
-			pre_MAE = self._absolute_error(input_array, deconv)
-			pre_RMSE = self._RMSE_loss(input_array, deconv)
+			kl_divergence, temp_term = self._sum_Kl_div(encode)
+			pre_MSE = self.MSE_loss(decode, input_array)
+			pre_MAE = self._absolute_error(input_array, decode)
+			pre_RMSE = self._RMSE_loss(input_array, decode)
 			pre_L2 = self._L2_norm({var_name: weight})
 
 			if loss_func == 'MAE':
@@ -196,9 +200,9 @@ class CNN_autoencoder:
 				'MAE': pre_MAE,
 				'MSE': pre_MSE,
 				'kl_diver': kl_divergence,
-				'temp': conv
+				'temp': encode
 			}
-			return pre_optimizer_OP, conv, deconv, loss
+			return pre_optimizer_OP, encode, decode, loss
 
 		def add_pre_train_layer(encoder, decoder, optimizer_OP, loss_set, layer_name=None):
 			layer = {
@@ -215,6 +219,8 @@ class CNN_autoencoder:
 			self.conv1 = network_para.get('conv1')
 			self.conv2 = network_para.get('conv2')
 			self.conv3 = network_para.get('conv3')
+			self.fc1 = network_para.get('fc1')
+			fc1_input = self.input_temporal * self.input_vertical * self.input_horizontal * self.input_channel * self.conv3
 			self.pre_train_layer = []
 			with tf.device('/cpu:0'):
 
@@ -223,6 +229,7 @@ class CNN_autoencoder:
 					'conv1': self.weight_variable([3, 5, 5, self.input_channel, self.conv1], 'conv1_w'),
 					'conv2': self.weight_variable([3, 5, 5, self.conv1, self.conv2], 'conv2_w'),
 					'conv3': self.weight_variable([3, 5, 5, self.conv2, self.conv3], 'conv3_w'),
+					'fc1': self.weight_variable([fc1_input, self.fc1], 'fc1_w'),
 					# 'deconv1': self.weight_variable([3, 5, 5, self.conv2, self.conv3], 'deconv1_w'),
 					# 'deconv2': self.weight_variable([3, 5, 5, self.conv1, self.conv2], 'deconv2_w'),
 					# 'deconv3': self.weight_variable([3, 5, 5, self.input_channel, self.conv1], 'deconv3_w')
@@ -231,6 +238,7 @@ class CNN_autoencoder:
 					'conv1': self.bias_variable([self.conv1], 'conv1_b'),
 					'conv2': self.bias_variable([self.conv2], 'conv2_b'),
 					'conv3': self.bias_variable([self.conv3], 'conv3_b'),
+					'fc1': self.bias_variable([self.fc1], 'fc1_b'),
 					# 'deconv1': self.bias_variable([self.conv2], 'deconv1_b'),
 					# 'deconv2': self.bias_variable([self.conv1], 'deconv2_b'),
 					# 'deconv3': self.bias_variable([self.input_channel], 'deconv3_b')
@@ -245,6 +253,7 @@ class CNN_autoencoder:
 				'conv1',
 				self.keep_prob,
 				self.norm,
+				'conv',
 				'MAE',
 				weight_decay=100)
 			add_pre_train_layer(en_conv_1, self.de_conv_1, pre_optimizer_OP_layer_1, self.pre_loss_1, 'conv1')
@@ -255,6 +264,7 @@ class CNN_autoencoder:
 				'conv2',
 				self.keep_prob,
 				self.norm,
+				'conv',
 				'RMSE',
 				weight_decay=100)
 			add_pre_train_layer(en_conv_2, de_conv_2, pre_optimizer_OP_layer_2, pre_loss_2, 'conv2')
@@ -265,9 +275,20 @@ class CNN_autoencoder:
 				'conv3',
 				self.keep_prob,
 				self.norm,
+				'conv',
 				'RMSE')
 			add_pre_train_layer(en_conv_3, de_conv_3, pre_optimizer_OP_layer_3, pre_loss_3, 'conv3')
-			self.pre_train_output = en_conv_3
+			pre_optimizer_OP_layer_4, en_code_4, de_code_4, pre_loss_4 = train_layer(
+				en_conv_2,
+				self.pre_weights['fc1'],
+				self.pre_bias['fc1'],
+				'fc1',
+				self.keep_prob,
+				self.norm,
+				'flat',
+				'RMSE')
+			add_pre_train_layer(en_code_4, de_code_4, pre_optimizer_OP_layer_4, pre_loss_4, 'fc1')
+			self.pre_train_output = en_code_4
 			'''
 			self.pre_optimizer_list = [pre_optimizer_OP_layer_1, pre_optimizer_OP_layer_2, pre_optimizer_OP_layer_3]
 			self.pre_loss = [self.pre_loss_1, pre_loss_2, pre_loss_3]
@@ -877,8 +898,6 @@ class CNN_autoencoder:
 			tf.summary.FileWriter('logs/', sess.graph)
 
 			for i, each_layer in enumerate(self.pre_train_layer):
-				if i not in [0, 1, 2]:
-					continue
 				history_data = {
 					'training_loss_his': [],
 					'testting_loss_hist': [],
@@ -928,12 +947,17 @@ class CNN_autoencoder:
 						average_training_loss = cumulate_loss / self.display_step
 						average_RMSE = cumulate_RMSE / self.display_step
 						average_cumulate_abd = cumulate_abd / self.display_step
-						index, testing_X, testing_Y = self._read_all_data_from_Tfreoced(
-							self.testing_file)
-						testing_loss, _ = self._testing_data(
-							sess, testing_X, testing_X, 'pre_train')   # batch_x it_self
-						print('testing_loss:{} average_training_loss:{} average absolute distance {} average RMSE {}'.format(
-							testing_loss, average_training_loss, average_cumulate_abd, average_RMSE))
+						if i == 0:
+							index, testing_X, testing_Y = self._read_all_data_from_Tfreoced(
+								self.testing_file)
+							testing_loss, _ = self._testing_data(
+								sess, testing_X, testing_X, 'pre_train')   # batch_x it_self
+							print('testing_loss:{} average_training_loss:{} average absolute distance {} average RMSE {}'.format(
+								testing_loss, average_training_loss, average_cumulate_abd, average_RMSE))
+						else:
+							print('average_training_loss:{} average absolute distance {} average RMSE {}'.format(
+								average_training_loss, average_cumulate_abd, average_RMSE))
+
 						history_data['epoch'].append(epoch)
 						history_data['training_loss_his'].append(average_training_loss)
 						history_data['testting_loss_hist'].append(0)
@@ -943,7 +967,7 @@ class CNN_autoencoder:
 						cumulate_RMSE = 0
 						cumulate_abd = 0
 						plot_history(axs, history_data)
-						
+
 					if epoch % 200 == 0 and epoch != 0:
 						self._save_model(sess, model_path['pretrain_save'])
 						# self._save_model(sess, model_path['save_weight_bias'])
