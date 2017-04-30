@@ -12,8 +12,9 @@ from math import sqrt
 class CNN_autoencoder:
 	def __init__(self, *data_shape, **network_para):
 		self.network_para = network_para
-		self.learning_rate = 0.0005
-		self.training_iters = 1000
+		self.learning_rate = 0.00005
+		self.training_iters = 2000
+		self.pre_train_iters = 500
 		self.batch_size = 100
 		self.display_step = 25
 		self.dropout = 0.7
@@ -45,6 +46,7 @@ class CNN_autoencoder:
 		# operation
 		self._set_pre_train_para(**network_para)
 		self._set_predictior_para(**network_para)
+
 
 	def _set_predictior_para(self, **network_para):
 		# tf.reset_default_graph()
@@ -90,7 +92,7 @@ class CNN_autoencoder:
 			MAE_loss = self._absolute_error(self.Ys, self.train_predictor)
 			L2_norm = self._L2_norm(self.predictor_weights)
 			L2_norm += self._L2_norm(self.pre_weights)
-			train_cost = RMSE_loss + L2_norm * self.weight_decay
+			train_cost = MSE_loss + L2_norm * self.weight_decay
 
 			self.predictor_loss = {
 				'MSE': MSE_loss,
@@ -131,6 +133,7 @@ class CNN_autoencoder:
 		def train_layer(input_array, weight, bias, var_name, dropout, norm=0, loss_func='RMSE', weight_decay=self.weight_decay):
 			def build_network(input_array, weight, bias, var_name, dropout, norm=0):
 				print('input shape :{}'.format(input_array.get_shape()))
+				# k_size = {'temporal': 6, 'vertical': 5, 'horizontal': 5}
 				strides_size = {'temporal': 1, 'vertical': 1, 'horizontal': 1}
 				deconv_w = self.weight_variable([3, 5, 5, weight.get_shape().as_list()[3], weight.get_shape().as_list()[4]], 'temp')
 				deconv_b = self.bias_variable([input_array.get_shape().as_list()[-1]], 'temp')
@@ -139,6 +142,7 @@ class CNN_autoencoder:
 				conv = self.conv3d(conv, weight, bias, strides_size)
 				conv = tf.nn.relu(conv)
 				conv = tf.nn.dropout(conv, dropout)
+				# conv = self.maxpool3d(conv, k_size, strides_size)
 
 				# decoder
 				print('conv shape :{}'.format(conv.get_shape()))
@@ -149,10 +153,11 @@ class CNN_autoencoder:
 					self.input_horizontal,
 					input_array.get_shape().as_list()[-1]])
 				deconv = self.deconv3d(conv, deconv_w, deconv_b, output_shape_of_deconv, strides_size)
-				# deconv = tf.nn.relu(deconv)
+				# deconv = tf.nn.tanh(deconv)
 				deconv = tf.nn.dropout(deconv, dropout)
 
 				return conv, deconv
+
 			conv, deconv = build_network(input_array, weight, bias, var_name, dropout, norm)
 
 			# layer operation
@@ -195,12 +200,22 @@ class CNN_autoencoder:
 			}
 			return pre_optimizer_OP, conv, deconv, loss
 
+		def add_pre_train_layer(encoder, decoder, optimizer_OP, loss_set, layer_name=None):
+			layer = {
+				'layer_name': layer_name,
+				'optimizer': optimizer_OP,
+				'encoder': encoder,
+				'deocer': decoder,
+				'loss_set': loss_set}
+			self.pre_train_layer.append(layer)
+
 		with tf.variable_scope("pre_train"):
 			# network parameter
 			self.pooling_times = 0
 			self.conv1 = network_para.get('conv1')
 			self.conv2 = network_para.get('conv2')
 			self.conv3 = network_para.get('conv3')
+			self.pre_train_layer = []
 			with tf.device('/cpu:0'):
 
 				# variable, control filter size
@@ -232,6 +247,7 @@ class CNN_autoencoder:
 				self.norm,
 				'MAE',
 				weight_decay=100)
+			add_pre_train_layer(en_conv_1, self.de_conv_1, pre_optimizer_OP_layer_1, self.pre_loss_1, 'conv1')
 			pre_optimizer_OP_layer_2, en_conv_2, de_conv_2, pre_loss_2 = train_layer(
 				en_conv_1,
 				self.pre_weights['conv2'],
@@ -241,6 +257,7 @@ class CNN_autoencoder:
 				self.norm,
 				'RMSE',
 				weight_decay=100)
+			add_pre_train_layer(en_conv_2, de_conv_2, pre_optimizer_OP_layer_2, pre_loss_2, 'conv2')
 			pre_optimizer_OP_layer_3, en_conv_3, de_conv_3, pre_loss_3 = train_layer(
 				en_conv_2,
 				self.pre_weights['conv3'],
@@ -249,9 +266,12 @@ class CNN_autoencoder:
 				self.keep_prob,
 				self.norm,
 				'RMSE')
+			add_pre_train_layer(en_conv_3, de_conv_3, pre_optimizer_OP_layer_3, pre_loss_3, 'conv3')
+			self.pre_train_output = en_conv_3
+			'''
 			self.pre_optimizer_list = [pre_optimizer_OP_layer_1, pre_optimizer_OP_layer_2, pre_optimizer_OP_layer_3]
 			self.pre_loss = [self.pre_loss_1, pre_loss_2, pre_loss_3]
-			self.pre_train_output = en_conv_3
+			'''
 			'''
 			# operation
 			self.pre_encoder_OP, self.pre_endecoder_OP, kl_divergence_OP = self._pre_train_net(
@@ -855,7 +875,8 @@ class CNN_autoencoder:
 			coord = tf.train.Coordinator()
 			treads = tf.train.start_queue_runners(sess=sess, coord=coord)
 			tf.summary.FileWriter('logs/', sess.graph)
-			for i, optimizer in enumerate(self.pre_optimizer_list):
+
+			for i, each_layer in enumerate(self.pre_train_layer):
 				if i not in [0, 1, 2]:
 					continue
 				history_data = {
@@ -876,8 +897,9 @@ class CNN_autoencoder:
 				cumulate_loss = 0
 				cumulate_RMSE = 0
 				cumulate_abd = 0
-				loss_set = self.pre_loss[i]
-				while epoch < self.training_iters:
+				loss_set = each_layer['loss_set']
+				optimizer = each_layer['optimizer']
+				while epoch < self.pre_train_iters:
 					index, batch_x, batch_y = sess.run(batch_tuple_OP)
 					# print('index:{}'.format(index))
 					loss = 0.
@@ -894,7 +916,6 @@ class CNN_autoencoder:
 							loss_set['MSE']],
 							feed_dict={
 							self.Xs: batch_x,
-							self.Ys: batch_y,
 							self.keep_prob: self.dropout,
 							self.norm: 1})
 					print('i:%d Epoch:%d  cost:%g absolute_distance:%g L2:%g kl:%g RMSE:%g MSE:%g' % (i, epoch, loss, absolute_distance, L2, kl, RMSE, MSE))
@@ -931,8 +952,9 @@ class CNN_autoencoder:
 			coord.request_stop()
 			coord.join(treads)
 			print('pre training finished!')
-			# plt.ioff()
 			self._save_model(sess, model_path['pretrain_save'])
+			plt.ioff()
+			plt.show()
 
 	def start_train(self, model_path, restore=False):
 
@@ -1064,7 +1086,7 @@ class CNN_autoencoder:
 						average_cost = cum_value['cost'] / self.display_step
 						index, testing_X, testing_Y = self._read_all_data_from_Tfreoced(self.testing_file)
 						testing_loss, _ = self._testing_data(sess, testing_X, testing_Y, 'train')
-						print('testing_loss:{} average_training_loss:{}'.format(testing_loss, average_SE_loss))
+						print('testing_loss:{} average_training_loss:{}'.format(testing_loss, average_cost))
 
 						history_data['epoch'].append(epoch)
 						history_data['testing_loss_his'].append(testing_loss)

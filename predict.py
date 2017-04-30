@@ -4,6 +4,7 @@ import numpy as np
 import pytz
 from datetime import datetime
 import data_utility as du
+from sklearn import preprocessing
 
 
 def set_time_zone(timestamp):
@@ -82,76 +83,81 @@ def plot_predict_vs_real2(real, predict):
 
 
 def plot_predict_vs_real(real, predict):
+	def __plot(plot_1, plot_2):
+		x = range(len(plot_1['time_str']))
+		fig = plt.figure()
+		ax1 = fig.add_subplot(211)
+		ax2 = fig.add_subplot(212)
 
-	# grid_id_1 = real[0,0,10,10,0]
-	# grid_id_2 = real[0,0,30,20,0]
-	plot_1_row = 9
-	plot_1_col = 5
-	plot_2_row = 10
-	plot_2_col = 20
-	plot_1 = {
-		'grid_id': int(real[0, 0, plot_1_row, plot_1_col, 0]),
-		'predict': [],
-		'real': []
-	}
-	plot_2 = {
-		'grid_id': int(real[0, 0, plot_2_row, plot_2_col, 0]),
-		'predict': [],
-		'real': []
-	}
-	time_x = []
-	for i in range(300):
-		for j in range(real.shape[1]):
-			plot_1['real'].append(real[i, j, plot_1_row, plot_1_col, 2])
-			plot_1['predict'].append(predict[i, j, plot_1_row, plot_1_col])
-			# print('id:{},real:{},predict:{}'.format(plot_1['grid_id'],real[i,j,10,10,2],predict[i,j,10,10]))
-			plot_2['real'].append(real[i, j, plot_2_row, plot_2_col, 2])
-			plot_2['predict'].append(predict[i, j, plot_2_row, plot_2_col])
-			# print('id: {},real: {},predict: {}'.format(plot_2['grid_id'], real[i, j, plot_2_row, plot_2_col, 2], predict[i, j, plot_2_row, plot_2_col]))
+		plt.xlabel('time sequence')
+		plt.ylabel('activity strength')
 
-			data_time = set_time_zone(int(real[i, j, plot_1_row, plot_1_col, 1]))
-			time_x.append(date_time_covert_to_str(data_time))
-	'''
-	for time_str in time_x:
-		print(time_str)
-	'''
-	x = range(len(time_x))
-	fig = plt.figure()
-	ax1 = fig.add_subplot(211)
-	ax2 = fig.add_subplot(212)
+		ax1.plot(x, plot_1['real'], label='real', marker='.')
+		ax1.plot(x, plot_1['predict'], label='predict', marker='.')
+		ax1.set_xticks(list(range(0, 300, 12)))
+		ax1.set_xticklabels(plot_1['time_str'][0:300:12], rotation=45)
+		ax1.set_title(plot_1['grid_id'])
+		ax1.grid()
+		# ax1.set_ylabel('time sequence')
+		# ax1.set_xlabel('activity strength')
+		ax1.legend()
 
-	plt.xlabel('time sequence')
-	plt.ylabel('activity strength')
+		ax2.plot(x, plot_2['real'], label='real', marker='.')
+		ax2.plot(x, plot_2['predict'], label='predict', marker='.')
+		ax2.set_xticks(list(range(0, 300, 12)))
+		ax2.set_xticklabels(plot_2['time_str'][0:300:12], rotation=45)
+		ax2.set_title(plot_2['grid_id'])
+		ax2.grid()
+		# ax2.set_ylabel('time sequence')
+		# ax2.set_xlabel('activity strength')
+		ax2.legend()
+		print('\ngrid id {}'.format(plot_1['grid_id']))
+		compute_loss_rate(np.array(plot_1['real']), np.array(plot_1['predict']))
+		print('\ngrid id {}'.format(plot_2['grid_id']))
+		compute_loss_rate(np.array(plot_2['real']), np.array(plot_2['predict']))
 
-	ax1.plot(x, plot_1['real'], label='real', marker='.')
-	ax1.plot(x, plot_1['predict'], label='predict', marker='.')
-	ax1.set_xticks(list(range(0, 300, 12)))
-	ax1.set_xticklabels(time_x[0:300:12], rotation=45)
-	ax1.set_title(plot_1['grid_id'])
-	ax1.grid()
-	# ax1.set_ylabel('time sequence')
-	# ax1.set_xlabel('activity strength')
-	ax1.legend()
+	def __get_plot_data(real, predict, *plt_row_col):
+		plot_1_row, plot_1_col, plot_2_row, plot_2_col = plt_row_col
+		plot_1 = {
+			'grid_id': int(real[0, 0, plot_1_row, plot_1_col, 0]),
+			'predict': [],
+			'real': [],
+			'time_str': []
+		}
+		plot_2 = {
+			'grid_id': int(real[0, 0, plot_2_row, plot_2_col, 0]),
+			'predict': [],
+			'real': [],
+			'time_str': []
+		}
 
-	ax2.plot(x, plot_2['real'], label='real', marker='.')
-	ax2.plot(x, plot_2['predict'], label='predict', marker='.')
-	ax2.set_xticks(list(range(0, 300, 12)))
-	ax2.set_xticklabels(time_x[0:300:12], rotation=45)
-	ax2.set_title(plot_2['grid_id'])
-	ax2.grid()
-	# ax2.set_ylabel('time sequence')
-	# ax2.set_xlabel('activity strength')
-	ax2.legend()
-	print('grid error:')
-	compute_loss_rate(np.array(plot_1['real']), np.array(plot_1['predict']))
-	compute_loss_rate(np.array(plot_2['real']), np.array(plot_2['predict']))
+		for i in range(300):
+			for j in range(real.shape[1]):
+				plot_1['real'].append(real[i, j, plot_1_row, plot_1_col, 2])
+				plot_1['predict'].append(predict[i, j, plot_1_row, plot_1_col])
+				# print('id:{},real:{},predict:{}'.format(plot_1['grid_id'],real[i,j,10,10,2],predict[i,j,10,10]))
+				plot_2['real'].append(real[i, j, plot_2_row, plot_2_col, 2])
+				plot_2['predict'].append(predict[i, j, plot_2_row, plot_2_col])
+				# print('id: {},real: {},predict: {}'.format(plot_2['grid_id'], real[i, j, plot_2_row, plot_2_col, 2], predict[i, j, plot_2_row, plot_2_col]))
+
+				data_time = set_time_zone(int(real[i, j, plot_1_row, plot_1_col, 1]))
+				plot_1['time_str'].append(date_time_covert_to_str(data_time))
+				data_time = set_time_zone(int(real[i, j, plot_2_row, plot_2_col, 1]))
+				plot_2['time_str'].append(date_time_covert_to_str(data_time))
+
+		__plot(plot_1, plot_2)
+
+	__get_plot_data(real, predict, 20, 10, 20, 11)
+	__get_plot_data(real, predict, 10, 5, 10, 10)
+	
+
 	plt.show()
 
 
 def compute_loss_rate(real, predict):
 	# print(real.shape, predict.shape)
 	# ab_sum = (np.absolute(real - predict).sum()) / real.size
-	print('real shape {} predict shape {}'.format(real.shape, predict.shape))
+	# print('real shape {} predict shape {}'.format(real.shape, predict.shape))
 	ab_sum = (np.absolute(real - predict).mean())
 	print('AE:', ab_sum)
 
@@ -228,6 +234,15 @@ def prepare_predict_data():
 
 
 def get_X_and_Y_array():
+	def _copy(old, new):
+		# print(old.shape, new.shape)
+		for i in range(old.shape[0]):
+			for j in range(old.shape[1]):
+				for row in range(old.shape[2]):
+					for col in range(old.shape[3]):
+						old[i, j, row, col, -1] = new[i, j, row, col, -1]  # internet
+
+		return old
 	training_data_list = du.list_all_input_file('./npy/final/testing_raw_data/')
 	training_data_list.sort()
 	X_array_list = []
@@ -245,6 +260,11 @@ def get_X_and_Y_array():
 		Y_array_list.append(du.load_array('./npy/final/testing_raw_data/one_hour_max_value/' + filename))
 	Y_array = np.concatenate(Y_array_list, axis=0)
 	del Y_array_list
+
+	new_X_array = feature_scaling(X_array[:, :, :, :, -1, np.newaxis])
+	new_Y_array = feature_scaling(Y_array[:, :, :, :, -1, np.newaxis])
+	X_array = _copy(X_array, new_X_array)
+	Y_array = _copy(Y_array, new_Y_array)
 	return X_array, Y_array
 
 
@@ -265,6 +285,14 @@ def predict_train(CNN, predict_array, Y_array, model_path):
 	plot_predict_vs_real(Y_array[1:], predict_y)
 
 
+def feature_scaling(input_datas):
+	input_shape = input_datas.shape
+	input_datas = input_datas.reshape(input_shape[0], -1)
+	min_max_scaler = preprocessing.MinMaxScaler(feature_range=(0, 255))
+	output = min_max_scaler.fit_transform(input_datas)
+	output = output.reshape(input_shape)
+	return output
+
 # prepare_predict_data()
 # fake_data = random_generate_data()
 
@@ -274,13 +302,14 @@ Y_array = Y_array[0:400]
 # print(Y_array[0, 0, 10, 20, -1])
 # predict_array = predict_array[0:400]
 
-network_parameter = {'conv1': 128, 'conv2': 64, 'conv3': 32, 'fc1': 512, 'fc2': 512}
+# network_parameter = {'conv1': 128, 'conv2': 64, 'conv3': 32, 'fc1': 512, 'fc2': 512}
+network_parameter = {'conv1': 128, 'conv2': 64, 'conv3': 32, 'fc1': 512, 'fc2': 1024}
 data_shape = [predict_array.shape[1], predict_array.shape[2], predict_array.shape[3], 1]
 predict_CNN = cn.CNN_autoencoder(*data_shape, **network_parameter)
 model_path = {
 	'pretrain_save': '/home/mldp/ML_with_bigdata/output_model/AE_pre_64_32_32_test.ckpt',
 	'pretrain_reload': '/home/mldp/ML_with_bigdata/output_model/AE_pre_64_32_32_test.ckpt',
-	'reload': '/home/mldp/ML_with_bigdata/output_model/train_test2.ckpt',
+	'reload': '/home/mldp/ML_with_bigdata/output_model/train_128_64_32_512_512.ckpt',
 	'save': '/home/mldp/ML_with_bigdata/output_model/train_test2.ckpt'
 }
 predict_CNN.set_training_data(predict_array[:, :, :, :, 2, np.newaxis], Y_array[:, :, :, :, 2, np.newaxis])
