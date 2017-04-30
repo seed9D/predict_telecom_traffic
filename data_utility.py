@@ -38,6 +38,19 @@ def get_MAX_internet_array(internet_input_array):
 	# print('output array shape {}'.format(output_array.shape))
 	return output_array
 
+def load_data_format_roll_10mins(input_dir, filelist):
+	def load_array(input_file):
+		print('loading file from {}...'.format(input_file))
+		X = np.load(input_file)
+		return X.astype(np.float32)
+
+	month, _ = os.path.split(input_dir)
+	month = month.split('/')[-2]
+	data_array_list = []
+	for file_name in filelist:
+		data_array_list.append(load_array(input_dir + file_name))
+	data_array = np.concatenate(data_array_list, axis=0)
+	del data_array_list
 
 def load_data_format(input_dir, filelist):
 	def load_array(input_file):
