@@ -38,19 +38,56 @@ def get_MAX_internet_array(internet_input_array):
 	# print('output array shape {}'.format(output_array.shape))
 	return output_array
 
+
 def load_data_format_roll_10mins(input_dir, filelist):
 	def load_array(input_file):
 		print('loading file from {}...'.format(input_file))
 		X = np.load(input_file)
 		return X.astype(np.float32)
 
+	def split_data(data_array):
+		split_block_size = 6
+		data_array_depth = data_array.shape[0]
+		new_data_length = data_array_depth - split_block_size
+
+		# remainder = data_array_depth % split_block_size
+		split_data_X_list = []
+		split_data_Y_list = []
+		for index in range(new_data_length):
+			split_data_X = data_array[index: index + split_block_size]
+			split_data_X = np.stack(split_data_X, axis=0)
+			# print('split_data_X shape:{}'.format(split_data_X.shape))
+			split_data_Y = data_array[index + split_block_size]
+			split_data_X_list.append(split_data_X)
+			split_data_Y_list.append(split_data_Y)
+		X = np.stack(split_data_X_list, axis=0)
+		del split_data_X_list
+		Y = np.stack(split_data_Y_list, axis=0)
+		Y = np.expand_dims(Y, axis=1)
+		del split_data_Y_list
+		print('x shape {} y shape {}'.format(X.shape, Y.shape))
+		return X, Y
+
 	month, _ = os.path.split(input_dir)
 	month = month.split('/')[-2]
 	data_array_list = []
-	for file_name in filelist:
+	data_group_para = 10
+	data_divide_amount = (len(filelist) // data_group_para) + 1
+	for i, file_name in enumerate(filelist):
 		data_array_list.append(load_array(input_dir + file_name))
+		if i % data_group_para == 0 and i != 0:
+			index = i // data_group_para
+			data_array = np.concatenate(data_array_list, axis=0)
+			data_array_list = []
+			X, Y = split_data(data_array)
+			save_array(X, './npy/npy_roll/X/' + month + '_roll_X_' + str(index))
+			save_array(Y, './npy/npy_roll/Y/' + month + '_roll_y_' + str(index))
+	# remainder
 	data_array = np.concatenate(data_array_list, axis=0)
 	del data_array_list
+	X, Y = split_data(data_array)
+	save_array(X, './npy/npy_roll/X/' + month + '_roll_X_' + str(data_divide_amount))
+	save_array(Y, './npy/npy_roll/Y/' + month + '_roll_y_' + str(data_divide_amount))
 
 def load_data_format(input_dir, filelist):
 	def load_array(input_file):
@@ -80,7 +117,7 @@ def load_data_format(input_dir, filelist):
 			generate more data
 		'''
 		array_list = []
-		for shift_index in range(3):
+		for shift_index in [0, 2, 4, 5]:
 			shift_array = data_array[shift_index:]
 			array_list.append(split_array(shift_array))
 
