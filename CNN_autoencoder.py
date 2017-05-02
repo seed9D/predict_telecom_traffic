@@ -280,6 +280,7 @@ class CNN_autoencoder:
 				'conv',
 				'MSE',
 				weight_decay=10)
+
 			_, encode, decode, pre_loss = train_layer(
 				encode,
 				self.pre_weights['conv2'],
@@ -290,6 +291,7 @@ class CNN_autoencoder:
 				'conv',
 				'MSE',
 				weight_decay=10)
+
 			_, encode, decode, pre_loss = train_layer(
 				encode,
 				self.pre_weights['conv3'],
@@ -349,7 +351,7 @@ class CNN_autoencoder:
 				'flat',
 				'MSE')
 
-			self.pre_train_output = encode
+			self.pre_train_output = self.pre_train_layer[-1]['encode']
 
 
 	def _pre_train_net(self, x, weights, bias, dropout, norm=0):
