@@ -13,15 +13,15 @@ from math import sqrt
 class CNN_autoencoder:
 	def __init__(self, *data_shape, **network_para):
 		self.network_para = network_para
-		self.learning_rate = 0.00005
+		self.learning_rate = 0.0002
 		self.training_iters = 2000
 		self.pre_train_iters = 500
-		self.batch_size = 100
-		self.display_step = 100
+		self.batch_size = 70
+		self.display_step = 50
 		self.dropout = 0.7
 		self.shuffle_min_after_dequeue = 600
 		self.shuffle_capacity = self.shuffle_min_after_dequeue + 3 * self.batch_size
-		self.weight_decay = 10
+		self.weight_decay = 0.01
 		self.Kl_beta = 1e-3
 		self.kl_sparsity_parameter = 0.4
 
@@ -270,7 +270,7 @@ class CNN_autoencoder:
 
 				# self.mean = tf.Variable(tf.zeros([self.input_channel]),name='mean',trainable=False,)
 				# self.std = tf.Variable(tf.zeros([self.input_channel]),name='std',trainable=False,)
-			pre_optimizer_OP_layer_1, en_conv_1, self.de_conv_1, self.pre_loss_1 = train_layer(
+			pre_optimizer_OP_layer_1, encode, self.de_conv_1, self.pre_loss_1 = train_layer(
 				self.Xs,
 				self.pre_weights['conv1'],
 				self.pre_bias['conv1'],
@@ -279,9 +279,9 @@ class CNN_autoencoder:
 				self.norm,
 				'conv',
 				'MSE',
-				weight_decay=100)
+				weight_decay=10)
 			_, encode, decode, pre_loss = train_layer(
-				en_conv_1,
+				encode,
 				self.pre_weights['conv2'],
 				self.pre_bias['conv2'],
 				'conv2',
@@ -289,7 +289,7 @@ class CNN_autoencoder:
 				self.norm,
 				'conv',
 				'MSE',
-				weight_decay=100)
+				weight_decay=10)
 			_, encode, decode, pre_loss = train_layer(
 				encode,
 				self.pre_weights['conv3'],
@@ -299,6 +299,7 @@ class CNN_autoencoder:
 				self.norm,
 				'conv',
 				'MSE')
+
 			_, encode, decode, pre_loss = train_layer(
 				encode,
 				self.pre_weights['conv4'],
@@ -308,6 +309,7 @@ class CNN_autoencoder:
 				self.norm,
 				'conv',
 				'MSE')
+
 			_, encode, decode, pre_loss = train_layer(
 				encode,
 				self.pre_weights['conv5'],
@@ -317,6 +319,7 @@ class CNN_autoencoder:
 				self.norm,
 				'conv',
 				'MSE')
+			'''
 			_, encode, decode, pre_loss = train_layer(
 				encode,
 				self.pre_weights['conv6'],
@@ -335,6 +338,7 @@ class CNN_autoencoder:
 				self.norm,
 				'conv',
 				'MSE')
+			'''
 			_, encode, decode, pre_loss = train_layer(
 				encode,
 				self.pre_weights['fc1'],
@@ -657,8 +661,8 @@ class CNN_autoencoder:
 		input_x = (input_x - self.mean) / self.std
 		print('input_x shape:', input_x.shape)
 		print('input_y shape {}'.format(input_y.shape))
-		testing_x = input_x[0:-1]
-		testing_y = input_y[1:]
+		testing_x = input_x
+		testing_y = input_y
 		with tf.Session() as sess:
 			loss = 0
 			predict_y = None
@@ -674,7 +678,7 @@ class CNN_autoencoder:
 			print('loss:{} predict_y shape {}'.format(loss, predict_y.shape))
 
 			# testing_y = self.un_normalize_data(sess,testing_y)
-			return input_x[0:-1], predict_y
+			return input_x, predict_y
 	'''
 	def set_pre_model_name(self, reload_model_path, save_model_path):
 
@@ -977,33 +981,31 @@ class CNN_autoencoder:
 					cumulate_loss += loss
 					cumulate_RMSE += RMSE
 					cumulate_abd += absolute_distance
-					history_data['epoch'].append(epoch)
-					history_data['training_loss_his'].append(loss)
-					history_data['testting_loss_hist'].append(0)
-					history_data['absolute_distance'].append(absolute_distance)
-					history_data['RMSE'].append(RMSE)
+
 					if epoch % self.display_step == 0:
 						average_training_loss = cumulate_loss / self.display_step
 						average_RMSE = cumulate_RMSE / self.display_step
 						average_cumulate_abd = cumulate_abd / self.display_step
-						if i == 0:
-							index, testing_X, testing_Y = self._read_all_data_from_Tfreoced(
-								self.testing_file)
-							testing_loss, _ = self._testing_data(
-								sess, testing_X, testing_X, 'pre_train')   # batch_x it_self
-							print('testing_loss:{} average_training_loss:{} average absolute distance {} average RMSE {}'.format(
-								testing_loss, average_training_loss, average_cumulate_abd, average_RMSE))
-						else:
-							print('average_training_loss:{} average absolute distance {} average RMSE {}'.format(
-								average_training_loss, average_cumulate_abd, average_RMSE))
+						history_data['epoch'].append(epoch)
+						history_data['training_loss_his'].append(average_training_loss)
+						history_data['testting_loss_hist'].append(0)
+						history_data['absolute_distance'].append(average_cumulate_abd)
+						history_data['RMSE'].append(average_RMSE)
+						print('average_training_loss:{} average absolute distance {} average RMSE {}'.format(
+							average_training_loss, average_cumulate_abd, average_RMSE))
 
 						cumulate_loss = 0
 						cumulate_RMSE = 0
 						cumulate_abd = 0
 						plot_history(axs, history_data)
-						pre_layer_loss(sess, testing_X)
 
-					if epoch % 200 == 0 and epoch != 0:
+					if epoch % 300 == 0 and epoch != 0:
+						if i == 0:
+							index, testing_X, testing_Y = self._read_all_data_from_Tfreoced(self.testing_file)
+							testing_loss, _ = self._testing_data(
+								sess, testing_X, testing_X, 'pre_train')   # batch_x it_self
+							print('testing loss:{}'.format(testing_loss))
+						pre_layer_loss(sess, testing_X)
 						self._save_model(sess, model_path['pretrain_save'])
 						# self._save_model(sess, model_path['save_weight_bias'])
 						self._save_history(history_data)
@@ -1101,7 +1103,7 @@ class CNN_autoencoder:
 			else:
 				sess.run(tf.global_variables_initializer())
 				print('reloading pre_train model....')
-				self._reload_model(sess, model_path['pretrain_reload'])
+				# self._reload_model(sess, model_path['pretrain_reload'])
 			coord = tf.train.Coordinator()
 			treads = tf.train.start_queue_runners(sess=sess, coord=coord)
 			with tf.device('/gpu:0'):
@@ -1167,3 +1169,27 @@ class CNN_autoencoder:
 			print('training finished!')
 			plt.ioff()
 			plt.show()
+
+	def test_some_function(self):
+		def test_shulffle():
+			data = self._read_data_from_Tfrecord(self.training_file)
+			batch_tuple_OP = tf.train.shuffle_batch(
+				data,
+				batch_size=self.batch_size,
+				capacity=self.shuffle_capacity,
+				min_after_dequeue=self.shuffle_min_after_dequeue)
+
+			with tf.Session() as sess:
+				epoch = 0 
+				coord = tf.train.Coordinator()
+				treads = tf.train.start_queue_runners(sess=sess, coord=coord)
+				while epoch < 30:
+					index, batch_x, batch_y = sess.run(batch_tuple_OP)
+					print('epoch {} batch_x shape:{}'.format(epoch, batch_x.shape))
+					for index_ in index:
+						print('\t{}'.format(index_), end=' ')
+					print()
+					epoch += 1
+				coord.request_stop()
+				coord.join(treads)
+			test_some_function()
