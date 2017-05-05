@@ -23,7 +23,7 @@ class CNN_autoencoder:
 		self.shuffle_capacity = self.shuffle_min_after_dequeue + 3 * self.batch_size
 		self.weight_decay = 0.01
 		self.Kl_beta = 1e-3
-		self.kl_sparsity_parameter = 0.4
+		self.kl_sparsity_parameter = 0.2
 
 		# self.n_input = 100*100
 
@@ -185,7 +185,7 @@ class CNN_autoencoder:
 			if loss_func == 'MAE':
 				pre_cost_OP = pre_MAE + pre_L2 * weight_decay  # + kl_divergence * self.Kl_beta
 			elif loss_func == 'MSE':
-				pre_cost_OP = pre_MSE + pre_L2 * weight_decay  # + kl_divergence * self.Kl_beta
+				pre_cost_OP = pre_MSE + pre_L2 * weight_decay # + kl_divergence * self.Kl_beta
 			else:
 				pre_cost_OP = pre_RMSE + pre_L2 * weight_decay  # + kl_divergence * self.Kl_beta
 			opt_vars = [v for v in tf.trainable_variables() if v.name.startswith("pre_train/" + var_name)]
@@ -301,7 +301,7 @@ class CNN_autoencoder:
 				self.norm,
 				'conv',
 				'MSE')
-
+			'''
 			_, encode, decode, pre_loss = train_layer(
 				encode,
 				self.pre_weights['conv4'],
@@ -321,7 +321,7 @@ class CNN_autoencoder:
 				self.norm,
 				'conv',
 				'MSE')
-			'''
+			
 			_, encode, decode, pre_loss = train_layer(
 				encode,
 				self.pre_weights['conv6'],

@@ -85,7 +85,7 @@ def get_X_and_Y_array():
 		X_array = feature_scaling(X_array)
 		Y_array = feature_scaling(Y_array)
 		X_array = X_array[0: -1]  # important!!
-		Y_array = Y_array[1:]  # important!! Y should shift 10 a unit
+		Y_array = Y_array[1:]  # important!! Y should shift 10 minutes
 		return X_array, Y_array
 
 	def task_2():
@@ -133,27 +133,30 @@ if __name__ == '__main__':
 	X_array, Y_array = get_X_and_Y_array()
 	# parameter
 	network_parameter = {
-		'conv1': 64,
-		'conv2': 64,
-		'conv3': 64,
-		'conv4': 64,
+		'conv1': 32,
+		'conv2': 32,
+		'conv3': 32,
+		'conv4': 32,
 		'conv5': 32,
 		'conv6': 32,
-		'conv7': 16,
-		'fc1': 1024}  # hidden layer
+		'conv7': 32,
+		'fc1': 512}  # hidden layer
 	data_shape = [X_array.shape[1], X_array.shape[2], X_array.shape[3], X_array.shape[4]]
 	train_CNN = cn.CNN_autoencoder(*data_shape, **network_parameter)
 	# train_CNN.reload_tfrecord('./training.tfrecoeds','./testing.tfrecoeds')
 	# train_CNN.set_model_name(
 		# '/home/mldp/ML_with_bigdata/output_model/CNN_autoencoder_64_64_AE_self.ckpt',
 		# '/home/mldp/ML_with_bigdata/output_model/CNN_autoencoder_64_64_AE_self.ckpt')
+	'''
+		pre train model : roll_10_pre_64_64_64_64_32_32_16_1024.mkpt
+	'''	
 	model_path = {
 		'pretrain_save': '/home/mldp/ML_with_bigdata/output_model/roll_10_pre_64_64_64_64_32_32_16_1024.ckpt',
 		'pretrain_reload': '/home/mldp/ML_with_bigdata/output_model/roll_10_pre_64_64_64_64_32_32_16_1024.ckpt',
-		'reload': '/home/mldp/ML_with_bigdata/output_model/roll_10_train_64_64_64_64_32_32_16_1024.ckpt',
-		'save': '/home/mldp/ML_with_bigdata/output_model/roll_10_train_64_64_64_64_32_32_16_1024.ckpt'
+		'reload': '/home/mldp/ML_with_bigdata/output_model/roll_10_train_32_512_v2.ckpt',
+		'save': '/home/mldp/ML_with_bigdata/output_model/roll_10_train_32_512_v2.ckpt'
 	}
 	train_CNN.set_training_data(X_array, Y_array)
 	del X_array, Y_array
-	train_CNN.start_pre_training(model_path, restore=False)
-	# train_CNN.start_train(model_path, restore=False)
+	# train_CNN.start_pre_training(model_path, restore=False)
+	train_CNN.start_train(model_path, restore=False)
