@@ -27,6 +27,7 @@ def date_time_covert_to_str(date_time):
 
 
 def plot_predict_vs_real(real, predict):
+	# print('real shape:{} predict shape:{}'.format(real.shape, predict.shape))
 	x_ragne = real.shape[0]
 
 	def __plot(plot_1, plot_2):
@@ -79,10 +80,10 @@ def plot_predict_vs_real(real, predict):
 
 		for i in range(x_ragne):
 			for j in range(real.shape[1]):
-				plot_1['real'].append(real[i, j, plot_1_row, plot_1_col, 2])
+				plot_1['real'].append(real[i, j, plot_1_row, plot_1_col, 2, np.newaxis])
 				plot_1['predict'].append(predict[i, j, plot_1_row, plot_1_col])
 				# print('id:{},real:{},predict:{}'.format(plot_1['grid_id'],real[i,j,10,10,2],predict[i,j,10,10]))
-				plot_2['real'].append(real[i, j, plot_2_row, plot_2_col, 2])
+				plot_2['real'].append(real[i, j, plot_2_row, plot_2_col, 2, np.newaxis])
 				plot_2['predict'].append(predict[i, j, plot_2_row, plot_2_col])
 				# print('id: {},real: {},predict: {}'.format(plot_2['grid_id'], real[i, j, plot_2_row, plot_2_col, 2], predict[i, j, plot_2_row, plot_2_col]))
 
@@ -92,8 +93,8 @@ def plot_predict_vs_real(real, predict):
 				plot_2['time_str'].append(date_time_covert_to_str(data_time))
 
 		__plot(plot_1, plot_2)
-	__get_plot_data(real, predict, 20, 10, 20, 11)
-	__get_plot_data(real, predict, 10, 5, 10, 10)
+	__get_plot_data(real, predict, 0, 0, 0, 1)
+	__get_plot_data(real, predict, 4, 3, 4, 4)
 
 	plt.show()
 
@@ -172,7 +173,7 @@ def prepare_predict_data():
 			print(data_array[0, 0, 20, 20, 0])
 			print('saving  array shape:{}'.format(data_array.shape))
 			du.save_array(data_array, y_target_path + '/Y_' + str(i))
-	task_2()
+	task_1()
 
 
 def get_X_and_Y_array():
@@ -250,7 +251,7 @@ def get_X_and_Y_array():
 		X_array = _copy(X_array, new_X_array)
 		Y_array = _copy(Y_array, new_Y_array)
 		return X_array, Y_array
-	return task_2()
+	return task_1()
 
 
 def predict_train(cnn_rnn, X_array, Y_array, model_path):
@@ -280,15 +281,17 @@ def feature_scaling(input_datas):
 
 
 X_array, Y_array = get_X_and_Y_array()
+Y_array = Y_array[:, :, 10:15, 10:15, :]
 X_array_train = X_array[0:200]
 Y_array_train = Y_array[0:200]
-X_array_test = X_array[X_array.shape[0] - 200:]
-Y_array_test = Y_array[Y_array.shape[0] - 200:]
+X_array_test = X_array[X_array.shape[0] - 100:]
+Y_array_test = Y_array[Y_array.shape[0] - 100:]
 del X_array, Y_array
 
 
-data_shape = [X_array_train.shape[1], X_array_train.shape[2], X_array_train.shape[3], 1]
-cnn_rnn = CNN_RNN(*data_shape)
+X_data_shape = [X_array_train.shape[1], X_array_train.shape[2], X_array_train.shape[3], 1]
+Y_data_shape = [Y_array_train.shape[1], Y_array_train.shape[2], Y_array_train.shape[3], 1]
+cnn_rnn = CNN_RNN(X_data_shape, Y_data_shape)
 model_path = {
 	'reload_path': '/home/mldp/ML_with_bigdata/CNN_RNN/output_model/CNN_RNN.ckpt',
 	'save_path': '/home/mldp/ML_with_bigdata/CNN_RNN/output_model/CNN_RNN.ckpt'

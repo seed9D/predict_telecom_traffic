@@ -9,7 +9,7 @@ import data_utility as du
 root_dir = '/home/mldp/ML_with_bigdata'
 
 
-def prepare_training_data():
+def prepare_training_data(task_num=2):
 	'''
 	input_dir_list = [
 			"/home/mldp/big_data/openbigdata/milano/SMS/11/data_preproccessing_10/",
@@ -20,7 +20,7 @@ def prepare_training_data():
 			filelist.sort()
 			load_data_format(input_dir, filelist)
 	'''
-	def task_1():
+	def _task_1():
 		'''
 		X: past one hour
 		Y: next hour's max value
@@ -49,7 +49,7 @@ def prepare_training_data():
 			max_array = max_array[:, :, 40:65, 40:65, -1, np.newaxis]  # only network activity
 			du.save_array(max_array, y_target_path + '/hour_max_' + str(i))
 
-	def task_2():
+	def _task_2():
 		'''
 		rolling 10 minutes among timeflows
 		X: past one hour
@@ -78,12 +78,12 @@ def prepare_training_data():
 			print('saving  array shape:{}'.format(data_array.shape))
 			du.save_array(data_array, y_target_path + '/Y_' + str(i))
 
-	task_2()
+	_task_1()
 
 
 def get_X_and_Y_array():
 
-	def task_1():
+	def _task_1():
 		'''
 		X: past one hour
 		Y: next hour's max value
@@ -113,7 +113,7 @@ def get_X_and_Y_array():
 		Y_array = Y_array[1:]  # important!! Y should shift 10 minutes
 		return X_array, Y_array
 
-	def task_2():
+	def _task_2():
 		'''
 		rolling 10 minutes among timeflows
 		return :
@@ -142,8 +142,7 @@ def get_X_and_Y_array():
 		X_array = feature_scaling(X_array)
 		Y_array = feature_scaling(Y_array)
 		return X_array, Y_array
-
-	return task_2()
+	return _task_1()
 
 
 def feature_scaling(input_datas):
@@ -156,18 +155,25 @@ def feature_scaling(input_datas):
 
 
 def print_Y_array(Y_array):
+	print('Y array shape:{}'.format(Y_array.shape))
 	for i in range(200):
 		for j in range(Y_array.shape[1]):
-			print(Y_array[i, j, 10, 10])
+			print(Y_array[i, j, 0, 0])
+
 
 if __name__ == '__main__':
 	# prepare_training_data()
 	X_array, Y_array = get_X_and_Y_array()
+	Y_array = Y_array[:, :, 10:15, 10:15, :]
 	# print_Y_array(Y_array)
 	# parameter
-	data_shape = [X_array.shape[1], X_array.shape[2], X_array.shape[3], X_array.shape[4]]
-
-	cnn_rnn = CNN_RNN(*data_shape)
+	X_data_shape = [X_array.shape[1], X_array.shape[2], X_array.shape[3], X_array.shape[4]]
+	Y_data_shape = [Y_array.shape[1], Y_array.shape[2], Y_array.shape[3], Y_array.shape[4]]
+	model_path = {
+		'reload_path': '/home/mldp/ML_with_bigdata/CNN_RNN/output_model/CNN_RNN.ckpt',
+		'save_path': '/home/mldp/ML_with_bigdata/CNN_RNN/output_model/CNN_RNN.ckpt'
+	}
+	cnn_rnn = CNN_RNN(X_data_shape, Y_data_shape)
 	cnn_rnn.set_training_data(X_array, Y_array)
 	del X_array, Y_array
-	cnn_rnn.start_train()
+	cnn_rnn.start_train(model_path, reload=False)
