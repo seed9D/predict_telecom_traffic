@@ -108,12 +108,74 @@ def prepare_training_data(task_num=2):
 			avg_array = avg_array[:, :, 40:65, 40:65, -1, np.newaxis]  # only network activity
 			du.save_array(avg_array, y_target_path + '/hour_avg_' + str(i))
 
-	_task_3()
+	def _task_4():
+		'''
+			X: past one hour
+			Y: next hour's min value
+		'''
+		x_target_path = './npy/final/hour_min/training/X'
+		y_target_path = './npy/final/hour_min/training/Y'
+		if not os.path.exists(x_target_path):
+			os.makedirs(x_target_path)
+		if not os.path.exists(y_target_path):
+			os.makedirs(y_target_path)
+
+		filelist = du.list_all_input_file(root_dir + '/npy/hour_min/X')
+		filelist.sort()
+
+		for i, filename in enumerate(filelist):
+			if filename != 'training_raw_data.npy':
+				data_array = du.load_array(root_dir + '/npy/hour_min/X/' + filename)
+				data_array = data_array[:, :, 40:65, 40:65, -1, np.newaxis]  # only network activity
+				print('saving array shape:{}'.format(data_array.shape))
+				du.save_array(data_array, x_target_path + '/hour_min_' + str(i))
+
+		filelist = du.list_all_input_file(root_dir + '/npy/hour_min/Y')
+		filelist.sort()
+		for i, filename in enumerate(filelist):
+			min_array = du.load_array(root_dir + '/npy/hour_min/Y/' + filename)
+			min_array = min_array[:, :, 40:65, 40:65, -1, np.newaxis]  # only network activity
+			du.save_array(min_array, y_target_path + '/hour_min_' + str(i))
+
+	def _task_5():
+		'''
+			X: past one hour
+			Y: next hour's min avg max internet traffic
+			for multi task learning
+		'''
+
+		# _task_4()
+		# _task_3()
+		# _task_1()
+		x_target_path = './npy/final/hour_min_avg_max/training/X'
+		y_target_path = './npy/final/hour_min_avg_max/training/Y'
+		if not os.path.exists(x_target_path):
+			os.makedirs(x_target_path)
+		if not os.path.exists(y_target_path):
+			os.makedirs(y_target_path)
+
+		max_X, max_Y = get_X_and_Y_array(task_num=1)
+		min_X, min_Y = get_X_and_Y_array(task_num=4)
+		avg_X, avg_Y = get_X_and_Y_array(task_num=3)
+		min_avg_max_Y = np.zeros([max_Y.shape[0], max_Y.shape[1], max_Y.shape[2], max_Y.shape[3], 3])
+
+		for i in range(max_Y.shape[0]):
+			for j in range(max_Y.shape[1]):
+				for row in range(max_Y.shape[2]):
+					for col in range(max_Y.shape[3]):
+						# print('min:{} avg:{} max:{}'.format(min_Y[i, j, row, col, 0], avg_Y[i, j, row, col, 0], max_Y[i, j, row, col, 0]))
+						min_avg_max_Y[i, j, row, col, 0] = min_Y[i, j, row, col, 0]
+						min_avg_max_Y[i, j, row, col, 1] = avg_Y[i, j, row, col, 0]
+						min_avg_max_Y[i, j, row, col, 2] = max_Y[i, j, row, col, 0]
+
+		du.save_array(max_X, x_target_path + '/min_avg_max_X')
+		du.save_array(min_avg_max_Y, y_target_path + '/min_avg_max_Y')
+	_task_5()
 
 
-def get_X_and_Y_array():
+def get_X_and_Y_array(task_num=1):
 
-	def _task_1():
+	def task_1():
 		'''
 		X: past one hour
 		Y: next hour's max value
@@ -137,13 +199,13 @@ def get_X_and_Y_array():
 			Y_array_list.append(du.load_array(y_dir + filename))
 		Y_array = np.concatenate(Y_array_list, axis=0)
 		del Y_array_list
-		X_array = feature_scaling(X_array)
-		Y_array = feature_scaling(Y_array)
+		# X_array = feature_scaling(X_array)
+		# Y_array = feature_scaling(Y_array)
 		X_array = X_array[0: -1]  # important!!
 		Y_array = Y_array[1:]  # important!! Y should shift 10 minutes
 		return X_array, Y_array
 
-	def _task_2():
+	def task_2():
 		'''
 		rolling 10 minutes among timeflows
 		return :
@@ -169,11 +231,11 @@ def get_X_and_Y_array():
 			Y_array_list.append(du.load_array(y_dir + filename))
 		Y_array = np.concatenate(Y_array_list, axis=0)
 		del Y_array_list
-		X_array = feature_scaling(X_array)
-		Y_array = feature_scaling(Y_array)
+		# X_array = feature_scaling(X_array)
+		# Y_array = feature_scaling(Y_array)
 		return X_array, Y_array
 
-	def _task_3():
+	def task_3():
 		'''
 		X: past one hour
 		Y: next hour's avg value
@@ -197,18 +259,94 @@ def get_X_and_Y_array():
 			Y_array_list.append(du.load_array(y_dir + filename))
 		Y_array = np.concatenate(Y_array_list, axis=0)
 		del Y_array_list
-		X_array = feature_scaling(X_array)
-		Y_array = feature_scaling(Y_array)
+		# X_array = feature_scaling(X_array)
+		# Y_array = feature_scaling(Y_array)
 		X_array = X_array[0: -1]  # important!!
 		Y_array = Y_array[1:]  # important!! Y should shift 10 minutes
 		return X_array, Y_array
 
-	return _task_1()
+	def task_4():
+		'''
+		X: past one hour
+		Y: next hour's min value
+		'''
+		x_dir = './npy/final/hour_min/training/X/'
+		y_dir = './npy/final/hour_min/training/Y/'
+		x_data_list = du.list_all_input_file(x_dir)
+		x_data_list.sort()
+		y_data_list = du.list_all_input_file(y_dir)
+		y_data_list.sort()
+
+		X_array_list = []
+		for filename in x_data_list:
+			X_array_list.append(du.load_array(x_dir + filename))
+
+		X_array = np.concatenate(X_array_list, axis=0)
+		del X_array_list
+
+		Y_array_list = []
+		for filename in y_data_list:
+			Y_array_list.append(du.load_array(y_dir + filename))
+		Y_array = np.concatenate(Y_array_list, axis=0)
+		del Y_array_list
+		# X_array = feature_scaling(X_array)
+		# Y_array = feature_scaling(Y_array)
+		X_array = X_array[0: -1]  # important!!
+		Y_array = Y_array[1:]  # important!! Y should shift 10 minutes
+		return X_array, Y_array
+
+	def task_5():
+		'''
+			X: past one hour
+			Y: next hour's min avg max network traffic
+			for multi task learning
+		'''
+		x_dir = './npy/final/hour_min_avg_max/training/X/'
+		y_dir = './npy/final/hour_min_avg_max/training/Y/'
+		x_data_list = du.list_all_input_file(x_dir)
+		x_data_list.sort()
+		y_data_list = du.list_all_input_file(y_dir)
+		y_data_list.sort()
+
+		X_array_list = []
+		for filename in x_data_list:
+			X_array_list.append(du.load_array(x_dir + filename))
+
+		X_array = np.concatenate(X_array_list, axis=0)
+		del X_array_list
+
+		Y_array_list = []
+		for filename in y_data_list:
+			Y_array_list.append(du.load_array(y_dir + filename))
+		Y_array = np.concatenate(Y_array_list, axis=0)
+		del Y_array_list
+		# X_array = feature_scaling(X_array)
+		# Y_array = feature_scaling(Y_array)
+		X_array = X_array[0: -1]  # important!!
+		Y_array = Y_array[1:]  # important!! Y should shift 10 minutes
+		return X_array, Y_array
+
+	if task_num == 1:
+		func = task_1()
+	elif task_num == 2:
+		func = task_2()
+	elif task_num == 3:
+		func = task_3()
+	elif task_num == 4:
+		func = task_4()
+	elif task_num == 5:
+		func = task_5()
+	else:
+		func = None
+
+	return func
 
 
 def feature_scaling(input_datas):
+	print(input_datas.shape)
 	input_shape = input_datas.shape
-	input_datas = input_datas.reshape(input_shape[0], -1)
+	input_datas = input_datas.reshape(-1, 1)
+	print(np.amin(input_datas))
 	min_max_scaler = preprocessing.MinMaxScaler(feature_range=(0.1, 255))
 	output = min_max_scaler.fit_transform(input_datas)
 	output = output.reshape(input_shape)
@@ -220,25 +358,28 @@ def print_Y_array(Y_array):
 	plot_y_list = []
 	for i in range(148):
 		for j in range(Y_array.shape[1]):
-			print(Y_array[i, j, 0, 0])
-			plot_y_list.append(Y_array[i, j, 0, 0])
+			print(Y_array[i, j, 10, 10])
+			plot_y_list.append(Y_array[i, j, 10, 10])
 	plt.figure()
-	plt.plot(plot_y_list)
+	plt.plot(plot_y_list,  marker='.')
 	plt.show()
 
 if __name__ == '__main__':
 	# prepare_training_data()
-	X_array, Y_array = get_X_and_Y_array()
-	Y_array = Y_array[:, :, 10:15, 10:15, :]
+	X_array, Y_array = get_X_and_Y_array(task_num=5)
+	X_array = feature_scaling(X_array)
+	Y_array = feature_scaling(Y_array)
 	# print_Y_array(Y_array)
+	Y_array = Y_array[:, :, 10:15, 10:15, :]
 	# parameter
-	X_data_shape = [X_array.shape[1], X_array.shape[2], X_array.shape[3], X_array.shape[4]]
-	Y_data_shape = [Y_array.shape[1], Y_array.shape[2], Y_array.shape[3], Y_array.shape[4]]
+	input_data_shape = [X_array.shape[1], X_array.shape[2], X_array.shape[3], X_array.shape[4]]
+	output_data_shape = [Y_array.shape[1], Y_array.shape[2], Y_array.shape[3], 1]
 	model_path = {
 		'reload_path': '/home/mldp/ML_with_bigdata/CNN_RNN/output_model/CNN_RNN.ckpt',
 		'save_path': '/home/mldp/ML_with_bigdata/CNN_RNN/output_model/CNN_RNN_avg.ckpt'
 	}
-	cnn_rnn = CNN_RNN(X_data_shape, Y_data_shape)
+	cnn_rnn = CNN_RNN(input_data_shape, output_data_shape)
 	cnn_rnn.set_training_data(X_array, Y_array)
 	del X_array, Y_array
-	cnn_rnn.start_train(model_path, reload=False)
+	# cnn_rnn.start_train(model_path, reload=False)
+	cnn_rnn.start_MTL_train(model_path, reload=False)
