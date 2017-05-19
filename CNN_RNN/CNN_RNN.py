@@ -14,7 +14,7 @@ class CNN_RNN:
 		self.shuffle_capacity = self.shuffle_min_after_dequeue + 3 * self.batch_size
 		self.learning_rate = 0.001
 		self.weight_decay = 0.01
-		self.keep_rate = 0.7
+		self.keep_rate = 0.6
 		beta_1 = 0.9
 		beta_2 = 0.999
 		self.input_temporal = input_data_shape[0]
@@ -53,7 +53,7 @@ class CNN_RNN:
 		RNN_last_output = tf.unpack(tf.transpose(self.RNN_states_series, [1, 0, 2]))  # a (batch_size, state_size) list with len num_step
 		output_layer = tf.add(tf.matmul(RNN_last_output[-1], self.weights['output_layer']), self.bias['output_layer'])
 		'''
-		self.tl_RNN_output = self._build_RNN_network(network, is_training=1)
+		self.tl_RNN_output = self._build_bi_RBB_network(network, is_training=1)
 		self.tl_share_output = self.tl_RNN_output
 
 		# network = tl.layers.DenseLayer(self.tl_RNN_output, n_units=200, act=tf.nn.relu, name='dense_layer')
@@ -121,7 +121,9 @@ class CNN_RNN:
 		with tf.variable_scope('prediction_layer'):
 			with tf.variable_scope(scope_name):
 				tl_regression = tl.layers.DenseLayer(tl_input, n_units=self.predictor_output, act=tl.activation.identity, name='regression_op')
-				regression_output = tl_regression.outputs
+				tl_regression = tl.layers.DropoutLayer(tl_regression, keep=0.8, name='drop_1')
+				tl_output = tl_regression
+				regression_output = tl_output.outputs
 				output = tf.reshape(regression_output, [-1, self.output_temporal, self.output_vertical, self.output_horizontal, self.output_channel], name='output_layer')
 
 				MSE = tf.reduce_mean(tf.pow(output - y, 2), name='MSE_op')
@@ -141,6 +143,7 @@ class CNN_RNN:
 				task_dic = {
 					'output': output,
 					'optomizer': optimizer_op,
+					'tl_output': tl_output,
 					'cost': cost,
 					'L2_loss': L2_loss,
 					'MSE': MSE,
@@ -221,6 +224,55 @@ class CNN_RNN:
 
 		return states_series, current_state
 
+	def _build_bi_RBB_network(self, input_X, is_training=1):
+		print('rnn network input shape :{}'.format(input_X.outputs.get_shape()))
+		with tf.variable_scope('bi_RNN'):
+			input_X = tl.layers.BatchNormLayer(input_X, name='batchnorm_layer_1')
+			network = tl.layers.ReshapeLayer(input_X, shape=[-1, self.RNN_num_step, int(input_X.outputs._shape[-1])], name='reshape_layer_1')
+
+			network = tl.layers.BiRNNLayer(
+				network,
+				cell_fn=tf.nn.rnn_cell.LSTMCell,
+				n_hidden=self.RNN_hidden_node_size,
+				initializer=tf.random_uniform_initializer(-0.1, 0.1),
+				n_steps=self.RNN_num_step,
+				fw_initial_state=None,
+				bw_initial_state=None,
+				return_last=False,
+				return_seq_2d=False,
+				name='bi_RNN_1')
+			if is_training:
+				network = tl.layers.DropoutLayer(network, keep=self.keep_rate, name='drop_1')
+			network = tl.layers.BiRNNLayer(
+				network,
+				cell_fn=tf.nn.rnn_cell.LSTMCell,
+				n_hidden=self.RNN_hidden_node_size,
+				initializer=tf.random_uniform_initializer(-0.1, 0.1),
+				n_steps=self.RNN_num_step,
+				fw_initial_state=None,
+				bw_initial_state=None,
+				return_last=False,
+				return_seq_2d=False,
+				name='bi_RNN_2')
+			if is_training:
+				network = tl.layers.DropoutLayer(network, keep=self.keep_rate, name='drop_2')
+
+			network = tl.layers.BiRNNLayer(
+				network,
+				cell_fn=tf.nn.rnn_cell.LSTMCell,
+				n_hidden=self.RNN_hidden_node_size,
+				initializer=tf.random_uniform_initializer(-0.1, 0.1),
+				n_steps=self.RNN_num_step,
+				fw_initial_state=None,
+				bw_initial_state=None,
+				return_last=True,
+				return_seq_2d=False,
+				name='bi_RNN_3')
+			if is_training:
+				network = tl.layers.DropoutLayer(network, keep=self.keep_rate, name='drop_3')
+
+			return network
+
 	def _build_RNN_network(self, input_X, is_training=1):
 		print('rnn network input shape :{}'.format(input_X.outputs.get_shape()))
 		# network = tl.layers.FlattenLayer(input_X, name='flatten_layer')  # [batch_size, mask_row, mask_col, n_mask] —> [batch_size, mask_row * mask_col * n_mask]
@@ -229,8 +281,8 @@ class CNN_RNN:
 			network = tl.layers.ReshapeLayer(input_X, shape=[-1, self.RNN_num_step, int(input_X.outputs._shape[-1])], name='reshape_layer_1')
 			network = tl.layers.RNNLayer(
 				network,
-				cell_fn=tf.nn.rnn_cell.BasicLSTMCell,
-				cell_init_args={'forget_bias': 0.0},
+				cell_fn=tf.nn.rnn_cell.GRUCell,
+				# cell_init_args={'forget_bias': 0.0},
 				n_hidden=self.RNN_hidden_node_size,
 				initializer=tf.random_uniform_initializer(-0.1, 0.1),
 				n_steps=self.RNN_num_step,
@@ -242,8 +294,8 @@ class CNN_RNN:
 				network = tl.layers.DropoutLayer(network, keep=self.keep_rate, name='drop_1')
 			network = tl.layers.RNNLayer(
 				network,
-				cell_fn=tf.nn.rnn_cell.BasicLSTMCell,
-				cell_init_args={'forget_bias': 0.0},
+				cell_fn=tf.nn.rnn_cell.GRUCell,
+				# cell_init_args={'forget_bias': 0.0},
 				n_hidden=self.RNN_hidden_node_size,
 				initializer=tf.random_uniform_initializer(-0.1, 0.1),
 				n_steps=self.RNN_num_step,
@@ -251,13 +303,14 @@ class CNN_RNN:
 				return_last=False,
 				return_seq_2d=False,  # trigger with return_last is False. if True, return shape: (?, 200); if False, return shape: (?, 6, 200)
 				name='basic_lstm_layer_2')
+		
 			if is_training:
 				network = tl.layers.DropoutLayer(network, keep=self.keep_rate, name='drop_2')
 
 			network = tl.layers.RNNLayer(
 				network,
-				cell_fn=tf.nn.rnn_cell.BasicLSTMCell,
-				cell_init_args={'forget_bias': 0.0},
+				cell_fn=tf.nn.rnn_cell.GRUCell,
+				# cell_init_args={'forget_bias': 0.0},
 				n_hidden=self.RNN_hidden_node_size,
 				initializer=tf.random_uniform_initializer(-0.1, 0.1),
 				n_steps=self.RNN_num_step,
@@ -269,8 +322,8 @@ class CNN_RNN:
 				network = tl.layers.DropoutLayer(network, keep=self.keep_rate, name='drop_3')
 			network = tl.layers.RNNLayer(
 				network,
-				cell_fn=tf.nn.rnn_cell.BasicLSTMCell,
-				cell_init_args={'forget_bias': 0.0},
+				cell_fn=tf.nn.rnn_cell.GRUCell,
+				# cell_init_args={'forget_bias': 0.0},
 				n_hidden=self.RNN_hidden_node_size,
 				initializer=tf.random_uniform_initializer(-0.1, 0.1),
 				n_steps=self.RNN_num_step,
@@ -473,7 +526,7 @@ class CNN_RNN:
 		cum_MAPE = 0
 		batch_num = test_x.shape[0] // self.batch_size
 		for batch_index in range(batch_num):
-			dp_dict = tl.utils.dict_to_one(self.tl_share_output.all_drop)
+			dp_dict = tl.utils.dict_to_one(task_dic['tl_output'].all_drop)
 			batch_x = test_x[batch_index * self.batch_size: (batch_index + 1) * self.batch_size]
 			batch_y = test_y[batch_index * self.batch_size: (batch_index + 1) * self.batch_size]
 			feed_dict = {
@@ -619,7 +672,7 @@ class CNN_RNN:
 		training_min_loss = 0
 		training_max_loss = 0
 		training_avg_loss = 0
-		display_step = 10
+		display_step = 50
 		epoch_his = []
 		plt.ion()
 		loss_fig = plt.figure(0)
@@ -633,13 +686,13 @@ class CNN_RNN:
 			return batch_x, batch_y
 
 		def run_task_optimizer(sess, batch_x, batch_y, task_name):
+			task_dic = self.multi_task_dic[task_name]
 			feed_dict = {
 				self.Xs: batch_x,
 				self.Ys: batch_y,
 				self.keep_prob: 0.7,
 				self.norm: 1}
-			feed_dict.update(self.tl_share_output.all_drop)
-			task_dic = self.multi_task_dic[task_name]
+			feed_dict.update(task_dic['tl_output'].all_drop)
 			_, cost, L2_loss = sess.run([task_dic['optomizer'], task_dic['cost'], task_dic['L2_loss']], feed_dict=feed_dict)
 
 			return cost, L2_loss
