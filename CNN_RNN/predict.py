@@ -109,6 +109,16 @@ def compute_loss_rate(real, predict):
 	rmse_sum = np.sqrt(((real - predict) ** 2).mean())
 	print('RMSE:', rmse_sum)
 
+	''' # find the zero index
+	zero_tuple = np.where(real == 0)
+	zero_array = np.array(zero_tuple)
+	zero_array = np.transpose(zero_array, (1, 0))
+	for _zero_array in zero_array:
+		real[_zero_array] = 1
+	'''
+	mean_ream = real.mean()
+	MAPE = np.divide(np.absolute(real - predict), mean_ream).mean()
+	print('Mean accuracy:{:.4f} MAPE:{:.4f}'.format(1 - MAPE, MAPE))
 
 def prepare_predict_data():
 	'''
@@ -173,6 +183,35 @@ def prepare_predict_data():
 			print(data_array[0, 0, 20, 20, 0])
 			print('saving  array shape:{}'.format(data_array.shape))
 			du.save_array(data_array, y_target_path + '/Y_' + str(i))
+
+	def task_3():
+		'''
+			X: past one hour
+			Y: next hour's avg value
+		'''
+		x_target_path = './npy/final/hour_avg/testing/X'
+		y_target_path = './npy/final/hour_avg/testing/Y'
+		if not os.path.exists(x_target_path):
+			os.makedirs(x_target_path)
+		if not os.path.exists(y_target_path):
+			os.makedirs(y_target_path)
+
+		filelist = du.list_all_input_file(root_dir + '/npy/hour_avg/X')
+		filelist.sort()
+		for i, filename in enumerate(filelist):
+			if filename != 'training_raw_data.npy':
+				data_array = du.load_array(root_dir + '/npy/hour_avg/X/' + filename)
+				data_array = data_array[:, :, 40:65, 40:65, (0, 1, -1)]
+				print('saving array shape:', data_array.shape)
+				du.save_array(data_array, x_target_path + '/hour_avg_' + str(i))
+
+				# prepare y
+				filelist = du.list_all_input_file(root_dir + '/npy/hour_avg/Y')
+				filelist.sort()
+				for i, filename in enumerate(filelist):
+					avg_array = du.load_array(root_dir + '/npy/hour_avg/Y/' + filename)
+					avg_array = avg_array[:, :, 40:65, 40:65, (0, 1, -1)]  # only network activity
+					du.save_array(avg_array, y_target_path + '/hour_avg_' + str(i))
 	task_1()
 
 
@@ -251,6 +290,42 @@ def get_X_and_Y_array():
 		X_array = _copy(X_array, new_X_array)
 		Y_array = _copy(Y_array, new_Y_array)
 		return X_array, Y_array
+
+	def task_3():
+		'''
+		X: past one hour
+		Y: next hour's avg value
+		'''
+		x_dir = './npy/final/hour_avg/testing/X/'
+		y_dir = './npy/final/hour_avg/testing/Y/'
+
+		x_data_list = du.list_all_input_file(x_dir)
+		x_data_list.sort()
+		y_data_list = du.list_all_input_file(y_dir)
+		y_data_list.sort()
+
+		X_array_list = []
+		for filename in x_data_list:
+			X_array_list.append(du.load_array(x_dir + filename))
+
+		X_array = np.concatenate(X_array_list, axis=0)
+		# X_array = X_array[:, :, 0:21, 0:21, :]
+		del X_array_list
+
+		Y_array_list = []
+		for filename in y_data_list:
+			Y_array_list.append(du.load_array(y_dir + filename))
+		Y_array = np.concatenate(Y_array_list, axis=0)
+		del Y_array_list
+
+		new_X_array = feature_scaling(X_array[:, :, :, :, -1, np.newaxis])
+		new_Y_array = feature_scaling(Y_array[:, :, :, :, -1, np.newaxis])
+		X_array = _copy(X_array, new_X_array)
+		Y_array = _copy(Y_array, new_Y_array)
+		X_array = X_array[0: -1]  # important!!
+		Y_array = Y_array[1:]  # important!! Y should shift 10 minutes
+		return X_array, Y_array
+
 	return task_1()
 
 
@@ -272,7 +347,7 @@ def predict_train(cnn_rnn, X_array, Y_array, model_path):
 def feature_scaling(input_datas):
 	input_shape = input_datas.shape
 	input_datas = input_datas.reshape(input_shape[0], -1)
-	min_max_scaler = preprocessing.MinMaxScaler(feature_range=(0, 255))
+	min_max_scaler = preprocessing.MinMaxScaler(feature_range=(0.1, 255))
 	output = min_max_scaler.fit_transform(input_datas)
 	output = output.reshape(input_shape)
 	return output
@@ -293,7 +368,7 @@ X_data_shape = [X_array_train.shape[1], X_array_train.shape[2], X_array_train.sh
 Y_data_shape = [Y_array_train.shape[1], Y_array_train.shape[2], Y_array_train.shape[3], 1]
 cnn_rnn = CNN_RNN(X_data_shape, Y_data_shape)
 model_path = {
-	'reload_path': '/home/mldp/ML_with_bigdata/CNN_RNN/output_model/CNN_RNN.ckpt',
+	'reload_path': '/home/mldp/ML_with_bigdata/CNN_RNN/output_model/CNN_RNN_avg.ckpt',
 	'save_path': '/home/mldp/ML_with_bigdata/CNN_RNN/output_model/CNN_RNN.ckpt'
 }
 

@@ -1,6 +1,7 @@
 import numpy as np
 from sklearn import preprocessing
 from CNN_RNN import CNN_RNN
+import matplotlib.pyplot as plt
 import sys
 import os
 sys.path.append('/home/mldp/ML_with_bigdata')
@@ -78,7 +79,36 @@ def prepare_training_data(task_num=2):
 			print('saving  array shape:{}'.format(data_array.shape))
 			du.save_array(data_array, y_target_path + '/Y_' + str(i))
 
-	_task_1()
+	def _task_3():
+		'''
+			X: past one hour
+			Y: next hour's average value
+		'''
+		x_target_path = './npy/final/hour_avg/training/X'
+		y_target_path = './npy/final/hour_avg/training/Y'
+		if not os.path.exists(x_target_path):
+			os.makedirs(x_target_path)
+		if not os.path.exists(y_target_path):
+			os.makedirs(y_target_path)
+
+		filelist = du.list_all_input_file(root_dir + '/npy/hour_avg/X')
+		filelist.sort()
+
+		for i, filename in enumerate(filelist):
+			if filename != 'training_raw_data.npy':
+				data_array = du.load_array(root_dir + '/npy/hour_avg/X/' + filename)
+				data_array = data_array[:, :, 40:65, 40:65, -1, np.newaxis]  # only network activity
+				print('saving array shape:{}'.format(data_array.shape))
+				du.save_array(data_array, x_target_path + '/hour_avg_' + str(i))
+
+		filelist = du.list_all_input_file(root_dir + '/npy/hour_avg/Y')
+		filelist.sort()
+		for i, filename in enumerate(filelist):
+			avg_array = du.load_array(root_dir + '/npy/hour_avg/Y/' + filename)
+			avg_array = avg_array[:, :, 40:65, 40:65, -1, np.newaxis]  # only network activity
+			du.save_array(avg_array, y_target_path + '/hour_avg_' + str(i))
+
+	_task_3()
 
 
 def get_X_and_Y_array():
@@ -142,13 +172,44 @@ def get_X_and_Y_array():
 		X_array = feature_scaling(X_array)
 		Y_array = feature_scaling(Y_array)
 		return X_array, Y_array
+
+	def _task_3():
+		'''
+		X: past one hour
+		Y: next hour's avg value
+		'''
+		x_dir = './npy/final/hour_avg/training/X/'
+		y_dir = './npy/final/hour_avg/training/Y/'
+		x_data_list = du.list_all_input_file(x_dir)
+		x_data_list.sort()
+		y_data_list = du.list_all_input_file(y_dir)
+		y_data_list.sort()
+
+		X_array_list = []
+		for filename in x_data_list:
+			X_array_list.append(du.load_array(x_dir + filename))
+
+		X_array = np.concatenate(X_array_list, axis=0)
+		del X_array_list
+
+		Y_array_list = []
+		for filename in y_data_list:
+			Y_array_list.append(du.load_array(y_dir + filename))
+		Y_array = np.concatenate(Y_array_list, axis=0)
+		del Y_array_list
+		X_array = feature_scaling(X_array)
+		Y_array = feature_scaling(Y_array)
+		X_array = X_array[0: -1]  # important!!
+		Y_array = Y_array[1:]  # important!! Y should shift 10 minutes
+		return X_array, Y_array
+
 	return _task_1()
 
 
 def feature_scaling(input_datas):
 	input_shape = input_datas.shape
 	input_datas = input_datas.reshape(input_shape[0], -1)
-	min_max_scaler = preprocessing.MinMaxScaler(feature_range=(0, 255))
+	min_max_scaler = preprocessing.MinMaxScaler(feature_range=(0.1, 255))
 	output = min_max_scaler.fit_transform(input_datas)
 	output = output.reshape(input_shape)
 	return output
@@ -156,10 +217,14 @@ def feature_scaling(input_datas):
 
 def print_Y_array(Y_array):
 	print('Y array shape:{}'.format(Y_array.shape))
-	for i in range(200):
+	plot_y_list = []
+	for i in range(148):
 		for j in range(Y_array.shape[1]):
 			print(Y_array[i, j, 0, 0])
-
+			plot_y_list.append(Y_array[i, j, 0, 0])
+	plt.figure()
+	plt.plot(plot_y_list)
+	plt.show()
 
 if __name__ == '__main__':
 	# prepare_training_data()
@@ -171,7 +236,7 @@ if __name__ == '__main__':
 	Y_data_shape = [Y_array.shape[1], Y_array.shape[2], Y_array.shape[3], Y_array.shape[4]]
 	model_path = {
 		'reload_path': '/home/mldp/ML_with_bigdata/CNN_RNN/output_model/CNN_RNN.ckpt',
-		'save_path': '/home/mldp/ML_with_bigdata/CNN_RNN/output_model/CNN_RNN.ckpt'
+		'save_path': '/home/mldp/ML_with_bigdata/CNN_RNN/output_model/CNN_RNN_avg.ckpt'
 	}
 	cnn_rnn = CNN_RNN(X_data_shape, Y_data_shape)
 	cnn_rnn.set_training_data(X_array, Y_array)
