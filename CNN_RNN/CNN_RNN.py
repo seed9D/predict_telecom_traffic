@@ -28,9 +28,9 @@ class CNN_RNN:
 		self.output_channel = 1
 		self.predictor_output = self.output_temporal * self.output_vertical * self.output_horizontal * self.output_channel
 
-		self.RNN_num_layers = 4
+		self.RNN_num_layers = 3
 		self.RNN_num_step = 6
-		self.RNN_hidden_node_size = 200
+		self.RNN_hidden_node_size = 100
 
 		# placeholder
 		# with tf.device('/cpu:0'):
@@ -53,7 +53,7 @@ class CNN_RNN:
 		RNN_last_output = tf.unpack(tf.transpose(self.RNN_states_series, [1, 0, 2]))  # a (batch_size, state_size) list with len num_step
 		output_layer = tf.add(tf.matmul(RNN_last_output[-1], self.weights['output_layer']), self.bias['output_layer'])
 		'''
-		self.tl_RNN_output = self._build_bi_RBB_network(network, is_training=1)
+		self.tl_RNN_output = self._build_RNN_network(network, is_training=1)
 		self.tl_share_output = self.tl_RNN_output
 
 		# network = tl.layers.DenseLayer(self.tl_RNN_output, n_units=200, act=tf.nn.relu, name='dense_layer')
@@ -97,7 +97,7 @@ class CNN_RNN:
 		def get_l2_list():
 			print('get_l2_list:')
 			var_list = []
-			exclude_list = ['Bias', 'regression_op/b', 'b_conv2d']
+			exclude_list = ['LSTMCell/B', 'regression_op/b', 'b_conv2d']
 			for v in tf.trainable_variables():
 				if any(x in v.name for x in exclude_list):
 					continue
@@ -158,6 +158,124 @@ class CNN_RNN:
 	def _L2_norm(self, var_list):
 		L2_loss = tf.add_n([tf.nn.l2_loss(v) for v in var_list])
 		return L2_loss
+
+	def _build_inception_CNN_network(self, input_X, is_training=1):
+		filter_map_1 = 32
+		filter_map_2 = 32
+		reduce1x1 = 16
+		with tf.variable_scope('inception_CNN'):
+			CNN_input = tf.reshape(input_X, [-1, self.input_vertical, self.input_horizontal, self.input_channel])
+			print('CNN_input shape:{}'.format(CNN_input))
+			network = tl.layers.InputLayer(CNN_input, name='input_layer')
+			network = tl.layers.BatchNormLayer(network, name='batchnorm_layer_1')
+
+			conv1_1x1_1 = tl.layers.Conv2dLayer(
+				network,
+				act=tf.nn.relu,
+				shape=[1, 1, 1, filter_map_1],
+				strides=[1, 1, 1, 1],
+				name='cnn_layer_1_1x1_1')
+
+			conv1_1x1_2 = tl.layers.Conv2dLayer(
+				network,
+				act=tf.nn.relu,
+				shape=[1, 1, 1, reduce1x1],
+				strides=[1, 1, 1, 1],
+				name='cnn_layer_1_1x1_2')
+
+			conv1_1x1_3 = tl.layers.Conv2dLayer(
+				network,
+				act=tf.nn.relu,
+				shape=[1, 1, 1, reduce1x1],
+				strides=[1, 1, 1, 1],
+				name='cnn_layer_1_1x1_3')
+
+			conv1_3x3 = tl.layers.Conv2dLayer(
+				conv1_1x1_2,
+				act=tf.nn.relu,
+				shape=[3, 3, reduce1x1, filter_map_1],
+				strides=[1, 1, 1, 1],
+				name='cnn_layer_1_3x3')
+
+			conv1_5x5 = tl.layers.Conv2dLayer(
+				conv1_1x1_3,
+				act=tf.nn.relu,
+				shape=[5, 5, reduce1x1, filter_map_1],
+				strides=[1, 1, 1, 1],
+				name='cnn_layer_1_5x5')
+			max_pool1 = tl.layers.PoolLayer(
+				network,
+				ksize=[1, 3, 3, 1],
+				strides=[1, 1, 1, 1],
+				padding='SAME',
+				pool=tf.nn.max_pool,
+				name='pool_layer_1')
+
+			conv1_1x1_4 = tl.layers.Conv2dLayer(
+				max_pool1,
+				act=tf.nn.relu,
+				shape=[1, 1, 1, filter_map_1],
+				strides=[1, 1, 1, 1],
+				name='cnn_layer_1_1x1_4')
+
+			inception1 = tl.layers.ConcatLayer(layer=[conv1_1x1_1, conv1_3x3, conv1_5x5, conv1_1x1_4], concat_dim=3, name='concate_layer1')
+			inception1.outputs = tf.nn.relu(inception1.outputs)
+			inception1 = tl.layers.DropoutLayer(inception1, keep=self.keep_rate, name='drop_1')
+
+			'''inception 2'''
+			conv2_1x1_1 = tl.layers.Conv2dLayer(
+				inception1,
+				act=tf.nn.relu,
+				shape=[1, 1, 4 * filter_map_1, filter_map_2],
+				strides=[1, 1, 1, 1],
+				name='cnn_layer_2_1x1_1')
+
+			conv2_1x1_2 = tl.layers.Conv2dLayer(
+				inception1,
+				act=tf.nn.relu,
+				shape=[1, 1, 4 * filter_map_1, reduce1x1],
+				strides=[1, 1, 1, 1],
+				name='cnn_layer_2_1x1_2')
+
+			conv2_1x1_3 = tl.layers.Conv2dLayer(
+				inception1,
+				act=tf.nn.relu,
+				shape=[1, 1, 4 * filter_map_1, reduce1x1],
+				strides=[1, 1, 1, 1],
+				name='cnn_layer_2_1x1_3')
+
+			conv2_3x3 = tl.layers.Conv2dLayer(
+				conv2_1x1_2,
+				act=tf.nn.relu,
+				shape=[3, 3, reduce1x1, filter_map_2],
+				strides=[1, 1, 1, 1],
+				name='cnn_layer_2_3x3')
+
+			conv2_5x5 = tl.layers.Conv2dLayer(
+				conv2_1x1_3,
+				act=tf.nn.relu,
+				shape=[5, 5, reduce1x1, filter_map_2],
+				strides=[1, 1, 1, 1],
+				name='cnn_layer_2_5x5')
+			max_pool2 = tl.layers.PoolLayer(
+				inception1,
+				ksize=[1, 3, 3, 1],
+				strides=[1, 1, 1, 1],
+				padding='SAME',
+				pool=tf.nn.max_pool,
+				name='pool_layer_2')
+
+			conv2_1x1_4 = tl.layers.Conv2dLayer(
+				max_pool2,
+				act=tf.nn.relu,
+				shape=[1, 1, 4 * filter_map_1, filter_map_2],
+				strides=[1, 1, 1, 1],
+				name='cnn_layer_2_1x1_4')
+			inception2 = tl.layers.ConcatLayer(layer=[conv2_1x1_1, conv2_3x3, conv2_5x5, conv2_1x1_4], concat_dim=3, name='concate_layer2')
+			inception2.output = tf.nn.relu(inception2.outputs)
+			inception2 = tl.layers.DropoutLayer(inception2, keep=self.keep_rate, name='drop_2')
+			print('network output shape:{}'.format(inception2.outputs.get_shape()))
+			return inception2
 
 	def _build_CNN_network(self, input_X, is_training=1):
 		with tf.variable_scope('CNN'):
@@ -281,7 +399,7 @@ class CNN_RNN:
 			network = tl.layers.ReshapeLayer(input_X, shape=[-1, self.RNN_num_step, int(input_X.outputs._shape[-1])], name='reshape_layer_1')
 			network = tl.layers.RNNLayer(
 				network,
-				cell_fn=tf.nn.rnn_cell.GRUCell,
+				cell_fn=tf.nn.rnn_cell.LSTMCell,
 				# cell_init_args={'forget_bias': 0.0},
 				n_hidden=self.RNN_hidden_node_size,
 				initializer=tf.random_uniform_initializer(-0.1, 0.1),
@@ -294,7 +412,7 @@ class CNN_RNN:
 				network = tl.layers.DropoutLayer(network, keep=self.keep_rate, name='drop_1')
 			network = tl.layers.RNNLayer(
 				network,
-				cell_fn=tf.nn.rnn_cell.GRUCell,
+				cell_fn=tf.nn.rnn_cell.LSTMCell,
 				# cell_init_args={'forget_bias': 0.0},
 				n_hidden=self.RNN_hidden_node_size,
 				initializer=tf.random_uniform_initializer(-0.1, 0.1),
@@ -303,13 +421,12 @@ class CNN_RNN:
 				return_last=False,
 				return_seq_2d=False,  # trigger with return_last is False. if True, return shape: (?, 200); if False, return shape: (?, 6, 200)
 				name='basic_lstm_layer_2')
-		
 			if is_training:
 				network = tl.layers.DropoutLayer(network, keep=self.keep_rate, name='drop_2')
-
+			'''
 			network = tl.layers.RNNLayer(
 				network,
-				cell_fn=tf.nn.rnn_cell.GRUCell,
+				cell_fn=tf.nn.rnn_cell.LSTMCell,
 				# cell_init_args={'forget_bias': 0.0},
 				n_hidden=self.RNN_hidden_node_size,
 				initializer=tf.random_uniform_initializer(-0.1, 0.1),
@@ -320,9 +437,10 @@ class CNN_RNN:
 				name='basic_lstm_layer_3')
 			if is_training:
 				network = tl.layers.DropoutLayer(network, keep=self.keep_rate, name='drop_3')
+			'''
 			network = tl.layers.RNNLayer(
 				network,
-				cell_fn=tf.nn.rnn_cell.GRUCell,
+				cell_fn=tf.nn.rnn_cell.LSTMCell,
 				# cell_init_args={'forget_bias': 0.0},
 				n_hidden=self.RNN_hidden_node_size,
 				initializer=tf.random_uniform_initializer(-0.1, 0.1),
@@ -330,9 +448,9 @@ class CNN_RNN:
 				initial_state=None,
 				return_last=True,
 				return_seq_2d=False,  # trigger with return_last is False. if True, return shape: (?, 200); if False, return shape: (?, 6, 200)
-				name='basic_lstm_layer_4')
+				name='basic_lstm_layer_3')
 			if is_training:
-				network = tl.layers.DropoutLayer(network, keep=self.keep_rate, name='drop_4')
+				network = tl.layers.DropoutLayer(network, keep=self.keep_rate, name='drop_3')
 		'''
 		network = tl.layers.DynamicRNNLayer(
 			network,
@@ -457,10 +575,10 @@ class CNN_RNN:
 			print(var_s)
 
 	def print_all_layers(self):
-		self.tl_output_layer.print_layers()
+		self.tl_share_output.print_layers()
 
 	def print_all_variables(self):
-		self.tl_output_layer.print_params()
+		self.tl_share_output.print_params()
 
 	def set_training_data(self, input_x, input_y):
 
@@ -667,6 +785,30 @@ class CNN_RNN:
 				print('training finished!')
 			plt.ioff()
 			plt.show()
+
+	def start_MTL_predict(self, testing_x, testing_y, model_path):
+		def get_multi_task_batch(batch_x, batch_y):
+			batch_y = np.transpose(batch_y, [4, 0, 1, 2, 3])
+			batch_y = np.expand_dims(batch_y, axis=5)
+			return batch_x, batch_y
+		print('input_x shape {}'.format(testing_x.shape))
+		print('input_y shape {}'.format(testing_y.shape))
+		testing_x, testing_y = get_multi_task_batch(testing_x, testing_y)
+		# tf.reset_default_graph()
+		# tf.train.import_meta_graph(model_path['reload_path'] + '.meta')
+
+		self.print_all_layers()
+		with tf.Session() as sess:
+			self._reload_model(sess, model_path['reload_path'])
+			testing_loss_min, testing_accu_min, prediction_min = self._MTL_testing_data(sess, testing_x, testing_y[0], 'min_traffic')
+			testing_loss_avg, testing_accu_avg, prediction_avg = self._MTL_testing_data(sess, testing_x, testing_y[1], 'avg_traffic')
+			testing_loss_max, testing_accu_max, prediction_max = self._MTL_testing_data(sess, testing_x, testing_y[2], 'max_traffic')
+		print('preddict finished!')
+		print('task Min: accu:{} MSE:{}'.format(1 - testing_accu_min, testing_loss_min))
+		print('task avg: accu:{} MSE:{}'.format(1 - testing_accu_avg, testing_loss_avg))
+		print('task Max: accu:{} MSE:{}'.format(1 - testing_accu_max, testing_loss_max))
+
+		return [prediction_min, prediction_avg, prediction_max]
 
 	def start_MTL_train(self, model_path, reload=False):
 		training_min_loss = 0

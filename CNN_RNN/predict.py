@@ -476,17 +476,28 @@ def predict_train(cnn_rnn, X_array, Y_array, model_path):
 	compute_loss_rate(Y_array[:, :, :, :, 2, np.newaxis], predict_y)
 	plot_predict_vs_real(Y_array, predict_y)
 
-def predict_MTL_train(cnn_rnn, X_array, Y_array, model_path):
-	print(Y_array.shape)
 
-	_, predict_y = cnn_rnn.start_predict(
-		X_array[:, :, :, :, 2, np.newaxis],
-		Y_array[:, :, :, :, 2, np.newaxis],
+def predict_MTL_train(cnn_rnn, X_array, Y_array, model_path):
+	# print(Y_array.shape)
+
+	prediction_min, prediction_avg, prediction_max = cnn_rnn.start_MTL_predict(
+		X_array[:, :, :, :, 2:],
+		Y_array[:, :, :, :, 2:],
 		model_path)
 	# compute_loss_rate(X_array[1:, :, :, :, 2, np.newaxis], predict_y)
-	compute_loss_rate(Y_array[:, :, :, :, 2, np.newaxis], predict_y)
-	plot_predict_vs_real(Y_array, predict_y)
-	
+	print('-' * 20, 'task min:', '-' * 20)
+	compute_loss_rate(Y_array[:, :, :, :, 2, np.newaxis], prediction_min)
+	plot_predict_vs_real(Y_array[:, :, :, :, (0, 1, 2)], prediction_min)
+	print('-' * 30)
+	print('-' * 20, 'task avg:', '-' * 20)
+	compute_loss_rate(Y_array[:, :, :, :, 3, np.newaxis], prediction_avg)
+	plot_predict_vs_real(Y_array[:, :, :, :, (0, 1, 3)], prediction_avg)
+	print('-' * 30)
+	print('-' * 20, 'task max:', '-' * 20)
+	compute_loss_rate(Y_array[:, :, :, :, 4, np.newaxis], prediction_max)
+	plot_predict_vs_real(Y_array[:, :, :, :, (0, 1, 4)], prediction_max)
+	print('-' * 30)
+
 
 def feature_scaling(input_datas):
 	input_shape = input_datas.shape
@@ -527,7 +538,7 @@ new_X_array = feature_scaling(X_array[:, :, :, :, 2:])
 new_Y_array = feature_scaling(Y_array[:, :, :, :, 2:])
 X_array = copy(X_array, new_X_array)
 Y_array = copy(Y_array, new_Y_array)
-print_Y_array(Y_array[:, :, :, :, 2:])
+# print_Y_array(Y_array[:, :, :, :, 2:])
 
 Y_array = Y_array[:, :, 10:15, 10:15, :]
 del new_X_array, new_Y_array
@@ -550,6 +561,8 @@ model_path = {
 
 cnn_rnn.set_training_data(X_array_train[:, :, :, :, 2:], Y_array_train[:, :, :, :, 2:])  # internet traffic min avg max
 
-predict_train(cnn_rnn, X_array_train, Y_array_train, model_path)
-predict_train(cnn_rnn, X_array_test, Y_array_test, model_path)
+# predict_train(cnn_rnn, X_array_train, Y_array_train, model_path)
+# predict_train(cnn_rnn, X_array_test, Y_array_test, model_path)
+predict_MTL_train(cnn_rnn, X_array_train, Y_array_train, model_path)
+predict_MTL_train(cnn_rnn, X_array_test, Y_array_test, model_path)
 
