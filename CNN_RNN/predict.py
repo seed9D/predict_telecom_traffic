@@ -120,11 +120,15 @@ def compute_loss_rate(real, predict):
 	MAPE = np.divide(np.absolute(real - predict), mean_ream).mean()
 	print('Mean accuracy:{:.4f} MAPE:{:.4f}'.format(1 - MAPE, MAPE))
 
+
 def prepare_predict_data():
 	'''
 		generate the predict data from original npy format
 	'''
-	def task_1():
+	grid_start = 45
+	grid_stop = 60
+
+	def _task_1():
 		'''
 			X: past one hour
 			Y: next hour's max value
@@ -141,7 +145,8 @@ def prepare_predict_data():
 		for i, filename in enumerate(filelist):
 			if filename != 'training_raw_data.npy':
 				data_array = du.load_array(root_dir + '/npy/hour_max/X/' + filename)
-				data_array = data_array[:, :, 40:65, 40:65, (0, 1, -1)]
+
+				data_array = data_array[:, :, grid_start:grid_stop, grid_start:grid_stop, (0, 1, -1)]
 				print('saving array shape:', data_array.shape)
 				du.save_array(data_array, x_target_path + '/hour_max_' + str(i))
 
@@ -150,10 +155,11 @@ def prepare_predict_data():
 				filelist.sort()
 				for i, filename in enumerate(filelist):
 					max_array = du.load_array(root_dir + '/npy/hour_max/Y/' + filename)
-					max_array = max_array[:, :, 40:65, 40:65, (0, 1, -1)]  # only network activity
+
+					max_array = max_array[:, :, grid_start:grid_stop, grid_start:grid_stop, (0, 1, -1)]  # only network activity
 					du.save_array(max_array, y_target_path + '/hour_max_' + str(i))
 
-	def task_2():
+	def _task_2():
 		'''
 		rolling 10 minutes among timeflows
 			X: past one hour
@@ -173,18 +179,20 @@ def prepare_predict_data():
 		filelist_Y.sort()
 		for i, filename in enumerate(filelist_X):
 			data_array = du.load_array(root_dir + '/npy/npy_roll/X/' + filename)
-			data_array = data_array[:, :, 40:65, 40:65, (0, 1, -1)]
+
+			data_array = data_array[:, :, grid_start:grid_stop, grid_start:grid_stop, (0, 1, -1)]
 			print('saving  array shape:{}'.format(data_array.shape))
 			du.save_array(data_array, x_target_path + '/X_' + str(i))
 
 		for i, filename in enumerate(filelist_Y):
 			data_array = du.load_array(root_dir + '/npy/npy_roll/Y/' + filename)
-			data_array = data_array[:, :, 40:65, 40:65, (0, 1, -1)]  # only network activity
+
+			data_array = data_array[:, :, grid_start:grid_stop, grid_start:grid_stop, (0, 1, -1)]  # only network activity
 			print(data_array[0, 0, 20, 20, 0])
 			print('saving  array shape:{}'.format(data_array.shape))
 			du.save_array(data_array, y_target_path + '/Y_' + str(i))
 
-	def task_3():
+	def _task_3():
 		'''
 			X: past one hour
 			Y: next hour's avg value
@@ -201,7 +209,8 @@ def prepare_predict_data():
 		for i, filename in enumerate(filelist):
 			if filename != 'training_raw_data.npy':
 				data_array = du.load_array(root_dir + '/npy/hour_avg/X/' + filename)
-				data_array = data_array[:, :, 40:65, 40:65, (0, 1, -1)]
+
+				data_array = data_array[:, :, grid_start:grid_stop, grid_start:grid_stop, (0, 1, -1)]
 				print('saving array shape:', data_array.shape)
 				du.save_array(data_array, x_target_path + '/hour_avg_' + str(i))
 
@@ -210,21 +219,75 @@ def prepare_predict_data():
 				filelist.sort()
 				for i, filename in enumerate(filelist):
 					avg_array = du.load_array(root_dir + '/npy/hour_avg/Y/' + filename)
-					avg_array = avg_array[:, :, 40:65, 40:65, (0, 1, -1)]  # only network activity
+					avg_array = avg_array[:, :, grid_start:grid_stop, grid_start:grid_stop, (0, 1, -1)]  # only network activity					avg_array = avg_array[:, :, grid_start:65, grid_start:65, (0, 1, -1)]  # only network activity
 					du.save_array(avg_array, y_target_path + '/hour_avg_' + str(i))
-	task_1()
+
+	def _task_4():
+		'''
+			X: past one hour
+			Y: next hour's min value
+		'''
+		x_target_path = './npy/final/hour_min/testing/X'
+		y_target_path = './npy/final/hour_min/testing/Y'
+		if not os.path.exists(x_target_path):
+			os.makedirs(x_target_path)
+		if not os.path.exists(y_target_path):
+			os.makedirs(y_target_path)
+		filelist = du.list_all_input_file(root_dir + '/npy/hour_min/X')
+		filelist.sort()
+
+		for i, filename in enumerate(filelist):
+			if filename != 'training_raw_data.npy':
+				data_array = du.load_array(root_dir + '/npy/hour_min/X/' + filename)
+				data_array = data_array[:, :, grid_start:grid_stop, grid_start:grid_stop, (0, 1, -1)]  # only network activity
+				print('saving array shape:{}'.format(data_array.shape))
+				du.save_array(data_array, x_target_path + '/hour_min_' + str(i))
+
+		filelist = du.list_all_input_file(root_dir + '/npy/hour_min/Y')
+		filelist.sort()
+		for i, filename in enumerate(filelist):
+			min_array = du.load_array(root_dir + '/npy/hour_min/Y/' + filename)
+			min_array = min_array[:, :, grid_start:grid_stop, grid_start:grid_stop, (0, 1, -1)]  # only network activity
+			du.save_array(min_array, y_target_path + '/hour_min_' + str(i))
+
+	def _task_5():
+		'''
+			X: past one hour
+			Y: next hour's min avg max internet traffic
+			for multi task learning
+		'''
+		_task_4()
+		_task_3()
+		_task_1()
+		x_target_path = './npy/final/hour_min_avg_max/testing/X'
+		y_target_path = './npy/final/hour_min_avg_max/testing/Y'
+		if not os.path.exists(x_target_path):
+			os.makedirs(x_target_path)
+		if not os.path.exists(y_target_path):
+			os.makedirs(y_target_path)
+
+		max_X, max_Y = get_X_and_Y_array(task_num=1)
+		min_X, min_Y = get_X_and_Y_array(task_num=4)
+		avg_X, avg_Y = get_X_and_Y_array(task_num=3)
+		min_avg_max_Y = np.zeros([max_Y.shape[0], max_Y.shape[1], max_Y.shape[2], max_Y.shape[3], 5])  # grid_id timestamp, min, avg, max
+
+		for i in range(max_Y.shape[0]):
+			for j in range(max_Y.shape[1]):
+				for row in range(max_Y.shape[2]):
+					for col in range(max_Y.shape[3]):
+						# print('min:{} avg:{} max:{}'.format(min_Y[i, j, row, col, 0], avg_Y[i, j, row, col, 0], max_Y[i, j, row, col, 0]))
+						min_avg_max_Y[i, j, row, col, 0] = min_Y[i, j, row, col, 0]
+						min_avg_max_Y[i, j, row, col, 1] = min_Y[i, j, row, col, 1]
+
+						min_avg_max_Y[i, j, row, col, 2] = min_Y[i, j, row, col, -1]
+						min_avg_max_Y[i, j, row, col, 3] = avg_Y[i, j, row, col, -1]
+						min_avg_max_Y[i, j, row, col, 4] = max_Y[i, j, row, col, -1]
+		du.save_array(max_X, x_target_path + '/min_avg_max_X')
+		du.save_array(min_avg_max_Y, y_target_path + '/min_avg_max_Y')
+	_task_5()
 
 
-def get_X_and_Y_array():
-	def _copy(old, new):
-			# print(old.shape, new.shape)
-			for i in range(old.shape[0]):
-				for j in range(old.shape[1]):
-					for row in range(old.shape[2]):
-						for col in range(old.shape[3]):
-							old[i, j, row, col, -1] = new[i, j, row, col, -1]  # internet
-
-			return old
+def get_X_and_Y_array(task_num=1):
 
 	def task_1():
 		'''
@@ -242,7 +305,6 @@ def get_X_and_Y_array():
 		X_array_list = []
 		for filename in x_data_list:
 			X_array_list.append(du.load_array(x_dir + filename))
-
 		X_array = np.concatenate(X_array_list, axis=0)
 		# X_array = X_array[:, :, 0:21, 0:21, :]
 		del X_array_list
@@ -253,10 +315,10 @@ def get_X_and_Y_array():
 		Y_array = np.concatenate(Y_array_list, axis=0)
 		del Y_array_list
 
-		new_X_array = feature_scaling(X_array[:, :, :, :, -1, np.newaxis])
-		new_Y_array = feature_scaling(Y_array[:, :, :, :, -1, np.newaxis])
-		X_array = _copy(X_array, new_X_array)
-		Y_array = _copy(Y_array, new_Y_array)
+		# new_X_array = feature_scaling(X_array[:, :, :, :, -1, np.newaxis])
+		# new_Y_array = feature_scaling(Y_array[:, :, :, :, -1, np.newaxis])
+		# X_array = _copy(X_array, new_X_array)
+		# Y_array = _copy(Y_array, new_Y_array)
 		X_array = X_array[0: -1]  # important!!
 		Y_array = Y_array[1:]  # important!! Y should shift 10 minutes
 		return X_array, Y_array
@@ -285,10 +347,10 @@ def get_X_and_Y_array():
 			Y_array_list.append(du.load_array(y_dir + filename))
 		Y_array = np.concatenate(Y_array_list, axis=0)
 		del Y_array_list
-		new_X_array = feature_scaling(X_array)
-		new_Y_array = feature_scaling(Y_array)
-		X_array = _copy(X_array, new_X_array)
-		Y_array = _copy(Y_array, new_Y_array)
+		# new_X_array = feature_scaling(X_array)
+		# new_Y_array = feature_scaling(Y_array)
+		# X_array = _copy(X_array, new_X_array)
+		# Y_array = _copy(Y_array, new_Y_array)
 		return X_array, Y_array
 
 	def task_3():
@@ -318,15 +380,86 @@ def get_X_and_Y_array():
 		Y_array = np.concatenate(Y_array_list, axis=0)
 		del Y_array_list
 
-		new_X_array = feature_scaling(X_array[:, :, :, :, -1, np.newaxis])
-		new_Y_array = feature_scaling(Y_array[:, :, :, :, -1, np.newaxis])
-		X_array = _copy(X_array, new_X_array)
-		Y_array = _copy(Y_array, new_Y_array)
+		# new_X_array = feature_scaling(X_array[:, :, :, :, -1, np.newaxis])
+		# new_Y_array = feature_scaling(Y_array[:, :, :, :, -1, np.newaxis])
+		# X_array = _copy(X_array, new_X_array)
+		# Y_array = _copy(Y_array, new_Y_array)
 		X_array = X_array[0: -1]  # important!!
 		Y_array = Y_array[1:]  # important!! Y should shift 10 minutes
 		return X_array, Y_array
 
-	return task_1()
+	def task_4():
+		'''
+		X: past one hour
+		Y: next hour's min value
+		'''
+		x_dir = './npy/final/hour_min/testing/X/'
+		y_dir = './npy/final/hour_min/testing/Y/'
+		x_data_list = du.list_all_input_file(x_dir)
+		x_data_list.sort()
+		y_data_list = du.list_all_input_file(y_dir)
+		y_data_list.sort()
+
+		X_array_list = []
+		for filename in x_data_list:
+			X_array_list.append(du.load_array(x_dir + filename))
+
+		X_array = np.concatenate(X_array_list, axis=0)
+		del X_array_list
+
+		Y_array_list = []
+		for filename in y_data_list:
+			Y_array_list.append(du.load_array(y_dir + filename))
+		Y_array = np.concatenate(Y_array_list, axis=0)
+		del Y_array_list
+		X_array = X_array[0: -1]  # important!!
+		Y_array = Y_array[1:]  # important!! Y should shift 10 minutes
+		return X_array, Y_array
+
+	def task_5():
+		'''
+			X: past one hour
+			Y: next hour's min avg max network traffic
+			for multi task learning
+		'''
+		x_dir = './npy/final/hour_min_avg_max/testing/X/'
+		y_dir = './npy/final/hour_min_avg_max/testing/Y/'
+		x_data_list = du.list_all_input_file(x_dir)
+		x_data_list.sort()
+		y_data_list = du.list_all_input_file(y_dir)
+		y_data_list.sort()
+		X_array_list = []
+		for filename in x_data_list:
+			X_array_list.append(du.load_array(x_dir + filename))
+
+		X_array = np.concatenate(X_array_list, axis=0)
+		del X_array_list
+
+		Y_array_list = []
+		for filename in y_data_list:
+			Y_array_list.append(du.load_array(y_dir + filename))
+		Y_array = np.concatenate(Y_array_list, axis=0)
+		del Y_array_list
+		# X_array = feature_scaling(X_array)
+		# Y_array = feature_scaling(Y_array)
+		X_array = X_array[0: -1]  # important!!
+		Y_array = Y_array[1:]  # important!! Y should shift 10 minutes
+		return X_array, Y_array
+
+	if task_num == 1:
+		func = task_1()
+	elif task_num == 2:
+		func = task_2()
+	elif task_num == 3:
+		func = task_3()
+	elif task_num == 4:
+		func = task_4()
+	elif task_num == 5:
+		func = task_5()
+	else:
+		func = None
+
+	return func
 
 
 def predict_train(cnn_rnn, X_array, Y_array, model_path):
@@ -343,20 +476,63 @@ def predict_train(cnn_rnn, X_array, Y_array, model_path):
 	compute_loss_rate(Y_array[:, :, :, :, 2, np.newaxis], predict_y)
 	plot_predict_vs_real(Y_array, predict_y)
 
+def predict_MTL_train(cnn_rnn, X_array, Y_array, model_path):
+	print(Y_array.shape)
+
+	_, predict_y = cnn_rnn.start_predict(
+		X_array[:, :, :, :, 2, np.newaxis],
+		Y_array[:, :, :, :, 2, np.newaxis],
+		model_path)
+	# compute_loss_rate(X_array[1:, :, :, :, 2, np.newaxis], predict_y)
+	compute_loss_rate(Y_array[:, :, :, :, 2, np.newaxis], predict_y)
+	plot_predict_vs_real(Y_array, predict_y)
+	
 
 def feature_scaling(input_datas):
 	input_shape = input_datas.shape
-	input_datas = input_datas.reshape(input_shape[0], -1)
+	input_datas = input_datas.reshape(-1, 1)
 	min_max_scaler = preprocessing.MinMaxScaler(feature_range=(0.1, 255))
 	output = min_max_scaler.fit_transform(input_datas)
 	output = output.reshape(input_shape)
 	return output
 
+
+def copy(old, new):
+	# print(old.shape, new.shape)
+	for i in range(old.shape[0]):
+		for j in range(old.shape[1]):
+			for row in range(old.shape[2]):
+				for col in range(old.shape[3]):
+					old[i, j, row, col, 2:] = new[i, j, row, col]  # internet
+
+	return old
+
+
+def print_Y_array(Y_array):
+	print('Y array shape:{}'.format(Y_array.shape))
+	plot_y_list = []
+	for i in range(148):
+		for j in range(Y_array.shape[1]):
+			print(Y_array[i, j, 5, 5])
+			plot_y_list.append(Y_array[i, j, 5, 5])
+	plt.figure()
+	plt.plot(plot_y_list, marker='.')
+	plt.show()
+
 # prepare_predict_data()
 
 
-X_array, Y_array = get_X_and_Y_array()
+X_array, Y_array = get_X_and_Y_array(task_num=5)
+new_X_array = feature_scaling(X_array[:, :, :, :, 2:])
+new_Y_array = feature_scaling(Y_array[:, :, :, :, 2:])
+X_array = copy(X_array, new_X_array)
+Y_array = copy(Y_array, new_Y_array)
+print_Y_array(Y_array[:, :, :, :, 2:])
+
 Y_array = Y_array[:, :, 10:15, 10:15, :]
+del new_X_array, new_Y_array
+
+
 X_array_train = X_array[0:200]
 Y_array_train = Y_array[0:200]
 X_array_test = X_array[X_array.shape[0] - 100:]
@@ -364,15 +540,15 @@ Y_array_test = Y_array[Y_array.shape[0] - 100:]
 del X_array, Y_array
 
 
-X_data_shape = [X_array_train.shape[1], X_array_train.shape[2], X_array_train.shape[3], 1]
-Y_data_shape = [Y_array_train.shape[1], Y_array_train.shape[2], Y_array_train.shape[3], 1]
-cnn_rnn = CNN_RNN(X_data_shape, Y_data_shape)
+input_data_shape = [X_array_train.shape[1], X_array_train.shape[2], X_array_train.shape[3], 1]
+output_data_shape = [Y_array_train.shape[1], Y_array_train.shape[2], Y_array_train.shape[3], 1]
+cnn_rnn = CNN_RNN(input_data_shape, output_data_shape)
 model_path = {
-	'reload_path': '/home/mldp/ML_with_bigdata/CNN_RNN/output_model/CNN_RNN_avg.ckpt',
+	'reload_path': '/home/mldp/ML_with_bigdata/CNN_RNN/output_model/CNN_RNN_LSTMcell.ckpt',
 	'save_path': '/home/mldp/ML_with_bigdata/CNN_RNN/output_model/CNN_RNN.ckpt'
 }
 
-cnn_rnn.set_training_data(X_array_train[:, :, :, :, 2, np.newaxis], Y_array_train[:, :, :, :, 2, np.newaxis])  # internet traffic
+cnn_rnn.set_training_data(X_array_train[:, :, :, :, 2:], Y_array_train[:, :, :, :, 2:])  # internet traffic min avg max
 
 predict_train(cnn_rnn, X_array_train, Y_array_train, model_path)
 predict_train(cnn_rnn, X_array_test, Y_array_test, model_path)

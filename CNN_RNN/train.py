@@ -11,6 +11,8 @@ root_dir = '/home/mldp/ML_with_bigdata'
 
 
 def prepare_training_data(task_num=2):
+	grid_start = 45
+	grid_stop = 60
 	'''
 	input_dir_list = [
 			"/home/mldp/big_data/openbigdata/milano/SMS/11/data_preproccessing_10/",
@@ -38,7 +40,7 @@ def prepare_training_data(task_num=2):
 		for i, filename in enumerate(filelist):
 			if filename != 'training_raw_data.npy':
 				data_array = du.load_array(root_dir + '/npy/hour_max/X/' + filename)
-				data_array = data_array[:, :, 40:65, 40:65, -1, np.newaxis]  # only network activity
+				data_array = data_array[:, :, grid_start:grid_stop, grid_start:grid_stop, -1, np.newaxis]  # only network activity
 				print('saving  array shape:{}'.format(data_array.shape))
 				du.save_array(
 					data_array, x_target_path + '/hour_max_' + str(i))
@@ -47,7 +49,7 @@ def prepare_training_data(task_num=2):
 		filelist.sort()
 		for i, filename in enumerate(filelist):
 			max_array = du.load_array(root_dir + '/npy/hour_max/Y/' + filename)
-			max_array = max_array[:, :, 40:65, 40:65, -1, np.newaxis]  # only network activity
+			max_array = max_array[:, :, grid_start:grid_stop, grid_start:grid_stop, -1, np.newaxis]  # only network activity
 			du.save_array(max_array, y_target_path + '/hour_max_' + str(i))
 
 	def _task_2():
@@ -69,13 +71,13 @@ def prepare_training_data(task_num=2):
 		filelist_Y.sort()
 		for i, filename in enumerate(filelist_X):
 			data_array = du.load_array(root_dir + '/npy/npy_roll/X/' + filename)
-			data_array = data_array[:, :, 40:65, 40:65, -1, np.newaxis]  # only network activity
+			data_array = data_array[:, :, grid_start:grid_stop, grid_start:grid_stop, -1, np.newaxis]  # only network activity
 			print('saving  array shape:{}'.format(data_array.shape))
 			du.save_array(data_array, x_target_path + '/X_' + str(i))
 
 		for i, filename in enumerate(filelist_Y):
 			data_array = du.load_array(root_dir + '/npy/npy_roll/Y/' + filename)
-			data_array = data_array[:, :, 40:65, 40:65, -1, np.newaxis]  # only network activity
+			data_array = data_array[:, :, grid_start:grid_stop, grid_start:grid_stop, -1, np.newaxis]  # only network activity
 			print('saving  array shape:{}'.format(data_array.shape))
 			du.save_array(data_array, y_target_path + '/Y_' + str(i))
 
@@ -97,7 +99,7 @@ def prepare_training_data(task_num=2):
 		for i, filename in enumerate(filelist):
 			if filename != 'training_raw_data.npy':
 				data_array = du.load_array(root_dir + '/npy/hour_avg/X/' + filename)
-				data_array = data_array[:, :, 40:65, 40:65, -1, np.newaxis]  # only network activity
+				data_array = data_array[:, :, grid_start:grid_stop, grid_start:grid_stop, -1, np.newaxis]  # only network activity
 				print('saving array shape:{}'.format(data_array.shape))
 				du.save_array(data_array, x_target_path + '/hour_avg_' + str(i))
 
@@ -105,7 +107,7 @@ def prepare_training_data(task_num=2):
 		filelist.sort()
 		for i, filename in enumerate(filelist):
 			avg_array = du.load_array(root_dir + '/npy/hour_avg/Y/' + filename)
-			avg_array = avg_array[:, :, 40:65, 40:65, -1, np.newaxis]  # only network activity
+			avg_array = avg_array[:, :, grid_start:grid_stop, grid_start:grid_stop, -1, np.newaxis]  # only network activity
 			du.save_array(avg_array, y_target_path + '/hour_avg_' + str(i))
 
 	def _task_4():
@@ -126,7 +128,7 @@ def prepare_training_data(task_num=2):
 		for i, filename in enumerate(filelist):
 			if filename != 'training_raw_data.npy':
 				data_array = du.load_array(root_dir + '/npy/hour_min/X/' + filename)
-				data_array = data_array[:, :, 40:65, 40:65, -1, np.newaxis]  # only network activity
+				data_array = data_array[:, :, grid_start:grid_stop, grid_start:grid_stop, -1, np.newaxis]  # only network activity
 				print('saving array shape:{}'.format(data_array.shape))
 				du.save_array(data_array, x_target_path + '/hour_min_' + str(i))
 
@@ -134,7 +136,7 @@ def prepare_training_data(task_num=2):
 		filelist.sort()
 		for i, filename in enumerate(filelist):
 			min_array = du.load_array(root_dir + '/npy/hour_min/Y/' + filename)
-			min_array = min_array[:, :, 40:65, 40:65, -1, np.newaxis]  # only network activity
+			min_array = min_array[:, :, grid_start:grid_stop, grid_start:grid_stop, -1, np.newaxis]  # only network activity
 			du.save_array(min_array, y_target_path + '/hour_min_' + str(i))
 
 	def _task_5():
@@ -144,9 +146,9 @@ def prepare_training_data(task_num=2):
 			for multi task learning
 		'''
 
-		# _task_4()
-		# _task_3()
-		# _task_1()
+		_task_4()
+		_task_3()
+		_task_1()
 		x_target_path = './npy/final/hour_min_avg_max/training/X'
 		y_target_path = './npy/final/hour_min_avg_max/training/Y'
 		if not os.path.exists(x_target_path):
@@ -376,7 +378,7 @@ if __name__ == '__main__':
 	output_data_shape = [Y_array.shape[1], Y_array.shape[2], Y_array.shape[3], 1]
 	model_path = {
 		'reload_path': '/home/mldp/ML_with_bigdata/CNN_RNN/output_model/CNN_RNN.ckpt',
-		'save_path': '/home/mldp/ML_with_bigdata/CNN_RNN/output_model/CNN_RNN_avg.ckpt'
+		'save_path': '/home/mldp/ML_with_bigdata/CNN_RNN/output_model/CNN_RNN_LSTMcell.ckpt'
 	}
 	cnn_rnn = CNN_RNN(input_data_shape, output_data_shape)
 	cnn_rnn.set_training_data(X_array, Y_array)
