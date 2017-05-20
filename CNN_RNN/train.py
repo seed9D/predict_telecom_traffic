@@ -378,7 +378,7 @@ if __name__ == '__main__':
 	output_data_shape = [Y_array.shape[1], Y_array.shape[2], Y_array.shape[3], 1]
 	model_path = {
 		'reload_path': '/home/mldp/ML_with_bigdata/CNN_RNN/output_model/CNN_RNN.ckpt',
-		'save_path': '/home/mldp/ML_with_bigdata/CNN_RNN/output_model/CNN_RNN_LSTMcell.ckpt'
+		'save_path': '/home/mldp/ML_with_bigdata/CNN_RNN/output_model/CNN_RNN_bi_LSTMcell_inceptionCNN.ckpt'
 	}
 	cnn_rnn = CNN_RNN(input_data_shape, output_data_shape)
 	cnn_rnn.set_training_data(X_array, Y_array)

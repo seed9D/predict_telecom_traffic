@@ -100,7 +100,7 @@ def plot_predict_vs_real(real, predict):
 
 
 def compute_loss_rate(real, predict):
-	# print(real.shape, predict.shape)
+	print(real.shape, predict.shape)
 	# ab_sum = (np.absolute(real - predict).sum()) / real.size
 	# print('real shape {} predict shape {}'.format(real.shape, predict.shape))
 	ab_sum = (np.absolute(real - predict).mean())
@@ -555,7 +555,7 @@ input_data_shape = [X_array_train.shape[1], X_array_train.shape[2], X_array_trai
 output_data_shape = [Y_array_train.shape[1], Y_array_train.shape[2], Y_array_train.shape[3], 1]
 cnn_rnn = CNN_RNN(input_data_shape, output_data_shape)
 model_path = {
-	'reload_path': '/home/mldp/ML_with_bigdata/CNN_RNN/output_model/CNN_RNN_LSTMcell.ckpt',
+	'reload_path': '/home/mldp/ML_with_bigdata/CNN_RNN/output_model/CNN_RNN_bi_LSTMcell_inceptionCNN.ckpt',
 	'save_path': '/home/mldp/ML_with_bigdata/CNN_RNN/output_model/CNN_RNN.ckpt'
 }
 
