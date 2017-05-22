@@ -345,10 +345,10 @@ def get_X_and_Y_array(task_num=1):
 
 
 def feature_scaling(input_datas):
-	print(input_datas.shape)
+	# print(input_datas.shape)
 	input_shape = input_datas.shape
 	input_datas = input_datas.reshape(-1, 1)
-	print(np.amin(input_datas))
+	# print(np.amin(input_datas))
 	min_max_scaler = preprocessing.MinMaxScaler(feature_range=(0.1, 255))
 	output = min_max_scaler.fit_transform(input_datas)
 	output = output.reshape(input_shape)
@@ -372,13 +372,13 @@ if __name__ == '__main__':
 	X_array = feature_scaling(X_array)
 	Y_array = feature_scaling(Y_array)
 	# print_Y_array(Y_array)
-	Y_array = Y_array[:, :, 10:15, 10:15, :]
+	Y_array = Y_array[:, :, 10:13, 10:13, :]
 	# parameter
 	input_data_shape = [X_array.shape[1], X_array.shape[2], X_array.shape[3], X_array.shape[4]]
 	output_data_shape = [Y_array.shape[1], Y_array.shape[2], Y_array.shape[3], 1]
 	model_path = {
-		'reload_path': '/home/mldp/ML_with_bigdata/CNN_RNN/output_model/CNN_RNN.ckpt',
-		'save_path': '/home/mldp/ML_with_bigdata/CNN_RNN/output_model/CNN_RNN_bi_LSTMcell_inceptionCNN.ckpt'
+		'reload_path': '/home/mldp/ML_with_bigdata/CNN_RNN/output_model/CNN_RNN_bi_LSTMcell.ckpt',
+		'save_path': '/home/mldp/ML_with_bigdata/CNN_RNN/output_model/CNN_RNN_only_RNN.ckpt'
 	}
 	cnn_rnn = CNN_RNN(input_data_shape, output_data_shape)
 	cnn_rnn.set_training_data(X_array, Y_array)

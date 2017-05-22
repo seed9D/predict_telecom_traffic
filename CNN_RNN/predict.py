@@ -94,7 +94,7 @@ def plot_predict_vs_real(real, predict):
 
 		__plot(plot_1, plot_2)
 	__get_plot_data(real, predict, 0, 0, 0, 1)
-	__get_plot_data(real, predict, 4, 3, 4, 4)
+	__get_plot_data(real, predict, 2, 1, 2, 2)
 
 	plt.show()
 
@@ -484,7 +484,11 @@ def predict_MTL_train(cnn_rnn, X_array, Y_array, model_path):
 		X_array[:, :, :, :, 2:],
 		Y_array[:, :, :, :, 2:],
 		model_path)
-	# compute_loss_rate(X_array[1:, :, :, :, 2, np.newaxis], predict_y)
+	real_min = Y_array[:, :, :, :, 2, np.newaxis]
+	real_avg = Y_array[:, :, :, :, 3, np.newaxis]
+	real_max = Y_array[:, :, :, :, 4, np.newaxis]
+	predict_y = np.concatenate((prediction_min, prediction_avg, prediction_max, real_min, real_avg, real_max), axis=-1)
+	# print_Y_array(predict_y)
 	print('-' * 20, 'task min:', '-' * 20)
 	compute_loss_rate(Y_array[:, :, :, :, 2, np.newaxis], prediction_min)
 	plot_predict_vs_real(Y_array[:, :, :, :, (0, 1, 2)], prediction_min)
@@ -522,10 +526,10 @@ def copy(old, new):
 def print_Y_array(Y_array):
 	print('Y array shape:{}'.format(Y_array.shape))
 	plot_y_list = []
-	for i in range(148):
+	for i in range(100):
 		for j in range(Y_array.shape[1]):
-			print(Y_array[i, j, 5, 5])
-			plot_y_list.append(Y_array[i, j, 5, 5])
+			print(Y_array[i, j, 2, 2])
+			plot_y_list.append(Y_array[i, j, 2, 2])
 	plt.figure()
 	plt.plot(plot_y_list, marker='.')
 	plt.show()
@@ -540,7 +544,7 @@ X_array = copy(X_array, new_X_array)
 Y_array = copy(Y_array, new_Y_array)
 # print_Y_array(Y_array[:, :, :, :, 2:])
 
-Y_array = Y_array[:, :, 10:15, 10:15, :]
+Y_array = Y_array[:, :, 10:13, 10:13, :]
 del new_X_array, new_Y_array
 
 
@@ -555,7 +559,7 @@ input_data_shape = [X_array_train.shape[1], X_array_train.shape[2], X_array_trai
 output_data_shape = [Y_array_train.shape[1], Y_array_train.shape[2], Y_array_train.shape[3], 1]
 cnn_rnn = CNN_RNN(input_data_shape, output_data_shape)
 model_path = {
-	'reload_path': '/home/mldp/ML_with_bigdata/CNN_RNN/output_model/CNN_RNN_bi_LSTMcell_inceptionCNN.ckpt',
+	'reload_path': '/home/mldp/ML_with_bigdata/CNN_RNN/output_model/CNN_RNN_bi_LSTMcell.ckpt',
 	'save_path': '/home/mldp/ML_with_bigdata/CNN_RNN/output_model/CNN_RNN.ckpt'
 }
 
@@ -563,6 +567,7 @@ cnn_rnn.set_training_data(X_array_train[:, :, :, :, 2:], Y_array_train[:, :, :, 
 
 # predict_train(cnn_rnn, X_array_train, Y_array_train, model_path)
 # predict_train(cnn_rnn, X_array_test, Y_array_test, model_path)
-predict_MTL_train(cnn_rnn, X_array_train, Y_array_train, model_path)
 predict_MTL_train(cnn_rnn, X_array_test, Y_array_test, model_path)
+predict_MTL_train(cnn_rnn, X_array_train, Y_array_train, model_path)
+
 
