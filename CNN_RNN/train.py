@@ -172,7 +172,27 @@ def prepare_training_data(task_num=2):
 
 		du.save_array(max_X, x_target_path + '/min_avg_max_X')
 		du.save_array(min_avg_max_Y, y_target_path + '/min_avg_max_Y')
-	_task_5()
+
+	def _task_6():
+		'''
+			X: past one hour
+			Y: next 10 minutes traffic level
+		'''
+		_task_2()
+		x_target_path = './npy/final/10_minutes_level/training/X'
+		y_target_path = './npy/final/10_minutes_level/training/Y'
+		if not os.path.exists(x_target_path):
+			os.makedirs(x_target_path)
+		if not os.path.exists(y_target_path):
+			os.makedirs(y_target_path)
+
+		X, Y = get_X_and_Y_array(task_num=2)
+		Y = feature_scaling(Y, feature_range=(1, 10))  # 10 interval
+		Y = np.floor(Y)  # 10 level
+		du.save_array(X, x_target_path + '/10_minutes_X')
+		du.save_array(Y, y_target_path + '/10_minutes_Y')
+
+	_task_6()
 
 
 def get_X_and_Y_array(task_num=1):
@@ -328,6 +348,34 @@ def get_X_and_Y_array(task_num=1):
 		Y_array = Y_array[1:]  # important!! Y should shift 10 minutes
 		return X_array, Y_array
 
+	def task_6():
+		'''
+			X: past one hour
+			Y: next 10 minutes traffic level
+		'''
+		x_dir = './npy/final/10_minutes_level/training/X/'
+		y_dir = './npy/final/10_minutes_level/training/Y/'
+		x_data_list = du.list_all_input_file(x_dir)
+		x_data_list.sort()
+		y_data_list = du.list_all_input_file(y_dir)
+		y_data_list.sort()
+
+		X_array_list = []
+		for filename in x_data_list:
+			X_array_list.append(du.load_array(x_dir + filename))
+
+		X_array = np.concatenate(X_array_list, axis=0)
+		del X_array_list
+
+		Y_array_list = []
+		for filename in y_data_list:
+			Y_array_list.append(du.load_array(y_dir + filename))
+		Y_array = np.concatenate(Y_array_list, axis=0)
+		del Y_array_list
+		# X_array = feature_scaling(X_array)
+		# Y_array = feature_scaling(Y_array)
+		return X_array, Y_array
+
 	if task_num == 1:
 		func = task_1()
 	elif task_num == 2:
@@ -338,18 +386,20 @@ def get_X_and_Y_array(task_num=1):
 		func = task_4()
 	elif task_num == 5:
 		func = task_5()
+	elif task_num == 6:
+		func = task_6()
 	else:
 		func = None
 
 	return func
 
 
-def feature_scaling(input_datas):
+def feature_scaling(input_datas, feature_range=(0.1, 255)):
 	# print(input_datas.shape)
 	input_shape = input_datas.shape
 	input_datas = input_datas.reshape(-1, 1)
 	# print(np.amin(input_datas))
-	min_max_scaler = preprocessing.MinMaxScaler(feature_range=(0.1, 255))
+	min_max_scaler = preprocessing.MinMaxScaler(feature_range=feature_range)
 	output = min_max_scaler.fit_transform(input_datas)
 	output = output.reshape(input_shape)
 	return output
@@ -363,25 +413,34 @@ def print_Y_array(Y_array):
 			print(Y_array[i, j, 10, 10])
 			plot_y_list.append(Y_array[i, j, 10, 10])
 	plt.figure()
-	plt.plot(plot_y_list,  marker='.')
+	plt.plot(plot_y_list, marker='.')
 	plt.show()
 
 if __name__ == '__main__':
 	# prepare_training_data()
 	X_array, Y_array = get_X_and_Y_array(task_num=5)
+	Y_array = Y_array[:, :, 10:13, 10:13, :]
 	X_array = feature_scaling(X_array)
 	Y_array = feature_scaling(Y_array)
-	# print_Y_array(Y_array)
-	Y_array = Y_array[:, :, 10:13, 10:13, :]
+
+	X_array_2, Y_array_2 = get_X_and_Y_array(task_num=6)
+	Y_array_2 = Y_array_2[:, :, 10:13, 10:13, :]
+	# X_array_2 = feature_scaling(X_array_2)
+	# Y_array_2 = feature_scaling(Y_array_2)
 	# parameter
 	input_data_shape = [X_array.shape[1], X_array.shape[2], X_array.shape[3], X_array.shape[4]]
 	output_data_shape = [Y_array.shape[1], Y_array.shape[2], Y_array.shape[3], 1]
 	model_path = {
-		'reload_path': '/home/mldp/ML_with_bigdata/CNN_RNN/output_model/CNN_RNN_bi_LSTMcell.ckpt',
-		'save_path': '/home/mldp/ML_with_bigdata/CNN_RNN/output_model/CNN_RNN_only_RNN.ckpt'
+		'reload_path': '/home/mldp/ML_with_bigdata/CNN_RNN/output_model/CNN_RNN_bi_LSTM.ckpt',
+		'save_path': '/home/mldp/ML_with_bigdata/CNN_RNN/output_model/CNN_RNN_bi_LSTM_residual.ckpt'
 	}
 	cnn_rnn = CNN_RNN(input_data_shape, output_data_shape)
-	cnn_rnn.set_training_data(X_array, Y_array)
+	cnn_rnn.create_MTL_task(X_array, Y_array[:, :, :, :, 0, np.newaxis], 'min_traffic')
+	cnn_rnn.create_MTL_task(X_array, Y_array[:, :, :, :, 1, np.newaxis], 'avg_traffic')
+	cnn_rnn.create_MTL_task(X_array, Y_array[:, :, :, :, 2, np.newaxis], 'max_traffic', 'cross_entropy')
 	del X_array, Y_array
+	cnn_rnn.create_MTL_task(X_array_2, Y_array_2[:, :, :, :, 0, np.newaxis], '10_mins')
+	del X_array_2, Y_array_2
+
 	# cnn_rnn.start_train(model_path, reload=False)
-	cnn_rnn.start_MTL_train(model_path, reload=False)
+	# cnn_rnn.start_MTL_train(model_path, reload=False)

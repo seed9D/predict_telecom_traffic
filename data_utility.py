@@ -266,6 +266,7 @@ def load_data_hour_max(input_dir, filelist):
 	save_array(X, x_target_path + month + '_hour_max_X_' + str(data_divide_amount))
 	save_array(Y, y_target_path + month + '_hour_max_Y_' + str(data_divide_amount))
 
+
 def load_data_format_roll_10mins(input_dir, filelist):
 	def load_array(input_file):
 		print('loading file from {}...'.format(input_file))

@@ -8,7 +8,6 @@ import os
 
 class CNN_RNN:
 	def __init__(self, input_data_shape, output_data_shape):
-
 		self.batch_size = 100
 		self.shuffle_min_after_dequeue = 600
 		self.shuffle_capacity = self.shuffle_min_after_dequeue + 3 * self.batch_size
@@ -30,7 +29,7 @@ class CNN_RNN:
 
 		self.RNN_num_layers = 3
 		self.RNN_num_step = 6
-		self.RNN_hidden_node_size = 150
+		self.RNN_hidden_node_size = 200
 
 		# placeholder
 		# with tf.device('/cpu:0'):
@@ -53,12 +52,9 @@ class CNN_RNN:
 
 		network = self._build_CNN_RNN(self.Xs)
 		flat_tl = tl.layers.FlattenLayer(network, name='flatten_layer')
-		self.tl_share_output = flat_tl
+		network = tl.layers.DenseLayer(flat_tl, W_init=tf.contrib.layers.xavier_initializer(), n_units=400, act=lambda x: tl.act.lrelu(x, 0.2), name='fully_connect_1')
+		self.tl_share_output = network
 		self.multi_task_dic = {}
-		self.multi_task_dic['normal'] = self._create_MTL_output(self.tl_share_output, self.Ys, 'normal')
-		self.multi_task_dic['max_traffic'] = self._create_MTL_output(self.tl_share_output, self.Ys, 'max_traffic')
-		self.multi_task_dic['avg_traffic'] = self._create_MTL_output(self.tl_share_output, self.Ys, 'avg_traffic')
-		self.multi_task_dic['min_traffic'] = self._create_MTL_output(self.tl_share_output, self.Ys, 'min_traffic')
 		self.saver = tf.train.Saver()
 
 	def _build_RNN(self, Xs):
@@ -147,7 +143,7 @@ class CNN_RNN:
 
 		tl_3D_CNN_output = build_CNN_network(Xs)
 		return tl_3D_CNN_output
-	
+
 	def _build_CNN_RNN(self, Xs):
 
 		def build_CNN_network(input_X, is_training=1):
@@ -155,15 +151,44 @@ class CNN_RNN:
 				CNN_input = tf.reshape(input_X, [-1, self.input_vertical, self.input_horizontal, self.input_channel])
 				# print('CNN_input shape:{}'.format(CNN_input))
 				network = tl.layers.InputLayer(CNN_input, name='input_layer')
-				network = tl.layers.BatchNormLayer(network, name='batchnorm_layer_1')
-				network = tl.layers.Conv2dLayer(
+				network = tl.layers.BatchNormLayer(network, is_train=is_training, name='batchnorm_layer_1')
+				network_5x5 = tl.layers.Conv2dLayer(
 					network,
 					act=tf.nn.relu,
-					shape=[5, 5, 1, 64],
+					W_init=tf.contrib.layers.xavier_initializer_conv2d(),
+					b_init=tf.constant_initializer(value=0.0),
+					shape=[5, 5, 1, 32],
 					strides=[1, 1, 1, 1],
 					padding='SAME',
-					name='cnn_layer_1')
+					name='cnn_layer_1_5x5')
 
+				network_5x5 = tl.layers.PoolLayer(
+					network_5x5,
+					ksize=[1, 2, 2, 1],
+					strides=[1, 2, 2, 1],
+					padding='SAME',
+					pool=tf.nn.max_pool,
+					name='pool_layer_1_5x5')
+
+				network_3x3 = tl.layers.Conv2dLayer(
+					network,
+					act=tf.nn.relu,
+					W_init=tf.contrib.layers.xavier_initializer_conv2d(),
+					b_init=tf.constant_initializer(value=0.0),
+					shape=[3, 3, 1, 32],
+					strides=[1, 1, 1, 1],
+					padding='SAME',
+					name='cnn_layer_1_3x3')
+
+				network_3x3 = tl.layers.PoolLayer(
+					network_3x3,
+					ksize=[1, 2, 2, 1],
+					strides=[1, 2, 2, 1],
+					padding='SAME',
+					pool=tf.nn.avg_pool,
+					name='pool_layer_1_3x3')
+
+				network = tl.layers.ConcatLayer(layer=[network_3x3, network_5x5], concat_dim=3, name='concate_layer_1')
 				network = tl.layers.PoolLayer(
 					network,
 					ksize=[1, 2, 2, 1],
@@ -175,6 +200,8 @@ class CNN_RNN:
 				network = tl.layers.Conv2dLayer(
 					network,
 					act=tf.nn.relu,
+					W_init=tf.contrib.layers.xavier_initializer_conv2d(),
+					b_init=tf.constant_initializer(value=0.0),
 					shape=[5, 5, 64, 64],
 					strides=[1, 1, 1, 1],
 					padding='SAME',
@@ -198,14 +225,14 @@ class CNN_RNN:
 		def build_bi_RBB_network(input_X, is_training=1):
 			# print('rnn network input shape :{}'.format(input_X.outputs.get_shape()))
 			with tf.variable_scope('BI_RNN'):
-				input_X = tl.layers.BatchNormLayer(input_X, name='batchnorm_layer_1')
+				input_X = tl.layers.BatchNormLayer(input_X, is_train=is_training, name='batchnorm_layer_1')
 				network = tl.layers.ReshapeLayer(input_X, shape=[-1, self.RNN_num_step, int(input_X.outputs._shape[-1])], name='reshape_layer_1')
 
 				network = tl.layers.BiRNNLayer(
 					network,
 					cell_fn=tf.nn.rnn_cell.LSTMCell,
 					n_hidden=self.RNN_hidden_node_size,
-					initializer=tf.random_uniform_initializer(-0.1, 0.1),
+					initializer=tf.contrib.layers.xavier_initializer(),
 					n_steps=self.RNN_num_step,
 					fw_initial_state=None,
 					bw_initial_state=None,
@@ -214,37 +241,6 @@ class CNN_RNN:
 					n_layer=self.RNN_num_layers,
 					dropout=(self.keep_rate, self.keep_rate),
 					name='layer_1')
-				'''
-				if is_training:
-					network = tl.layers.DropoutLayer(network, keep=self.keep_rate, name='drop_1')
-				network = tl.layers.BiRNNLayer(
-					network,
-					cell_fn=tf.nn.rnn_cell.LSTMCell,
-					n_hidden=self.RNN_hidden_node_size,
-					initializer=tf.random_uniform_initializer(-0.1, 0.1),
-					n_steps=self.RNN_num_step,
-					fw_initial_state=None,
-					bw_initial_state=None,
-					return_last=False,
-					return_seq_2d=False,
-					name='layer_2')
-				if is_training:
-					network = tl.layers.DropoutLayer(network, keep=self.keep_rate, name='drop_2')
-
-				network = tl.layers.BiRNNLayer(
-					network,
-					cell_fn=tf.nn.rnn_cell.LSTMCell,
-					n_hidden=self.RNN_hidden_node_size,
-					initializer=tf.random_uniform_initializer(-0.1, 0.1),
-					n_steps=self.RNN_num_step,
-					fw_initial_state=None,
-					bw_initial_state=None,
-					return_last=True,
-					return_seq_2d=False,
-					name='layer_3')
-				if is_training:
-					network = tl.layers.DropoutLayer(network, keep=self.keep_rate, name='drop_3')
-				'''
 				return network
 
 		def build_RNN_network(input_X, is_training=1):
@@ -318,13 +314,12 @@ class CNN_RNN:
 				return_seq_2d=True,
 				name='basic_lstm_layer_2')
 			'''
-			return network		
+			return network
 
 		def build_inception_CNN_network(input_X, is_training=1):
-			filter_map_1 = 32
-			filter_map_2 = 32
-			reduce1x1 = 16
-
+			filter_map_1 = 16
+			filter_map_2 = 16
+			reduce1x1 = 10
 			def create_inception(input_tl, filter_map_size, reduce_size, scope_name):
 				input_shape = input_tl.outputs.get_shape().as_list()
 				input_channel = input_shape[-1]
@@ -332,6 +327,8 @@ class CNN_RNN:
 					conv1_1x1_1 = tl.layers.Conv2dLayer(
 						input_tl,
 						act=tf.nn.relu,
+						W_init=tf.contrib.layers.xavier_initializer_conv2d(),
+						b_init=tf.constant_initializer(value=0.0),
 						shape=[1, 1, input_channel, filter_map_size],
 						strides=[1, 1, 1, 1],
 						name='inception_1x1_1')
@@ -340,6 +337,8 @@ class CNN_RNN:
 					conv1_1x1_2 = tl.layers.Conv2dLayer(
 						input_tl,
 						act=tf.nn.relu,
+						W_init=tf.contrib.layers.xavier_initializer_conv2d(),
+						b_init=tf.constant_initializer(value=0.0),
 						shape=[1, 1, input_channel, reduce_size],
 						strides=[1, 1, 1, 1],
 						name='inception_1x1_2')
@@ -348,6 +347,8 @@ class CNN_RNN:
 					conv1_1x1_3 = tl.layers.Conv2dLayer(
 						input_tl,
 						act=tf.nn.relu,
+						W_init=tf.contrib.layers.xavier_initializer_conv2d(),
+						b_init=tf.constant_initializer(value=0.0),
 						shape=[1, 1, input_channel, reduce_size],
 						strides=[1, 1, 1, 1],
 						name='inception_1x1_3')
@@ -356,6 +357,8 @@ class CNN_RNN:
 					conv1_3x3 = tl.layers.Conv2dLayer(
 						conv1_1x1_2,
 						act=tf.nn.relu,
+						W_init=tf.contrib.layers.xavier_initializer_conv2d(),
+						b_init=tf.constant_initializer(value=0.0),
 						shape=[3, 3, reduce_size, filter_map_size],
 						strides=[1, 1, 1, 1],
 						name='inception_3x3')
@@ -364,6 +367,8 @@ class CNN_RNN:
 					conv1_5x5 = tl.layers.Conv2dLayer(
 						conv1_1x1_3,
 						act=tf.nn.relu,
+						W_init=tf.contrib.layers.xavier_initializer_conv2d(),
+						b_init=tf.constant_initializer(value=0.0),
 						shape=[5, 5, reduce_size, filter_map_size],
 						strides=[1, 1, 1, 1],
 						name='inception_5x5')
@@ -379,6 +384,8 @@ class CNN_RNN:
 					conv1_1x1_4 = tl.layers.Conv2dLayer(
 						max_pool1,
 						act=tf.nn.relu,
+						W_init=tf.contrib.layers.xavier_initializer_conv2d(),
+						b_init=tf.constant_initializer(value=0.0),
 						shape=[1, 1, input_channel, filter_map_size],
 						strides=[1, 1, 1, 1],
 						name='inception1_1x1_4')
@@ -391,41 +398,8 @@ class CNN_RNN:
 				print('CNN_input shape:{}'.format(CNN_input))
 				network = tl.layers.InputLayer(CNN_input, name='input_layer')
 				network = tl.layers.BatchNormLayer(network, name='batchnorm_layer_1')
-				'''
-				network_5x5 = tl.layers.Conv2dLayer(
-					network,
-					act=tf.nn.relu,
-					shape=[5, 5, 1, 32],
-					strides=[1, 1, 1, 1],
-					padding='SAME',
-					name='cnn_layer_5x5')
-				network_5x5 = tl.layers.PoolLayer(
-					network_5x5,
-					ksize=[1, 2, 2, 1],
-					strides=[1, 2, 2, 1],
-					padding='SAME',
-					pool=tf.nn.avg_pool,
-					name='pool_layer_5x5')
-
-				network_3x3 = tl.layers.Conv2dLayer(
-					network,
-					act=tf.nn.relu,
-					shape=[3, 3, 1, 32],
-					strides=[1, 1, 1, 1],
-					padding='SAME',
-					name='cnn_layer_3x3')
-				network_3x3 = tl.layers.PoolLayer(
-					network_3x3,
-					ksize=[1, 2, 2, 1],
-					strides=[1, 2, 2, 1],
-					padding='SAME',
-					pool=tf.nn.avg_pool,
-					name='pool_layer_3x3')
-				network = tl.layers.ConcatLayer(layer=[network_5x5, network_3x3], concat_dim=3, name='concate_layer1')
-				network = tl.layers.DropoutLayer(network, keep=self.keep_rate, name='drop_1')
-				'''
 				inception = create_inception(network, filter_map_1, reduce1x1, 'inception_1')
-				# inception1 = tl.layers.DropoutLayer(inception1, keep=self.keep_rate, name='drop_2')
+				inception = tl.layers.DropoutLayer(inception, keep=self.keep_rate, name='drop_1')
 				inception = tl.layers.PoolLayer(
 					inception,
 					ksize=[1, 2, 2, 1],
@@ -433,18 +407,42 @@ class CNN_RNN:
 					padding='SAME',
 					pool=tf.nn.max_pool,
 					name='pool_layer_1')
+				network = tl.layers.Conv2dLayer(
+					inception,
+					act=tf.nn.relu,
+					W_init=tf.contrib.layers.xavier_initializer_conv2d(),
+					b_init=tf.constant_initializer(value=0.0),
+					shape=[5, 5, 64, 64],
+					strides=[1, 1, 1, 1],
+					padding='SAME',
+					name='cnn_layer_1')
+				network = tl.layers.PoolLayer(
+					network,
+					ksize=[1, 3, 3, 1],
+					strides=[1, 1, 1, 1],
+					padding='SAME',
+					pool=tf.nn.avf_pool,
+					name='pool_layer_1')
+				network = tl.layers.DropoutLayer(network, keep=self.keep_rate, name='drop_1')
 				print('network output shape:{}'.format(inception.outputs.get_shape()))
 				return inception
 
 		with tf.variable_scope('CNN_RNN'):
-			tl_CNN_output = build_CNN_network(Xs, is_training=1)
+			tl_CNN_output = build_CNN_network(Xs, is_training=False)
 
-			network = tl.layers.FlattenLayer(tl_CNN_output, name='flatten_layer')
-			network = tl.layers.BatchNormLayer(network, name='batchnorm_layer_1')
+			cnn_flat = tl.layers.FlattenLayer(tl_CNN_output, name='CNN_flatten')
+			network = tl.layers.BatchNormLayer(cnn_flat, is_train=False, name='batchnorm_layer_1')
+			tl_RNN_output = build_bi_RBB_network(network, is_training=False)
+			# print('CNN output:{}  rnn output:{}'.format(tl_CNN_output.outputs.get_shape().as_list(), tl_RNN_output.outputs.get_shape().as_list()))
+			'''
+			rnn_flat = tl.layers.FlattenLayer(tl_RNN_output, name='RNN_flatten')
+			cnn_flat = tl.layers.ReshapeLayer(cnn_flat, [-1, self.input_temporal * cnn_flat.outputs.get_shape().as_list()[-1]])
+			CNN_RNN_ouput_tl = tl.layers.ConcatLayer([cnn_flat, rnn_flat], concat_dim=1, name='CNN_RNN_concat')
+			CNN_RNN_ouput_tl = tl.layers.DropoutLayer(CNN_RNN_ouput_tl, keep=0.9, name='dropout_layer')
+			'''
+			CNN_RNN_ouput_tl = tl_RNN_output
 
-			tl_RNN_output = build_bi_RBB_network(network, is_training=1)
-
-		return tl_RNN_output
+		return CNN_RNN_ouput_tl
 
 	def _create_Non_MTL_output(self):
 		# non MTL
@@ -474,10 +472,11 @@ class CNN_RNN:
 		self.optimizer_op = optimizer.apply_gradients(capped_gvs)
 		'''
 
-	def create_MTL_task(self):
-		pass
+	def create_MTL_task(self, input_x, input_y, task_name, loss_type='MSE'):
+		self.multi_task_dic[task_name] = self._create_MTL_output(self.tl_share_output, self.Ys, task_name, loss_type='MSE')
+		self._set_training_data(input_x, input_y, task_name)
 
-	def _create_MTL_output(self, tl_input, y, scope_name):
+	def _create_MTL_output(self, tl_input, y, scope_name, loss_type='MSE'):
 		def get_l2_list():
 			# print('get_l2_list:')
 			var_list = []
@@ -513,23 +512,31 @@ class CNN_RNN:
 
 		with tf.variable_scope('prediction_layer'):
 			with tf.variable_scope(scope_name):
-				tl_regression = tl.layers.DenseLayer(tl_input, n_units=self.predictor_output, act=tl.activation.identity, name='regression_op')
+				tl_input = tl.layers.BatchNormLayer(tl_input, is_train=False, name='batch_norm')
+				tl_regression = tl.layers.DenseLayer(tl_input, W_init=tf.contrib.layers.xavier_initializer(), n_units=self.predictor_output, act=tl.activation.identity, name='regression_op')
 				tl_regression = tl.layers.DropoutLayer(tl_regression, keep=0.8, name='drop_1')
 				tl_output = tl_regression
 				regression_output = tl_output.outputs
 				# print('regression_output shape {}'.format(regression_output.get_shape().as_list()))
 				output = tf.reshape(regression_output, [-1, self.output_temporal, self.output_vertical, self.output_horizontal, self.output_channel], name='output_layer')
 
+				cross_entropy = tf.nn.softmax_cross_entropy_with_logits(output, y, name='corss_entropy_op')
 				MSE = tf.reduce_mean(tf.pow(output - y, 2), name='MSE_op')
 				RMSE = tf.sqrt(tf.reduce_mean(tf.pow(output - y, 2)))
 				MAE = tf.reduce_mean(tf.abs(output - y))
 				MAPE = tf.reduce_mean(tf.divide(tf.abs(y - output), tf.reduce_mean(y)), name='MAPE_OP')
 				L2_list = get_l2_list()
 				L2_loss = self._L2_norm(L2_list)
-				cost = tf.add(MSE, L2_loss * self.weight_decay, name='cost_op')
 
+				if loss_type == 'cross_entropy':
+					prediction_softmax = tf.nn.softmax(output)
+					correct_prediciton = tf.equal(tf.argmax(prediction_softmax, 1), tf.argmax(y, 1))
+					accuracy = tf.reduce_mean(tf.cast(correct_prediciton, tf.float32))
+					cost = tf.add(cross_entropy, L2_loss * self.weight_decay, name='cost_op')
+				else:
+					cost = tf.add(MSE, L2_loss * self.weight_decay, name='cost_op')
+					accuracy = 1 - MAPE
 				optimizer = tf.train.AdamOptimizer(learning_rate=self.learning_rate)
-
 				opt_vars = get_trainable_var()
 				gvs = optimizer.compute_gradients(cost, var_list=opt_vars)
 				capped_gvs = [(tf.clip_by_norm(grad, 5), var) for grad, var in gvs if grad is not None]
@@ -551,8 +558,11 @@ class CNN_RNN:
 					'MAE': MAE,
 					'MAPE': MAPE,
 					'RMSE': RMSE,
+					'cross_entropy': cross_entropy,
+					'accurcy': accuracy,
 					'training_cost_history': [],
-					'testing_cost_history': []
+					'testing_cost_history': [],
+					'training_temp_loss': 0
 				}
 				return task_dic
 
@@ -694,8 +704,7 @@ class CNN_RNN:
 	def print_all_variables(self):
 		self.tl_share_output.print_params()
 
-	def set_training_data(self, input_x, input_y):
-
+	def _set_training_data(self, input_x, input_y, task_name):
 		print('input_x shape:{}'.format(input_x.shape))
 		print('input_y shape:{}'.format(input_y.shape))
 		self.Y_temporal = input_y.shape[1]
@@ -712,15 +721,32 @@ class CNN_RNN:
 		# print(X_data[1,0,0,0,-1],Y_data[0,0,0,0,-1])
 		training_X = X_data[0:int(9 * X_data.shape[0] / 10)]
 		training_Y = Y_data[0:int(9 * Y_data.shape[0] / 10)]
-		self.testing_X = X_data[int(9 * X_data.shape[0] / 10):]
-		self.testing_Y = Y_data[int(9 * Y_data.shape[0] / 10):]
-		self.training_file = 'training.tfrecoeds'
-		self.testing_file = 'testing.tfrecoeds'
+		testing_X = X_data[int(9 * X_data.shape[0] / 10):]
+		testing_Y = Y_data[int(9 * Y_data.shape[0] / 10):]
+
+		training_file = task_name + '_training.tfrecoeds'
+		testing_file = task_name + '_testing.tfrecoeds'
+
 		print('training X shape:{}, training Y shape:{}'.format(
 			training_X.shape, training_Y.shape))
-		self._write_to_Tfrecord(training_X, training_Y, self.training_file)
-		self._write_to_Tfrecord(self.testing_X, self.testing_Y, self.testing_file)
+		self._write_to_Tfrecord(training_X, training_Y, training_file)
+		self._write_to_Tfrecord(testing_X, testing_Y, testing_file)
 		self.training_data_number = training_X.shape[0]
+		self.multi_task_dic[task_name]['training_file'] = training_file
+		self.multi_task_dic[task_name]['testing_file'] = testing_file
+
+		training_data = self._read_data_from_Tfrecord(self.multi_task_dic[task_name]['training_file'])
+		batch_tuple_OP = tf.train.shuffle_batch(
+			training_data,
+			batch_size=self.batch_size,
+			capacity=self.shuffle_capacity,
+			min_after_dequeue=self.shuffle_min_after_dequeue)
+		batch_without_shuffle_OP = tf.train.batch(
+			training_data,
+			batch_size=self.batch_size)
+
+		self.multi_task_dic[task_name]['shuffle_batch_OP'] = batch_tuple_OP
+		self.multi_task_dic[task_name]['batch_OP'] = batch_without_shuffle_OP
 
 	def _testing_data(self, sess, test_x, test_y):
 		predict_list = []
@@ -755,7 +781,7 @@ class CNN_RNN:
 		task_dic = self.multi_task_dic[task_name]
 		predict_list = []
 		cum_MSE = 0
-		cum_MAPE = 0
+		cum_accu = 0
 		batch_num = test_x.shape[0] // self.batch_size
 		for batch_index in range(batch_num):
 			dp_dict = tl.utils.dict_to_one(task_dic['tl_output'].all_drop)
@@ -768,7 +794,7 @@ class CNN_RNN:
 				self.norm: 0}
 			feed_dict.update(dp_dict)
 			with tf.device('/gpu:0'):
-				MSE, MAPE, predict = sess.run([task_dic['MSE'], task_dic['MAPE'], task_dic['output']], feed_dict=feed_dict)
+				MSE, accu, predict = sess.run([task_dic['MSE'], task_dic['accurcy'], task_dic['output']], feed_dict=feed_dict)
 			'''
 			for i in range(10, 15):
 				for j in range(predict.shape[1]):
@@ -778,8 +804,8 @@ class CNN_RNN:
 			for predict_element in predict:
 				predict_list.append(predict_element)
 			cum_MSE += MSE
-			cum_MAPE += MAPE
-		return cum_MSE / batch_num, 1 - (cum_MAPE / batch_num), np.stack(predict_list)
+			cum_accu += accu
+		return cum_MSE / batch_num, cum_accu / batch_num, np.stack(predict_list)
 
 	def start_predict(self, testing_x, testing_y, model_path):
 		print('input_x shape {}'.format(testing_x.shape))
@@ -925,43 +951,79 @@ class CNN_RNN:
 		return [prediction_min, prediction_avg, prediction_max]
 
 	def start_MTL_train(self, model_path, reload=False):
-		training_min_loss = 0
-		training_max_loss = 0
-		training_avg_loss = 0
-		training_accu_min = 0
-		training_accu_avg = 0
-		training_accu_max = 0
 		display_step = 50
 		epoch_his = []
 		plt.ion()
-		loss_fig = plt.figure(0)
+		# loss_fig = plt.figure(0)
 		min_fig = plt.figure(1)
 		avg_fig = plt.figure(2)
 		max_fig = plt.figure(3)
+		_10_mins_fig = plt.figure(4)
 
 		def get_multi_task_batch(batch_x, batch_y):
 			batch_y = np.transpose(batch_y, [4, 0, 1, 2, 3])
 			batch_y = np.expand_dims(batch_y, axis=5)
 			return batch_x, batch_y
 
-		def run_task_optimizer(sess, batch_x, batch_y, task_name, optimizer='optomizer'):
-			task_dic = self.multi_task_dic[task_name]
-			feed_dict = {
-				self.Xs: batch_x,
-				self.Ys: batch_y,
-				self.keep_prob: 0.7,
-				self.norm: 1}
-			feed_dict.update(task_dic['tl_output'].all_drop)
-			_, cost, L2_loss = sess.run([task_dic[optimizer], task_dic['cost'], task_dic['L2_loss']], feed_dict=feed_dict)
+		def run_multi_task(sess, task_name=''):
+			def run_task_optimizer(sess, batch_x, batch_y, task_name, optimizer='optomizer'):
+				task_dic = self.multi_task_dic[task_name]
+				feed_dict = {
+					self.Xs: batch_x,
+					self.Ys: batch_y,
+					self.keep_prob: 0.7,
+					self.norm: 1}
+				feed_dict.update(task_dic['tl_output'].all_drop)
+				_, cost, L2_loss = sess.run([task_dic[optimizer], task_dic['cost'], task_dic['L2_loss']], feed_dict=feed_dict)
 
-			return cost, L2_loss
+				return cost, L2_loss
+			task = self.multi_task_dic[task_name]
+			training_batch_op = task['shuffle_batch_OP']
+			index, batch_x, batch_y = sess.run(training_batch_op)
+			# batch_x, batch_y = get_multi_task_batch(batch_x, batch_y)
+			cost, L2 = run_task_optimizer(sess, batch_x, batch_y, task_name)
+			task['training_temp_loss'] += cost
+
+		def run_task_evaluate(sess, fig, epoch, task_name=''):
+			task = self.multi_task_dic[task_name]
+			index, testing_X, testing_Y = self._read_all_data_from_Tfreoced(task['testing_file'])
+			index, batch_x_sample, batch_y_sample = sess.run(task['batch_OP'])
+			# batch_x_sample, batch_y_sample = get_multi_task_batch(batch_x_sample, batch_y_sample)
+			# testing_X, testing_Y = get_multi_task_batch(testing_X, testing_Y)
+			testing_loss, testing_accu, prediction = self._MTL_testing_data(sess, testing_X, testing_Y, task_name)
+			training_loss_nodrop, training_accu, train_prediction = self._MTL_testing_data(sess, batch_x_sample, batch_y_sample, task_name)
+
+			task['training_temp_loss'] /= display_step
+			epoch_his.append(epoch)
+
+			self.multi_task_dic[task_name]['testing_cost_history'].append(testing_loss)
+			self.multi_task_dic[task_name]['training_cost_history'].append(task['training_temp_loss'])
+			print('task:{} epoch:{} training_cost:{:.4f} trainin_MSE(nodrop):{:.4f} training_accu:{:.4f} testing_MSE(nodrop):{:.4f} testing_accu:{:.4f}'.format(
+				task_name,
+				epoch,
+				task['training_temp_loss'],
+				training_loss_nodrop,
+				training_accu,
+				testing_loss,
+				testing_accu))
+			_plot_predict_vs_real(
+				fig,
+				task_name,
+				testing_Y[:100, 0, 0, 0, 0],
+				prediction[:100, 0, 0, 0, 0],
+				batch_y_sample[:100, 0, 0, 0, 0],
+				train_prediction[:100, 0, 0, 0, 0])
+			task['training_temp_loss'] = 0
 
 		def _plot_predict_vs_real(fig_instance, task_name, testing_y, testing_predict_y, training_y, training_predict_y):
 
-			ax_1 = fig_instance.add_subplot(2, 1, 1)
-			ax_2 = fig_instance.add_subplot(2, 1, 2)
+			ax_1 = fig_instance.add_subplot(3, 1, 1)
+			ax_2 = fig_instance.add_subplot(3, 1, 2)
+			ax_3 = fig_instance.add_subplot(3, 1, 3)
 			ax_1.cla()
 			ax_2.cla()
+			ax_3.cla()
+
 			ax_1.plot(testing_y, label='real', marker='.')
 			ax_1.plot(testing_predict_y, label='predict', marker='.')
 			ax_1.set_title(task_name + ' testing data')
@@ -973,6 +1035,12 @@ class CNN_RNN:
 			ax_2.set_title(task_name + ' training data')
 			ax_2.grid()
 			ax_2.legend()
+
+			ax_3.plot(self.multi_task_dic[task_name]['training_cost_history'], 'g-', label=task_name + ' training losses')
+			ax_3.plot(self.multi_task_dic[task_name]['testing_cost_history'], 'b-', label=task_name + ' testing losses')
+			ax_3.set_title(task_name + 'loss')
+			ax_3.grid()
+			ax_3.legend()
 			# ax.draw()
 			plt.pause(0.001)
 
@@ -983,25 +1051,17 @@ class CNN_RNN:
 			ax_1.cla()
 			ax_2.cla()
 			ax_3.cla()
-			ax_1.plot(epoch_his, self.multi_task_dic['min_traffic']['training_cost_history'], 'g-', label='min training losses')
-			ax_1.plot(epoch_his, self.multi_task_dic['min_traffic']['testing_cost_history'], 'b-', label='min testing losses')
+			ax_1.plot(self.multi_task_dic['min_traffic']['training_cost_history'], 'g-', label='min training losses')
+			ax_1.plot(self.multi_task_dic['min_traffic']['testing_cost_history'], 'b-', label='min testing losses')
 			ax_1.legend()
-			ax_2.plot(epoch_his, self.multi_task_dic['avg_traffic']['training_cost_history'], 'g-', label='avg training losses')
-			ax_2.plot(epoch_his, self.multi_task_dic['avg_traffic']['testing_cost_history'], 'b-', label='avg testing losses')
+			ax_2.plot(self.multi_task_dic['avg_traffic']['training_cost_history'], 'g-', label='avg training losses')
+			ax_2.plot(self.multi_task_dic['avg_traffic']['testing_cost_history'], 'b-', label='avg testing losses')
 			ax_2.legend()
-			ax_3.plot(epoch_his, self.multi_task_dic['max_traffic']['training_cost_history'], 'g-', label='max training losses')
-			ax_3.plot(epoch_his, self.multi_task_dic['max_traffic']['testing_cost_history'], 'b-', label='max testing losses')
+			ax_3.plot(self.multi_task_dic['max_traffic']['training_cost_history'], 'g-', label='max training losses')
+			ax_3.plot(self.multi_task_dic['max_traffic']['testing_cost_history'], 'b-', label='max testing losses')
 			ax_3.legend()
 			plt.pause(0.001)
-		data = self._read_data_from_Tfrecord(self.training_file)
-		batch_tuple_OP = tf.train.shuffle_batch(
-			data,
-			batch_size=self.batch_size,
-			capacity=self.shuffle_capacity,
-			min_after_dequeue=self.shuffle_min_after_dequeue)
-		batch_without_batch_OP = tf.train.batch(
-			data,
-			batch_size=self.batch_size)
+
 		with tf.Session() as sess:
 			coord = tf.train.Coordinator()
 			treads = tf.train.start_queue_runners(sess=sess, coord=coord)
@@ -1010,87 +1070,21 @@ class CNN_RNN:
 				self._reload_model(sess, model_path['reload_path'])
 			else:
 				sess.run(tf.global_variables_initializer())
-			'''get batch sample'''
-			_, batch_x_sample, batch_y_sample = sess.run(batch_without_batch_OP)
-			batch_x_sample, batch_y_sample = get_multi_task_batch(batch_x_sample, batch_y_sample)
 			with tf.device('/gpu:0'):
 				for epoch in range(20000):
-					index, batch_x, batch_y = sess.run(batch_tuple_OP)
-					batch_x, batch_y = get_multi_task_batch(batch_x, batch_y)
-					if training_accu_min < 1:
-						cost_min, L2_min = run_task_optimizer(sess, batch_x, batch_y[0], 'min_traffic')
-					else:
-						cost_min, L2_min = run_task_optimizer(sess, batch_x, batch_y[0], 'min_traffic', 'prediction_optimizer')
-					training_min_loss += cost_min
-					if training_accu_avg < 1:
-						cost_avg, L2_avg = run_task_optimizer(sess, batch_x, batch_y[1], 'avg_traffic')
-					else:
-						cost_avg, L2_avg = run_task_optimizer(sess, batch_x, batch_y[1], 'avg_traffic', 'prediction_optimizer')
-					training_avg_loss += cost_avg
-
-					if training_accu_max < 1:
-						cost_max, L2_max = run_task_optimizer(sess, batch_x, batch_y[2], 'max_traffic')
-					else:
-						cost_max, L2_max = run_task_optimizer(sess, batch_x, batch_y[2], 'max_traffic', 'prediction_optimizer')
-					training_max_loss += cost_max
+					run_multi_task(sess, 'min_traffic')
+					run_multi_task(sess, 'avg_traffic')
+					run_multi_task(sess, 'max_traffic')
+					run_multi_task(sess, '10_mins')
 
 					if epoch % display_step == 0 and epoch is not 0:
-						index, testing_X, testing_Y = self._read_all_data_from_Tfreoced(self.testing_file)
-						testing_X, testing_Y = get_multi_task_batch(testing_X, testing_Y)
-						testing_loss_min, testing_accu_min, prediction_min = self._MTL_testing_data(sess, testing_X, testing_Y[0], 'min_traffic')
-						testing_loss_avg, testing_accu_avg, prediction_avg = self._MTL_testing_data(sess, testing_X, testing_Y[1], 'avg_traffic')
-						testing_loss_max, testing_accu_max, prediction_max = self._MTL_testing_data(sess, testing_X, testing_Y[2], 'max_traffic')
-
-						training_loss_min_nodrop, training_accu_min, train_prediction_min = self._MTL_testing_data(sess, batch_x_sample, batch_y_sample[0], 'min_traffic')
-						training_loss_avg_nodrop, training_accu_avg, train_prediction_avg = self._MTL_testing_data(sess, batch_x_sample, batch_y_sample[1], 'avg_traffic')
-						training_loss_max_nodrop, training_accu_max, train_prediction_max = self._MTL_testing_data(sess, batch_x_sample, batch_y_sample[2], 'max_traffic')
-
-						training_min_loss /= display_step
-						training_avg_loss /= display_step
-						training_max_loss /= display_step
-						epoch_his.append(epoch)
-						self.multi_task_dic['min_traffic']['testing_cost_history'].append(testing_loss_min)
-						self.multi_task_dic['avg_traffic']['testing_cost_history'].append(testing_loss_avg)
-						self.multi_task_dic['max_traffic']['testing_cost_history'].append(testing_loss_max)
-
-						self.multi_task_dic['min_traffic']['training_cost_history'].append(training_min_loss)
-						self.multi_task_dic['avg_traffic']['training_cost_history'].append(training_avg_loss)
-						self.multi_task_dic['max_traffic']['training_cost_history'].append(training_max_loss)
-
-						print('Min task: epoch:{} training_cost:{:.4f} L2_loss:{:.4f} trainin_MSE(nodrop):{:.4f} training_accu:{:.4f} testing_MSE(nodrop):{:.4f} testing_accu:{:.4f}'.format(
-							epoch,
-							training_min_loss,
-							L2_min,
-							training_loss_min_nodrop,
-							training_accu_min,
-							testing_loss_min,
-							testing_accu_min))
-
-						print('Avg task: epoch:{} training_cost:{:.4f} L2_loss:{:.4f} trainin_MSE(nodrop):{:.4f} training_accu:{:.4f} testing_MSE(nodrop):{:.4f} testing_accu:{:.4f}'.format(
-							epoch,
-							training_avg_loss,
-							L2_avg,
-							training_loss_avg_nodrop,
-							training_accu_avg,
-							testing_loss_avg,
-							testing_accu_avg))
-
-						print('Max task: epoch:{} training_cost:{:.4f} L2_loss:{:.4f} trainin_MSE(nodrop):{:.4f} training_accu:{:.4f} testing_MSE(nodrop):{:.4f} testing_accu:{:.4f}'.format(
-							epoch,
-							training_max_loss,
-							L2_max,
-							training_loss_max_nodrop,
-							training_accu_max,
-							testing_loss_max,
-							testing_accu_max))
+						run_task_evaluate(sess, min_fig, epoch, task_name='min_traffic')
+						run_task_evaluate(sess, avg_fig, epoch, task_name='avg_traffic')
+						run_task_evaluate(sess, max_fig, epoch, task_name='max_traffic')
+						run_task_evaluate(sess, _10_mins_fig, epoch, task_name='10_mins')
 						print()
-						_plot_loss_rate(epoch_his)
-						_plot_predict_vs_real(min_fig, 'Min task', testing_Y[0][:100, 0, 0, 0, 0], prediction_min[:100, 0, 0, 0, 0], batch_y_sample[0][:100, 0, 0, 0, 0], train_prediction_min[:100, 0, 0, 0, 0])
-						_plot_predict_vs_real(avg_fig, 'Avg task', testing_Y[1][:100, 0, 0, 0, 0], prediction_avg[:100, 0, 0, 0, 0], batch_y_sample[1][:100, 0, 0, 0, 0], train_prediction_avg[:100, 0, 0, 0, 0])
-						_plot_predict_vs_real(max_fig, 'Max task', testing_Y[2][:100, 0, 0, 0, 0], prediction_max[:100, 0, 0, 0, 0], batch_y_sample[2][:100, 0, 0, 0, 0], train_prediction_max[:100, 0, 0, 0, 0])
-						training_min_loss = 0
-						training_avg_loss = 0
-						training_max_loss = 0
+						epoch_his.append(epoch)
+						# _plot_loss_rate(epoch_his)
 					if epoch % 500 == 0 and epoch is not 0:
 						self._save_model(sess, model_path['save_path'])
 			coord.request_stop()

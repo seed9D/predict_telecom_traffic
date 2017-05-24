@@ -1,6 +1,7 @@
 from CNN_RNN import CNN_RNN
 import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
 import pytz
 from sklearn import preprocessing
 import os
@@ -10,7 +11,7 @@ sys.path.append('/home/mldp/ML_with_bigdata')
 import data_utility as du
 
 root_dir = '/home/mldp/ML_with_bigdata'
-
+y_scalar = None
 
 def set_time_zone(timestamp):
 
@@ -99,26 +100,56 @@ def plot_predict_vs_real(real, predict):
 	plt.show()
 
 
+def plot_error_distribution(error_array, error_name):
+		error_array = error_array.flatten()
+		error_array = pd.DataFrame({error_name: error_array})
+		print(error_array.describe())
+
+		plt.figure()
+		plt.subplot(211)
+		error_array.hist(ax=plt.gca())
+		plt.subplot(212)
+		error_array.plot(kind='kde', ax=plt.gca(), label='Resudual error')
+		plt.legend()
+		plt.title('Residual Forecast Error Plots')
+
+
 def compute_loss_rate(real, predict):
-	print(real.shape, predict.shape)
+	# print(real.shape, predict.shape)
 	# ab_sum = (np.absolute(real - predict).sum()) / real.size
 	# print('real shape {} predict shape {}'.format(real.shape, predict.shape))
-	ab_sum = (np.absolute(real - predict).mean())
-	print('AE:', ab_sum)
 
-	rmse_sum = np.sqrt(((real - predict) ** 2).mean())
-	print('RMSE:', rmse_sum)
+	def AE(real, predict):
+		AE = np.absolute(real - predict)
+		AE_mean = AE.mean()
+		print('AE:', AE_mean)
+		# plot_error_distribution(AE, 'absoulute_error')
 
-	''' # find the zero index
-	zero_tuple = np.where(real == 0)
-	zero_array = np.array(zero_tuple)
-	zero_array = np.transpose(zero_array, (1, 0))
-	for _zero_array in zero_array:
-		real[_zero_array] = 1
-	'''
-	mean_ream = real.mean()
-	MAPE = np.divide(np.absolute(real - predict), mean_ream).mean()
-	print('Mean accuracy:{:.4f} MAPE:{:.4f}'.format(1 - MAPE, MAPE))
+	def RMSE(real, predict):
+		MSE = (real - predict) ** 2
+		RMSE = np.sqrt(MSE.mean())
+
+		print('RMSE:', RMSE)
+		# plot_error_distribution(MSE, 'square error')
+
+	def MAPE(real, predict):
+		''' # find the zero index
+		zero_tuple = np.where(real == 0)
+		zero_array = np.array(zero_tuple)
+		zero_array = np.transpose(zero_array, (1, 0))
+		for _zero_array in zero_array:
+			real[_zero_array] = 1
+		'''
+		mean_real = real.mean()
+		AE = np.absolute(real - predict)
+		MAPE = np.divide(AE, mean_real)
+		MAPE_mean = MAPE.mean()
+		print('Mean accuracy:{:.4f} MAPE:{:.4f}'.format(1 - MAPE_mean, MAPE_mean))
+		# plot_error_distribution(MAPE, 'mean absoulute percentage error')
+
+	AE(real, predict)
+	RMSE(real, predict)
+	MAPE(real, predict)
 
 
 def prepare_predict_data():
@@ -487,29 +518,43 @@ def predict_MTL_train(cnn_rnn, X_array, Y_array, model_path):
 	real_min = Y_array[:, :, :, :, 2, np.newaxis]
 	real_avg = Y_array[:, :, :, :, 3, np.newaxis]
 	real_max = Y_array[:, :, :, :, 4, np.newaxis]
+
+	''' unfeature scaling'''
 	predict_y = np.concatenate((prediction_min, prediction_avg, prediction_max, real_min, real_avg, real_max), axis=-1)
-	# print_Y_array(predict_y)
+	predict_y = unfeature_scaling(predict_y)
+	new_Y_array = unfeature_scaling(Y_array[:, :, :, :, 2:])
+	Y_array = copy(Y_array, new_Y_array)
+
 	print('-' * 20, 'task min:', '-' * 20)
-	compute_loss_rate(Y_array[:, :, :, :, 2, np.newaxis], prediction_min)
-	plot_predict_vs_real(Y_array[:, :, :, :, (0, 1, 2)], prediction_min)
+	compute_loss_rate(Y_array[:, :, :, :, 2, np.newaxis], predict_y[:, :, :, :, 0, np.newaxis])
+	plot_predict_vs_real(Y_array[:, :, :, :, (0, 1, 2)], predict_y[:, :, :, :, 0, np.newaxis])
 	print('-' * 30)
 	print('-' * 20, 'task avg:', '-' * 20)
-	compute_loss_rate(Y_array[:, :, :, :, 3, np.newaxis], prediction_avg)
-	plot_predict_vs_real(Y_array[:, :, :, :, (0, 1, 3)], prediction_avg)
+	compute_loss_rate(Y_array[:, :, :, :, 3, np.newaxis], predict_y[:, :, :, :, 1, np.newaxis])
+	plot_predict_vs_real(Y_array[:, :, :, :, (0, 1, 3)], predict_y[:, :, :, :, 1, np.newaxis])
 	print('-' * 30)
 	print('-' * 20, 'task max:', '-' * 20)
-	compute_loss_rate(Y_array[:, :, :, :, 4, np.newaxis], prediction_max)
-	plot_predict_vs_real(Y_array[:, :, :, :, (0, 1, 4)], prediction_max)
+	compute_loss_rate(Y_array[:, :, :, :, 4, np.newaxis], predict_y[:, :, :, :, 2, np.newaxis])
+	plot_predict_vs_real(Y_array[:, :, :, :, (0, 1, 4)], predict_y[:, :, :, :, 2, np.newaxis])
 	print('-' * 30)
+
+
+def unfeature_scaling(input_datas):
+	input_shape = input_datas.shape
+	input_datas = input_datas.reshape(-1, 1)
+	output = y_scalar.inverse_transform(input_datas)
+	output = output.reshape(input_shape)
+	return output
 
 
 def feature_scaling(input_datas):
+
 	input_shape = input_datas.shape
 	input_datas = input_datas.reshape(-1, 1)
 	min_max_scaler = preprocessing.MinMaxScaler(feature_range=(0.1, 255))
 	output = min_max_scaler.fit_transform(input_datas)
 	output = output.reshape(input_shape)
-	return output
+	return output, min_max_scaler
 
 
 def copy(old, new):
@@ -538,13 +583,13 @@ def print_Y_array(Y_array):
 
 
 X_array, Y_array = get_X_and_Y_array(task_num=5)
-new_X_array = feature_scaling(X_array[:, :, :, :, 2:])
-new_Y_array = feature_scaling(Y_array[:, :, :, :, 2:])
-X_array = copy(X_array, new_X_array)
-Y_array = copy(Y_array, new_Y_array)
 # print_Y_array(Y_array[:, :, :, :, 2:])
 
 Y_array = Y_array[:, :, 10:13, 10:13, :]
+new_X_array, _ = feature_scaling(X_array[:, :, :, :, 2:])
+new_Y_array, y_scalar = feature_scaling(Y_array[:, :, :, :, 2:])
+X_array = copy(X_array, new_X_array)
+Y_array = copy(Y_array, new_Y_array)
 del new_X_array, new_Y_array
 
 
@@ -559,7 +604,7 @@ input_data_shape = [X_array_train.shape[1], X_array_train.shape[2], X_array_trai
 output_data_shape = [Y_array_train.shape[1], Y_array_train.shape[2], Y_array_train.shape[3], 1]
 cnn_rnn = CNN_RNN(input_data_shape, output_data_shape)
 model_path = {
-	'reload_path': '/home/mldp/ML_with_bigdata/CNN_RNN/output_model/CNN_RNN_bi_LSTMcell.ckpt',
+	'reload_path': '/home/mldp/ML_with_bigdata/CNN_RNN/output_model/CNN_RNN_only_RNN.ckpt',
 	'save_path': '/home/mldp/ML_with_bigdata/CNN_RNN/output_model/CNN_RNN.ckpt'
 }
 
