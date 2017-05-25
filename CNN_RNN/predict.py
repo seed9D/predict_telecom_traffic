@@ -315,7 +315,26 @@ def prepare_predict_data():
 						min_avg_max_Y[i, j, row, col, 4] = max_Y[i, j, row, col, -1]
 		du.save_array(max_X, x_target_path + '/min_avg_max_X')
 		du.save_array(min_avg_max_Y, y_target_path + '/min_avg_max_Y')
-	_task_5()
+
+	def _task_6():
+		'''
+			X: past one hour
+			Y: next 10 minutes traffic level
+		'''
+		_task_2()
+		x_target_path = './npy/final/10_minutes_level/testing/X'
+		y_target_path = './npy/final/10_minutes_level/testing/Y'
+		if not os.path.exists(x_target_path):
+			os.makedirs(x_target_path)
+		if not os.path.exists(y_target_path):
+			os.makedirs(y_target_path)
+
+		X, Y = get_X_and_Y_array(task_num=2)
+		Y = feature_scaling(Y, feature_range=(1, 10))  # 10 interval
+		Y = np.floor(Y)  # 10 level
+		du.save_array(X, x_target_path + '/10_minutes_X')
+		du.save_array(Y, y_target_path + '/10_minutes_Y')
+	_task_6()
 
 
 def get_X_and_Y_array(task_num=1):
@@ -477,6 +496,34 @@ def get_X_and_Y_array(task_num=1):
 		Y_array = Y_array[1:]  # important!! Y should shift 10 minutes
 		return X_array, Y_array
 
+	def task_6():
+		'''
+			X: past one hour
+			Y: next 10 minutes traffic level
+		'''
+		x_dir = './npy/final/10_minutes_level/testing/X/'
+		y_dir = './npy/final/10_minutes_level/testing/Y/'
+		x_data_list = du.list_all_input_file(x_dir)
+		x_data_list.sort()
+		y_data_list = du.list_all_input_file(y_dir)
+		y_data_list.sort()
+
+		X_array_list = []
+		for filename in x_data_list:
+			X_array_list.append(du.load_array(x_dir + filename))
+
+		X_array = np.concatenate(X_array_list, axis=0)
+		del X_array_list
+
+		Y_array_list = []
+		for filename in y_data_list:
+			Y_array_list.append(du.load_array(y_dir + filename))
+		Y_array = np.concatenate(Y_array_list, axis=0)
+		del Y_array_list
+		# X_array = feature_scaling(X_array)
+		# Y_array = feature_scaling(Y_array)
+		return X_array, Y_array
+	
 	if task_num == 1:
 		func = task_1()
 	elif task_num == 2:
@@ -487,6 +534,8 @@ def get_X_and_Y_array(task_num=1):
 		func = task_4()
 	elif task_num == 5:
 		func = task_5()
+	elif task_num == 6:
+		func = task_6()
 	else:
 		func = None
 
@@ -604,14 +653,15 @@ input_data_shape = [X_array_train.shape[1], X_array_train.shape[2], X_array_trai
 output_data_shape = [Y_array_train.shape[1], Y_array_train.shape[2], Y_array_train.shape[3], 1]
 cnn_rnn = CNN_RNN(input_data_shape, output_data_shape)
 model_path = {
-	'reload_path': '/home/mldp/ML_with_bigdata/CNN_RNN/output_model/CNN_RNN_only_RNN.ckpt',
+	'reload_path': '/home/mldp/ML_with_bigdata/CNN_RNN/output_model/CNN_RNN_test.ckpt',
 	'save_path': '/home/mldp/ML_with_bigdata/CNN_RNN/output_model/CNN_RNN.ckpt'
 }
 
-cnn_rnn.set_training_data(X_array_train[:, :, :, :, 2:], Y_array_train[:, :, :, :, 2:])  # internet traffic min avg max
-
 # predict_train(cnn_rnn, X_array_train, Y_array_train, model_path)
 # predict_train(cnn_rnn, X_array_test, Y_array_test, model_path)
+cnn_rnn.create_MTL_task(X_array_test, Y_array_test[:, :, :, :, 2, np.newaxis], 'min_traffic')
+cnn_rnn.create_MTL_task(X_array_test, Y_array_test[:, :, :, :, 3, np.newaxis], 'avg_traffic')
+cnn_rnn.create_MTL_task(X_array_test, Y_array_test[:, :, :, :, 4, np.newaxis], 'max_traffic')
 predict_MTL_train(cnn_rnn, X_array_test, Y_array_test, model_path)
 predict_MTL_train(cnn_rnn, X_array_train, Y_array_train, model_path)
 

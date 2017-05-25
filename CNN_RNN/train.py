@@ -423,24 +423,23 @@ if __name__ == '__main__':
 	X_array = feature_scaling(X_array)
 	Y_array = feature_scaling(Y_array)
 
-	X_array_2, Y_array_2 = get_X_and_Y_array(task_num=6)
-	Y_array_2 = Y_array_2[:, :, 10:13, 10:13, :]
-	# X_array_2 = feature_scaling(X_array_2)
-	# Y_array_2 = feature_scaling(Y_array_2)
+	# X_array_2, Y_array_2 = get_X_and_Y_array(task_num=6)
+	# Y_array_2 = Y_array_2[:, :, 10:13, 10:13, :]
+	
 	# parameter
 	input_data_shape = [X_array.shape[1], X_array.shape[2], X_array.shape[3], X_array.shape[4]]
 	output_data_shape = [Y_array.shape[1], Y_array.shape[2], Y_array.shape[3], 1]
 	model_path = {
-		'reload_path': '/home/mldp/ML_with_bigdata/CNN_RNN/output_model/CNN_RNN_bi_LSTM.ckpt',
-		'save_path': '/home/mldp/ML_with_bigdata/CNN_RNN/output_model/CNN_RNN_bi_LSTM_residual.ckpt'
+		'reload_path': '/home/mldp/ML_with_bigdata/CNN_RNN/output_model/CNN_RNN_test.ckpt',
+		'save_path': '/home/mldp/ML_with_bigdata/CNN_RNN/output_model/CNN_RNN_test.ckpt'
 	}
 	cnn_rnn = CNN_RNN(input_data_shape, output_data_shape)
 	cnn_rnn.create_MTL_task(X_array, Y_array[:, :, :, :, 0, np.newaxis], 'min_traffic')
 	cnn_rnn.create_MTL_task(X_array, Y_array[:, :, :, :, 1, np.newaxis], 'avg_traffic')
-	cnn_rnn.create_MTL_task(X_array, Y_array[:, :, :, :, 2, np.newaxis], 'max_traffic', 'cross_entropy')
+	cnn_rnn.create_MTL_task(X_array, Y_array[:, :, :, :, 2, np.newaxis], 'max_traffic')
 	del X_array, Y_array
-	cnn_rnn.create_MTL_task(X_array_2, Y_array_2[:, :, :, :, 0, np.newaxis], '10_mins')
-	del X_array_2, Y_array_2
+	# cnn_rnn.create_MTL_task(X_array_2, Y_array_2[:, :, :, :, 0, np.newaxis], '10_mins', 'cross_entropy')
+	# del X_array_2, Y_array_2
 
 	# cnn_rnn.start_train(model_path, reload=False)
-	# cnn_rnn.start_MTL_train(model_path, reload=False)
+	cnn_rnn.start_MTL_train(model_path, reload=False)
