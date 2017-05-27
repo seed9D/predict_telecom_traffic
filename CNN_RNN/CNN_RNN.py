@@ -1,21 +1,19 @@
 import tensorflow as tf
 import tensorlayer as tl
 import matplotlib.pyplot as plt
+import CNN_RNN_config
 import numpy as np
 from math import sqrt
 import os
 
 
 class CNN_RNN:
-	def __init__(self, input_data_shape, output_data_shape):
-		self.batch_size = 100
+	def __init__(self, input_data_shape, output_data_shape, config):
+
+		self._parse_config(config)
 		self.shuffle_min_after_dequeue = 600
 		self.shuffle_capacity = self.shuffle_min_after_dequeue + 3 * self.batch_size
-		self.learning_rate = 0.0005
-		self.weight_decay = 0.005
-		self.keep_rate = 0.5
-		beta_1 = 0.9
-		beta_2 = 0.999
+
 		self.input_temporal = input_data_shape[0]
 		self.input_vertical = input_data_shape[1]
 		self.input_horizontal = input_data_shape[2]
@@ -26,10 +24,6 @@ class CNN_RNN:
 		self.output_horizontal = output_data_shape[2]
 		self.output_channel = 1
 		self.predictor_output = self.output_temporal * self.output_vertical * self.output_horizontal * self.output_channel
-
-		self.RNN_num_layers = 3
-		self.RNN_num_step = 6
-		self.RNN_hidden_node_size = 200
 
 		# placeholder
 		# with tf.device('/cpu:0'):
@@ -53,10 +47,91 @@ class CNN_RNN:
 
 		network = self._build_CNN_RNN(self.Xs)
 		flat_tl = tl.layers.FlattenLayer(network, name='flatten_layer')
-		network = tl.layers.DenseLayer(flat_tl, W_init=tf.contrib.layers.xavier_initializer(), n_units=1024, act=lambda x: tl.act.lrelu(x, 0.2), name='fully_connect_1')
+		network = tl.layers.DenseLayer(flat_tl, W_init=self.fully_connected_W_init, n_units=self.fully_connected_units, act=lambda x: tl.act.lrelu(x, 0.2), name='fully_connect_1')
 		network = tl.layers.DropoutLayer(network, keep=self.keep_rate, name='drop_1')
 		self.tl_share_output = network
 		self.multi_task_dic = {}
+
+	def _parse_config(self, config):
+
+		def parse_pooling(type_fn='max_pool'):
+			if type_fn == 'max_pool':
+				func = tf.nn.max_pool
+			else:
+				func = tf.nn.avg_pool
+			return func
+
+		def parse_activation(type_fn='relu'):
+			if type_fn == 'relu':
+				func = tf.nn.relu
+			else:
+				func = tf.nn.relu
+			return func
+
+		def parse_initializer_method(type_fn='xavier'):
+			if type_fn:
+				func = tf.contrib.layers.xavier_initializer_conv2d()
+			else:
+				func = tf.truncated_normal_initializer(stddev=0.1)
+
+			return func
+
+		def parse_RNN_cell(type_fn='LSTMcell'):
+			if type_fn:
+				cell = tf.nn.rnn_cell.LSTMCell
+			else:
+				cell = tf.nn.rnn_cell.BasicLSTMCell
+
+			return cell
+		self.batch_size = config.batch_size
+		self.learning_rate = config.learning_rate
+		self.weight_decay = config.weight_decay
+		self.keep_rate = config.keep_rate
+		self.RNN_num_layers = config.RNN_num_layers
+		self.RNN_num_step = config.RNN_num_step
+		self.RNN_hidden_node_size = config.RNN_hidden_node_size
+
+		self.RNN_cell = parse_RNN_cell(config.RNN_cell)
+		self.RNN_cell_init_args = config.RNN_cell_init_args
+		self.RNN_init_state_noise_stddev = config.RNN_init_state_noise_stddev
+		self.RNN_initializer = parse_initializer_method(config.RNN_initializer)
+
+		self.CNN_layer_activation_fn = parse_activation(config.CNN_layer_activation_fn)
+		self.CNN_layer_1_5x5_kernel_shape = config.CNN_layer_1_5x5_kernel_shape
+		self.CNN_layer_1_5x5_kernel_strides = config.CNN_layer_1_5x5_kernel_strides
+		self.CNN_layer_1_5x5_conv_Winit = parse_initializer_method(config.CNN_layer_1_5x5_conv_Winit)
+
+		self.CNN_layer_1_5x5_pooling = parse_pooling(config.CNN_layer_1_5x5_pooling)
+		self.CNN_layer_1_5x5_pooling_ksize = config.CNN_layer_1_5x5_pooling_ksize
+		self.CNN_layer_1_5x5_pooling_strides = config.CNN_layer_1_5x5_pooling_strides
+
+		self.CNN_layer_1_3x3_kernel_shape = config.CNN_layer_1_3x3_kernel_shape
+		self.CNN_layer_1_3x3_kernel_strides = config.CNN_layer_1_3x3_kernel_strides
+		self.CNN_layer_1_3x3_conv_Winit = parse_initializer_method(config.CNN_layer_1_3x3_conv_Winit)
+
+		self.CNN_layer_1_3x3_pooling = parse_pooling(config.CNN_layer_1_3x3_pooling)
+		self.CNN_layer_1_3x3_pooling_ksize = config.CNN_layer_1_3x3_pooling_ksize
+		self.CNN_layer_1_3x3_pooling_strides = config.CNN_layer_1_3x3_pooling_strides
+
+		self.CNN_layer_1_pooling = parse_pooling(config.CNN_layer_1_pooling)
+		self.CNN_layer_1_pooling_ksize = config.CNN_layer_1_pooling_ksize
+		self.CNN_layer_1_pooling_strides = config.CNN_layer_1_pooling_strides
+
+		self.CNN_layer_2_kernel_shape = config.CNN_layer_2_kernel_shape
+		self.CNN_layer_2_strides = config.CNN_layer_2_strides
+		self.CNN_layer_2_conv_Winit = parse_initializer_method(config.CNN_layer_2_conv_Winit)
+
+		self.CNN_layer_2_pooling_ksize = config.CNN_layer_2_pooling_ksize
+		self.CNN_layer_2_pooling_strides = config.CNN_layer_2_pooling_strides
+		self.CNN_layer_2_pooling = parse_pooling(config.CNN_layer_2_pooling)
+
+		self.fully_connected_W_init = parse_initializer_method(config.fully_connected_W_init)
+		self.fully_connected_units = config.fully_connected_units
+		self.prediction_layer_1_W_init = parse_initializer_method(config.prediction_layer_1_W_init)
+		self.prediction_layer_1_uints = config.prediction_layer_1_uints
+		self.prediction_layer_2_W_init = parse_initializer_method(config.prediction_layer_2_W_init)
+
+		self.hyper_config = config
 
 	def _build_RNN(self, Xs):
 		def build_RNN_network(input_X, is_training=1):
@@ -210,69 +285,69 @@ class CNN_RNN:
 				# print('CNN_input shape:{}'.format(CNN_input))
 				network = tl.layers.InputLayer(CNN_input, name='input_layer')
 				network = tl.layers.BatchNormLayer(network, is_train=is_training, name='batchnorm_layer_1')
-
 				network_5x5 = tl.layers.Conv2dLayer(
 					network,
-					act=tf.nn.relu,
-					W_init=tf.contrib.layers.xavier_initializer_conv2d(),
+					act=self.CNN_layer_activation_fn,
+					W_init=self.CNN_layer_1_5x5_conv_Winit,
 					b_init=tf.constant_initializer(value=0.01),
-					shape=[5, 5, 1, 32],
-					strides=[1, 1, 1, 1],
+					shape=self.CNN_layer_1_5x5_kernel_shape,
+					strides=self.CNN_layer_1_5x5_kernel_strides,
 					padding='SAME',
 					name='cnn_layer_1_5x5')
 
 				network_5x5 = tl.layers.PoolLayer(
 					network_5x5,
-					ksize=[1, 2, 2, 1],
-					strides=[1, 2, 2, 1],
+					ksize=self.CNN_layer_1_5x5_pooling_ksize,
+					strides=self.CNN_layer_1_5x5_pooling_strides,
 					padding='SAME',
-					pool=tf.nn.max_pool,
+					pool=self.CNN_layer_1_5x5_pooling,
 					name='pool_layer_1_5x5')
 
 				network_3x3 = tl.layers.Conv2dLayer(
 					network,
-					act=tf.nn.relu,
-					W_init=tf.contrib.layers.xavier_initializer_conv2d(),
+					act=self.CNN_layer_activation_fn,
+					W_init=self.CNN_layer_1_3x3_conv_Winit,
 					b_init=tf.constant_initializer(value=0.01),
-					shape=[3, 3, 1, 32],
-					strides=[1, 1, 1, 1],
+					shape=self.CNN_layer_1_3x3_kernel_shape,
+					strides=self.CNN_layer_1_3x3_kernel_strides,
 					padding='SAME',
 					name='cnn_layer_1_3x3')
 
 				network_3x3 = tl.layers.PoolLayer(
 					network_3x3,
-					ksize=[1, 2, 2, 1],
-					strides=[1, 2, 2, 1],
+					ksize=self.CNN_layer_1_3x3_pooling_ksize,
+					strides=self.CNN_layer_1_3x3_pooling_strides,
 					padding='SAME',
-					pool=tf.nn.max_pool,
+					pool=self.CNN_layer_1_3x3_pooling,
 					name='pool_layer_1_3x3')
 
 				network = tl.layers.ConcatLayer(layer=[network_3x3, network_5x5], concat_dim=3, name='concate_layer_1')
 
 				network = tl.layers.PoolLayer(
 					network,
-					ksize=[1, 2, 2, 1],
-					strides=[1, 2, 2, 1],
+					ksize=self.CNN_layer_1_pooling_ksize,
+					strides=self.CNN_layer_1_pooling_strides,
 					padding='SAME',
-					pool=tf.nn.avg_pool,
+					pool=self.CNN_layer_1_pooling,
 					name='pool_layer_1')
+
 				network = tl.layers.DropoutLayer(network, keep=self.keep_rate, name='drop_1')
 				network = tl.layers.Conv2dLayer(
 					network,
-					act=tf.nn.relu,
-					W_init=tf.contrib.layers.xavier_initializer_conv2d(),
+					act=self.CNN_layer_activation_fn,
+					W_init=self.CNN_layer_2_conv_Winit,
 					b_init=tf.constant_initializer(value=0.01),
-					shape=[5, 5, 64, 64],
-					strides=[1, 1, 1, 1],
+					shape=self.CNN_layer_2_kernel_shape,
+					strides=self.CNN_layer_2_strides,
 					padding='SAME',
 					name='cnn_layer_2')
 
 				network = tl.layers.PoolLayer(
 					network,
-					ksize=[1, 2, 2, 1],
-					strides=[1, 1, 1, 1],
+					ksize=self.CNN_layer_2_pooling_ksize,
+					strides=self.CNN_layer_2_pooling_strides,
 					padding='SAME',
-					pool=tf.nn.avg_pool,
+					pool=self.CNN_layer_2_pooling,
 					name='pool_layer_2')
 				network = tl.layers.DropoutLayer(network, keep=self.keep_rate, name='drop_2')
 				# network = tl.layers.FlattenLayer(network, name='flatten_layer')
@@ -283,7 +358,7 @@ class CNN_RNN:
 				return network
 
 		def build_bi_RNN_network(input_X, is_training=1):
-			def make_gaussan_state_initial(scope_name, stddev=0.3):
+			def make_gaussan_state_initial(scope_name, stddev=self.RNN_init_state_noise_stddev):
 				with tf.variable_scope(scope_name):
 					init_state = tf.Variable(np.zeros((self.RNN_num_layers, 2, self.batch_size, self.RNN_hidden_node_size), dtype=np.float32), trainable=True)
 					result_intital_state = tf.cond(self.add_noise, lambda: init_state + tf.random_normal(tf.shape(init_state), stddev=stddev), lambda: init_state)
@@ -300,9 +375,10 @@ class CNN_RNN:
 
 				network = tl.layers.BiRNNLayer(
 					network,
-					cell_fn=tf.nn.rnn_cell.LSTMCell,
+					cell_fn=self.RNN_cell,
+					cell_init_args=self.RNN_cell_init_args,
 					n_hidden=self.RNN_hidden_node_size,
-					initializer=tf.contrib.layers.xavier_initializer(),
+					initializer=self.RNN_initializer,
 					n_steps=self.RNN_num_step,
 					fw_initial_state=make_gaussan_state_initial('fw'),
 					bw_initial_state=make_gaussan_state_initial('bw'),
@@ -585,10 +661,10 @@ class CNN_RNN:
 			with tf.variable_scope(scope_name):
 
 				tl_input = tl.layers.BatchNormLayer(tl_input, is_train=False, name='batch_norm')
-				tl_regression = tl.layers.DenseLayer(tl_input, W_init=tf.contrib.layers.xavier_initializer(), n_units=1024, act=lambda x: tl.act.lrelu(x, 0.2), name='regression_op_1')
-				tl_regression = tl.layers.DropoutLayer(tl_regression, keep=0.7, name='drop_1')
-				tl_regression = tl.layers.DenseLayer(tl_input, W_init=tf.contrib.layers.xavier_initializer(), n_units=self.predictor_output, act=tl.activation.identity, name='regression_op_2')
-				tl_regression = tl.layers.DropoutLayer(tl_regression, keep=0.8, name='drop_2')
+				tl_regression = tl.layers.DenseLayer(tl_input, W_init=self.prediction_layer_1_W_init, n_units=self.prediction_layer_1_uints, act=lambda x: tl.act.lrelu(x, 0.2), name='regression_op_1')
+				tl_regression = tl.layers.DropoutLayer(tl_regression, keep=self.keep_rate, name='drop_1')
+				tl_regression = tl.layers.DenseLayer(tl_input, W_init=self.prediction_layer_2_W_init, n_units=self.predictor_output, act=tl.activation.identity, name='regression_op_2')
+				tl_regression = tl.layers.DropoutLayer(tl_regression, keep=self.keep_rate, name='drop_2')
 				tl_output = tl_regression
 				regression_output = tl_output.outputs
 				# print('regression_output shape {}'.format(regression_output.get_shape().as_list()))
@@ -605,6 +681,7 @@ class CNN_RNN:
 
 				if loss_type == 'cross_entropy':
 					prediction_softmax = tf.nn.softmax(output)
+					output = tf.argmax(prediction_softmax, 1)
 					correct_prediciton = tf.equal(tf.argmax(prediction_softmax, 1), tf.argmax(y, 1))
 					accuracy = tf.reduce_mean(tf.cast(correct_prediciton, tf.float32))
 					cost = tf.add(cross_entropy, L2_loss * self.weight_decay, name='cost_op')
@@ -635,8 +712,10 @@ class CNN_RNN:
 					'RMSE': RMSE,
 					'cross_entropy': cross_entropy,
 					'accurcy': accuracy,
-					'training_cost_history': [],
-					'testing_cost_history': [],
+					'training_accurcy_history': [],
+					'testing_accurcy_history': [],
+					'training_MSE_history': [],
+					'testing_MSE_history': [],
 					'training_temp_loss': 0
 				}
 				return task_dic
@@ -758,6 +837,7 @@ class CNN_RNN:
 		finally:
 			print('save_path{}'.format(save_path))
 
+
 	def _reload_model(self, sess, model_path):
 		print('reloading model {}.....'.format(model_path))
 		self.saver.restore(sess, model_path)
@@ -775,7 +855,8 @@ class CNN_RNN:
 
 	def print_all_layers(self):
 		self.tl_share_output.print_layers()
-
+		# print(self.tl_share_output.all_layers)
+	
 	def print_all_variables(self):
 		self.tl_share_output.print_params()
 
@@ -913,8 +994,8 @@ class CNN_RNN:
 			# plt.subplot(1, 1, 1)
 			ax = fig_1.add_subplot(1, 1, 1)
 			ax.cla()
-			ax.plot(history_data['epoch'], history_data['training_cost'], 'g-', label='training losses')
-			ax.plot(history_data['epoch'], history_data['testing_cost'], 'b-', label='testing losses')
+			ax.plot(history_data['training_cost'], 'g-', label='training losses')
+			ax.plot(history_data['testing_cost'], 'b-', label='testing losses')
 
 			# plt.plot(test_cost, 'r-', label='testing losses')
 			ax.legend()
@@ -1035,6 +1116,50 @@ class CNN_RNN:
 		max_fig = plt.figure(3)
 		_10_mins_fig = plt.figure(4)
 
+		model_base_name = os.path.basename(model_path['save_path'])
+		model_base_name = os.path.splitext(model_base_name)[0]
+		dir_name = './result/' + model_base_name + '/'
+
+		def save_result_report(dir_name='./result/temp/'):
+			if not os.path.exists(dir_name):
+				os.makedirs(dir_name)
+			with open(dir_name + 'report.txt', 'w') as f:
+				task_keys = self.multi_task_dic.keys()
+				task_keys = sorted(task_keys)
+
+				record_len = len(self.multi_task_dic[task_keys[0]]['training_accurcy_history'])
+				for num in range(record_len):
+					for key in task_keys:
+						line = key + ': \n'
+						line += ' train_MSE: ' + str(self.multi_task_dic[key]['training_MSE_history'][num])
+						line += ' train_accu: ' + str(self.multi_task_dic[key]['training_accurcy_history'][num])
+						line += ' test_MES: ' + str(self.multi_task_dic[key]['testing_MSE_history'][num])
+						line += ' test_accu: ' + str(self.multi_task_dic[key]['testing_accurcy_history'][num])
+						f.write(line + '\n')
+					f.write('\n')
+
+		def save_hyperparameter(config, dir_name='./result/temp/'):
+			if not os.path.exists(dir_name):
+				os.makedirs(dir_name)
+			
+			config.save_json(dir_name + 'config.json')
+			'''
+			sort_key_val = [(k, config[k]) for k in sorted(config.keys())]
+
+			with open(dir_name + 'config.txt', 'w') as f:
+				for element in sort_key_val:
+					line = str(element[0]) + ': ' + str(element[1])
+					f.write(line + '\n')
+			'''
+		def save_figure(dir_name='./result/temp/'):
+			min_fig.set_size_inches(12, 9)
+			avg_fig.set_size_inches(12, 9)
+			max_fig.set_size_inches(12, 9)
+			min_fig.savefig(dir_name + 'min.png', dpi=100)
+			avg_fig.savefig(dir_name + 'avg.png', dpi=100)
+			max_fig.savefig(dir_name + 'max.png', dpi=100)
+
+
 		def get_multi_task_batch(batch_x, batch_y):
 			batch_y = np.transpose(batch_y, [4, 0, 1, 2, 3])
 			batch_y = np.expand_dims(batch_y, axis=5)
@@ -1071,8 +1196,10 @@ class CNN_RNN:
 			task['training_temp_loss'] /= display_step
 			epoch_his.append(epoch)
 
-			self.multi_task_dic[task_name]['testing_cost_history'].append(testing_loss)
-			self.multi_task_dic[task_name]['training_cost_history'].append(task['training_temp_loss'])
+			self.multi_task_dic[task_name]['testing_MSE_history'].append(testing_loss)
+			self.multi_task_dic[task_name]['training_MSE_history'].append(training_loss_nodrop)
+			self.multi_task_dic[task_name]['testing_accurcy_history'].append(testing_accu)
+			self.multi_task_dic[task_name]['training_accurcy_history'].append(training_accu)
 			print('task:{} epoch:{} training_cost:{:.4f} trainin_MSE(nodrop):{:.4f} training_accu:{:.4f} testing_MSE(nodrop):{:.4f} testing_accu:{:.4f}'.format(
 				task_name,
 				epoch,
@@ -1111,8 +1238,8 @@ class CNN_RNN:
 			ax_2.grid()
 			ax_2.legend()
 
-			ax_3.plot(self.multi_task_dic[task_name]['training_cost_history'], 'g-', label=task_name + ' training losses')
-			ax_3.plot(self.multi_task_dic[task_name]['testing_cost_history'], 'b-', label=task_name + ' testing losses')
+			ax_3.plot(self.multi_task_dic[task_name]['training_MSE_history'], 'g-', label=task_name + ' training losses')
+			ax_3.plot(self.multi_task_dic[task_name]['testing_MSE_history'], 'b-', label=task_name + ' testing losses')
 			ax_3.set_title(task_name + 'loss')
 			ax_3.grid()
 			ax_3.legend()
@@ -1137,6 +1264,7 @@ class CNN_RNN:
 			ax_3.legend()
 			plt.pause(0.001)
 
+		save_hyperparameter(self.hyper_config, dir_name)
 		with tf.Session() as sess:
 			coord = tf.train.Coordinator()
 			treads = tf.train.start_queue_runners(sess=sess, coord=coord)
@@ -1146,10 +1274,11 @@ class CNN_RNN:
 			else:
 				sess.run(tf.global_variables_initializer())
 			with tf.device('/gpu:0'):
-				for epoch in range(20000):
+				for epoch in range(2000):
 					# run_multi_task(sess, 'min_traffic', 'prediction_optimizer')
 					# run_multi_task(sess, 'avg_traffic', 'prediction_optimizer')
 					# run_multi_task(sess, 'max_traffic', 'prediction_optimizer')
+
 					run_multi_task(sess, 'min_traffic')
 					run_multi_task(sess, 'avg_traffic')
 					run_multi_task(sess, 'max_traffic')
@@ -1165,14 +1294,20 @@ class CNN_RNN:
 						# _plot_loss_rate(epoch_his)
 					if epoch % 500 == 0 and epoch is not 0:
 						self._save_model(sess, model_path['save_path'])
+						save_result_report(dir_name)
+						save_figure(dir_name)
+
 			coord.request_stop()
 			coord.join(treads)
 			print('training finished!')
 			self._save_model(sess, model_path['save_path'])
+			save_result_report(dir_name)
+			save_figure(dir_name)
 		plt.ioff()
 		plt.show()
 
 if __name__ == '__main__':
 	X_data_shape = [6, 25, 25, 1]
 	Y_data_shape = [1, 5, 5, 1]
-	cnn_rnn = CNN_RNN(X_data_shape, Y_data_shape)
+	hyper_config = CNN_RNN_config.HyperParameterConfig()
+	cnn_rnn = CNN_RNN(X_data_shape, Y_data_shape, hyper_config)

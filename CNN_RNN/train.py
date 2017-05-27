@@ -3,6 +3,7 @@ from sklearn import preprocessing
 from CNN_RNN import CNN_RNN
 import matplotlib.pyplot as plt
 import sys
+import CNN_RNN_config
 import os
 sys.path.append('/home/mldp/ML_with_bigdata')
 import data_utility as du
@@ -178,7 +179,19 @@ def prepare_training_data(task_num=2):
 			X: past one hour
 			Y: next 10 minutes traffic level
 		'''
-		_task_2()
+		def num_2_vector(input_Y, class_number=10):
+			def sigmoid(input_array):
+				return 1 / (1 + np.exp(input_array))
+			# input_Y_shape = input_Y.shape
+			# print(input_Y_shape)
+			input_Y = feature_scaling(input_Y, feature_range=(0.1, 255))
+			input_Y = sigmoid(input_Y)
+			input_Y = feature_scaling(input_Y, feature_range=(0, 10))
+			input_Y = np.floor(input_Y)
+			print_Y_array(input_Y)
+			return input_Y
+
+		# _task_2()
 		x_target_path = './npy/final/10_minutes_level/training/X'
 		y_target_path = './npy/final/10_minutes_level/training/Y'
 		if not os.path.exists(x_target_path):
@@ -187,10 +200,10 @@ def prepare_training_data(task_num=2):
 			os.makedirs(y_target_path)
 
 		X, Y = get_X_and_Y_array(task_num=2)
-		Y = feature_scaling(Y, feature_range=(1, 10))  # 10 interval
-		Y = np.floor(Y)  # 10 level
-		du.save_array(X, x_target_path + '/10_minutes_X')
-		du.save_array(Y, y_target_path + '/10_minutes_Y')
+		Y = num_2_vector(Y)
+
+		# du.save_array(X, x_target_path + '/10_minutes_X')
+		# du.save_array(Y, y_target_path + '/10_minutes_Y')
 
 	_task_6()
 
@@ -410,8 +423,8 @@ def print_Y_array(Y_array):
 	plot_y_list = []
 	for i in range(148):
 		for j in range(Y_array.shape[1]):
-			print(Y_array[i, j, 10, 10])
-			plot_y_list.append(Y_array[i, j, 10, 10])
+			print(Y_array[i, j, 5, 10])
+			plot_y_list.append(Y_array[i, j, 5, 10])
 	plt.figure()
 	plt.plot(plot_y_list, marker='.')
 	plt.show()
@@ -425,7 +438,7 @@ if __name__ == '__main__':
 
 	# X_array_2, Y_array_2 = get_X_and_Y_array(task_num=6)
 	# Y_array_2 = Y_array_2[:, :, 10:13, 10:13, :]
-	
+
 	# parameter
 	input_data_shape = [X_array.shape[1], X_array.shape[2], X_array.shape[3], X_array.shape[4]]
 	output_data_shape = [Y_array.shape[1], Y_array.shape[2], Y_array.shape[3], 1]
@@ -433,7 +446,8 @@ if __name__ == '__main__':
 		'reload_path': '/home/mldp/ML_with_bigdata/CNN_RNN/output_model/CNN_RNN_test.ckpt',
 		'save_path': '/home/mldp/ML_with_bigdata/CNN_RNN/output_model/CNN_RNN_test.ckpt'
 	}
-	cnn_rnn = CNN_RNN(input_data_shape, output_data_shape)
+	hyper_config = CNN_RNN_config.HyperParameterConfig()
+	cnn_rnn = CNN_RNN(input_data_shape, output_data_shape, hyper_config)
 	cnn_rnn.create_MTL_task(X_array, Y_array[:, :, :, :, 0, np.newaxis], 'min_traffic')
 	cnn_rnn.create_MTL_task(X_array, Y_array[:, :, :, :, 1, np.newaxis], 'avg_traffic')
 	cnn_rnn.create_MTL_task(X_array, Y_array[:, :, :, :, 2, np.newaxis], 'max_traffic')
