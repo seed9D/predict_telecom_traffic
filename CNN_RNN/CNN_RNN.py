@@ -1,7 +1,6 @@
 import tensorflow as tf
 import tensorlayer as tl
 import matplotlib.pyplot as plt
-import CNN_RNN_config
 import numpy as np
 from math import sqrt
 import os

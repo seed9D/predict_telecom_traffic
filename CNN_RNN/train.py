@@ -1,6 +1,5 @@
 import numpy as np
 from sklearn import preprocessing
-from CNN_RNN import CNN_RNN
 import matplotlib.pyplot as plt
 import sys
 import CNN_RNN_config
@@ -429,8 +428,8 @@ def print_Y_array(Y_array):
 	plt.plot(plot_y_list, marker='.')
 	plt.show()
 
-if __name__ == '__main__':
-	# prepare_training_data()
+
+def train():
 	X_array, Y_array = get_X_and_Y_array(task_num=5)
 	Y_array = Y_array[:, :, 10:13, 10:13, :]
 	X_array = feature_scaling(X_array)
@@ -438,7 +437,6 @@ if __name__ == '__main__':
 
 	# X_array_2, Y_array_2 = get_X_and_Y_array(task_num=6)
 	# Y_array_2 = Y_array_2[:, :, 10:13, 10:13, :]
-
 	# parameter
 	input_data_shape = [X_array.shape[1], X_array.shape[2], X_array.shape[3], X_array.shape[4]]
 	output_data_shape = [Y_array.shape[1], Y_array.shape[2], Y_array.shape[3], 1]
@@ -457,3 +455,19 @@ if __name__ == '__main__':
 
 	# cnn_rnn.start_train(model_path, reload=False)
 	cnn_rnn.start_MTL_train(model_path, reload=False)
+
+
+def grid_search():
+	X_array, Y_array = get_X_and_Y_array(task_num=5)
+	Y_array = Y_array[:, :, 10:13, 10:13, :]
+	X_array = feature_scaling(X_array)
+	Y_array = feature_scaling(Y_array)
+	model_path = '/home/mldp/ML_with_bigdata/CNN_RNN/output_model/CNN_RNN.ckpt'
+	gridsearcg = CNN_RNN_config.GridSearch(model_path, X_array, Y_array)
+	gridsearcg.search_learning_rate()
+
+if __name__ == '__main__':
+	# prepare_training_data()
+	# train()
+	grid_search()
+	
