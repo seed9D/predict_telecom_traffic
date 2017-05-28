@@ -2,10 +2,15 @@ import os
 import json
 import numpy as np
 from CNN_RNN import CNN_RNN
-
+from collections import OrderedDict
+import operator
+import itertools
+from functools import reduce
+import shutil
 
 class HyperParameterConfig:
 	def __init__(self):
+		self.iter_epoch = 2000
 		self.batch_size = 100
 		self.learning_rate = 0.0005
 		self.keep_rate = 0.7
@@ -93,20 +98,117 @@ class GridSearch():
 		self.model_dirname = os.path.dirname(model_path)
 		self.model_name = os.path.splitext(model_basename)
 
+	def _find_in_obj(self, obj, condition, path=None):
+		if path is None:
+			path = []
+
+		if isinstance(obj, list):
+			for index, value in enumerate(obj):
+				new_path = list(path)
+				new_path.append(index)
+				for result in self._find_in_obj(value, condition, path=new_path):
+					yield result
+		if isinstance(obj, dict):
+			for key, value in obj.items():
+				new_path = list(path)
+				new_path.append(key)
+				for result in self._find_in_obj(value, condition, path=new_path):
+					yield result
+
+				if condition == key:
+					new_path = list(path)
+					new_path.append(key)
+					yield new_path
+
 	def search_learning_rate(self):
+		def find_highest_accu(obj):
+			key_paths = self._find_in_obj(obj, 'testing_accurcy')  # generator
+
+			key_paths = list(key_paths)
+			key_paths.sort(key=operator.itemgetter(1))  # sort by element 2 in tuple
+			uni_task_key = []
+			task_groups = []
+			max_pairs = []
+			for k, g in itertools.groupby(key_paths, lambda x: x[1]):  # group by task
+				uni_task_key.append(k)
+				task_groups.append(list(g))
+				# value = reduce(operator.getitem, key_pair, obj)
+			for each_task_group in task_groups:
+				task_iter = iter(each_task_group)
+				key_value = [(ele, reduce(operator.getitem, ele, obj)) for ele in task_iter]
+				max_pair = max(key_value, key=lambda x: x[1])
+
+				'''
+				for ele in task_iter:
+					value = reduce(operator.getitem, ele, obj)
+					print('rate:{} task:{} {}:{}'.format(
+						ele[0],
+						ele[1],
+						ele[2],
+						value))
+				'''
+				max_pairs.append(max_pair)
+			return max_pairs
+
 		hyper_config = HyperParameterConfig()
+		rate_summerize = OrderedDict()
 		# rate_list = list(range(0.0001, 0.05, 0.0005))
-		rate_array = np.arange(0.0001, 0.05, 0.0005)
+		rate_array = np.arange(0.00001, 0.001, 0.00005)
+		rate_array = rate_array.tolist()
+
+		basic_result_path = '/home/mldp/ML_with_bigdata/CNN_RNN/result/search_learning_rate/'
+		shutil.rmtree(basic_result_path)
+		if not os.path.exists(basic_result_path):
+			os.makedirs(basic_result_path)
+
 		for rate in rate_array:
 			print('rate:{}'.format(rate))
-			hyper_config.learning_rate = rate
-			save_model_path = self.model_dirname + '/' + self.model_name[0] + '_rate_' + str(rate) + '.ckpt'
+			hyper_config.learning_rate = round(float(rate), 6)
+			save_model_path = self.model_dirname + '/' + self.model_name[0] + '_rate_' + str(hyper_config.learning_rate) + '.ckpt'
+			result_path = basic_result_path + 'rate_' + str(hyper_config.learning_rate) + '/'
+
+			if not os.path.exists(result_path):
+				os.makedirs(result_path)
+
 			model_path = {
 				'reload_path': '/home/mldp/ML_with_bigdata/CNN_RNN/output_model/CNN_RNN_test.ckpt',
-				'save_path': save_model_path
+				'save_path': save_model_path,
+				'result_path': result_path
 			}
+			summerize = self._run_CNN_RNN(model_path, hyper_config)
+			rate_summerize[str(rate)] = summerize
 
-			self._run_CNN_RNN(model_path, hyper_config)
+		print('search finish!!')
+
+		max_pairs = find_highest_accu(rate_summerize)
+		for max_pair in max_pairs:
+			print('rate:{} in task: {} {}:{}'.format(
+				max_pair[0][0],
+				max_pair[0][1],
+				max_pair[0][2],
+				max_pair[1]))
+
+		with open(basic_result_path + 'search_rate_report.txt', 'w') as outfile:
+			json_string = json.dumps(rate_summerize, sort_keys=True, indent=4)
+			# print(json_string)
+			outfile.write(json_string + '\n')
+			for max_pair in max_pairs:
+				outfile.write('rate:{} in task: {} {}:{} \n'.format(
+					max_pair[0][0],
+					max_pair[0][1],
+					max_pair[0][2],
+					max_pair[1]))
+
+		'''
+		with open(basic_result_path + 'search_rate_report.txt', 'w') as outfile:
+			for rate_v, rate_v_element in rate_summerize.items():
+				print(rate_v, ': ')
+				outfile.write()
+				for task, result in rate_v_element.items():
+					print(task, ':')
+					print('\t', result)
+		'''
+	
 
 	def _run_CNN_RNN(self, model_path, config):
 		input_data_shape = [self.X_array.shape[1], self.X_array.shape[2], self.X_array.shape[3], self.X_array.shape[4]]
@@ -115,7 +217,8 @@ class GridSearch():
 		cnn_rnn.create_MTL_task(self.X_array, self.Y_array[:, :, :, :, 0, np.newaxis], 'min_traffic')
 		cnn_rnn.create_MTL_task(self.X_array, self.Y_array[:, :, :, :, 1, np.newaxis], 'avg_traffic')
 		cnn_rnn.create_MTL_task(self.X_array, self.Y_array[:, :, :, :, 2, np.newaxis], 'max_traffic')
-		cnn_rnn.start_MTL_train(model_path, reload=False)
+		return cnn_rnn.start_MTL_train(model_path, reload=False)
+
 
 if __name__ == '__main__':
 

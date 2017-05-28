@@ -8,7 +8,8 @@ import os
 
 class CNN_RNN:
 	def __init__(self, input_data_shape, output_data_shape, config):
-
+		tf.reset_default_graph()
+		tl.layers.clear_layers_name()
 		self._parse_config(config)
 		self.shuffle_min_after_dequeue = 600
 		self.shuffle_capacity = self.shuffle_min_after_dequeue + 3 * self.batch_size
@@ -82,6 +83,7 @@ class CNN_RNN:
 				cell = tf.nn.rnn_cell.BasicLSTMCell
 
 			return cell
+		self.iter_epoch = config.iter_epoch
 		self.batch_size = config.batch_size
 		self.learning_rate = config.learning_rate
 		self.weight_decay = config.weight_decay
@@ -1078,7 +1080,7 @@ class CNN_RNN:
 				coord.request_stop()
 				coord.join(treads)
 				print('training finished!')
-			plt.ioff()
+			# plt.ioff()
 			plt.show()
 
 	def start_MTL_predict(self, testing_x, testing_y, model_path):
@@ -1115,9 +1117,29 @@ class CNN_RNN:
 		max_fig = plt.figure(3)
 		_10_mins_fig = plt.figure(4)
 
-		model_base_name = os.path.basename(model_path['save_path'])
-		model_base_name = os.path.splitext(model_base_name)[0]
-		dir_name = './result/' + model_base_name + '/'
+		# model_base_name = os.path.basename(model_path['save_path'])
+		# model_base_name = os.path.splitext(model_base_name)[0]
+		# dir_name = './result/' + model_base_name + '/'
+		result_path = model_path['result_path']
+
+		def summarized_report():
+			task_keys = self.multi_task_dic.keys()
+			task_keys = sorted(task_keys)
+			summary_dic = {}
+			for key in task_keys:
+				task_summ_dict = {}
+				train_MSE = self.multi_task_dic[key]['training_MSE_history'][-1]
+				train_accu = self.multi_task_dic[key]['training_accurcy_history'][-1]
+				test_MSE = self.multi_task_dic[key]['testing_MSE_history'][-1]
+				test_accu = self.multi_task_dic[key]['testing_accurcy_history'][-1]
+
+				task_summ_dict['training_MSE'] = train_MSE
+				task_summ_dict['training_accurcy'] = train_accu
+				task_summ_dict['testing_MSE'] = test_MSE
+				task_summ_dict['testing_accurcy'] = test_accu
+				summary_dic[key] = task_summ_dict
+
+			return summary_dic
 
 		def save_result_report(dir_name='./result/temp/'):
 			if not os.path.exists(dir_name):
@@ -1140,7 +1162,7 @@ class CNN_RNN:
 		def save_hyperparameter(config, dir_name='./result/temp/'):
 			if not os.path.exists(dir_name):
 				os.makedirs(dir_name)
-			
+
 			config.save_json(dir_name + 'config.json')
 			'''
 			sort_key_val = [(k, config[k]) for k in sorted(config.keys())]
@@ -1263,7 +1285,7 @@ class CNN_RNN:
 			ax_3.legend()
 			plt.pause(0.001)
 
-		save_hyperparameter(self.hyper_config, dir_name)
+		save_hyperparameter(self.hyper_config, result_path)
 		with tf.Session() as sess:
 			coord = tf.train.Coordinator()
 			treads = tf.train.start_queue_runners(sess=sess, coord=coord)
@@ -1273,7 +1295,7 @@ class CNN_RNN:
 			else:
 				sess.run(tf.global_variables_initializer())
 			with tf.device('/gpu:0'):
-				for epoch in range(2000):
+				for epoch in range(self.iter_epoch):
 					# run_multi_task(sess, 'min_traffic', 'prediction_optimizer')
 					# run_multi_task(sess, 'avg_traffic', 'prediction_optimizer')
 					# run_multi_task(sess, 'max_traffic', 'prediction_optimizer')
@@ -1293,17 +1315,18 @@ class CNN_RNN:
 						# _plot_loss_rate(epoch_his)
 					if epoch % 500 == 0 and epoch is not 0:
 						self._save_model(sess, model_path['save_path'])
-						save_result_report(dir_name)
-						save_figure(dir_name)
+						save_result_report(result_path)
+						save_figure(result_path)
 
 			coord.request_stop()
 			coord.join(treads)
 			print('training finished!')
 			self._save_model(sess, model_path['save_path'])
-			save_result_report(dir_name)
-			save_figure(dir_name)
+			save_result_report(result_path)
+			save_figure(result_path)
 		plt.ioff()
-		plt.show()
+		# plt.show()
+		return summarized_report()
 
 if __name__ == '__main__':
 	X_data_shape = [6, 25, 25, 1]
