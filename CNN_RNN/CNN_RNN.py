@@ -131,6 +131,7 @@ class CNN_RNN:
 		self.prediction_layer_1_W_init = parse_initializer_method(config.prediction_layer_1_W_init)
 		self.prediction_layer_1_uints = config.prediction_layer_1_uints
 		self.prediction_layer_2_W_init = parse_initializer_method(config.prediction_layer_2_W_init)
+		self.prediction_layer_keep_rate = config.prediction_layer_keep_rate
 
 		self.hyper_config = config
 
@@ -663,9 +664,9 @@ class CNN_RNN:
 
 				tl_input = tl.layers.BatchNormLayer(tl_input, is_train=False, name='batch_norm')
 				tl_regression = tl.layers.DenseLayer(tl_input, W_init=self.prediction_layer_1_W_init, n_units=self.prediction_layer_1_uints, act=lambda x: tl.act.lrelu(x, 0.2), name='regression_op_1')
-				tl_regression = tl.layers.DropoutLayer(tl_regression, keep=self.keep_rate, name='drop_1')
+				tl_regression = tl.layers.DropoutLayer(tl_regression, keep=self.prediction_layer_keep_rate, name='drop_1')
 				tl_regression = tl.layers.DenseLayer(tl_input, W_init=self.prediction_layer_2_W_init, n_units=self.predictor_output, act=tl.activation.identity, name='regression_op_2')
-				tl_regression = tl.layers.DropoutLayer(tl_regression, keep=self.keep_rate, name='drop_2')
+				tl_regression = tl.layers.DropoutLayer(tl_regression, keep=self.prediction_layer_keep_rate, name='drop_2')
 				tl_output = tl_regression
 				regression_output = tl_output.outputs
 				# print('regression_output shape {}'.format(regression_output.get_shape().as_list()))
@@ -1141,10 +1142,10 @@ class CNN_RNN:
 
 			return summary_dic
 
-		def save_result_report(dir_name='./result/temp/'):
+		def save_result_report(dir_name='./result/temp'):
 			if not os.path.exists(dir_name):
 				os.makedirs(dir_name)
-			with open(dir_name + 'report.txt', 'w') as f:
+			with open(os.path.join(dir_name, 'report.txt'), 'w') as f:
 				task_keys = self.multi_task_dic.keys()
 				task_keys = sorted(task_keys)
 
@@ -1159,11 +1160,11 @@ class CNN_RNN:
 						f.write(line + '\n')
 					f.write('\n')
 
-		def save_hyperparameter(config, dir_name='./result/temp/'):
+		def save_hyperparameter(config, dir_name='./result/temp'):
 			if not os.path.exists(dir_name):
 				os.makedirs(dir_name)
 
-			config.save_json(dir_name + 'config.json')
+			config.save_json(os.path.join(dir_name, 'config.json'))
 			'''
 			sort_key_val = [(k, config[k]) for k in sorted(config.keys())]
 
@@ -1172,14 +1173,13 @@ class CNN_RNN:
 					line = str(element[0]) + ': ' + str(element[1])
 					f.write(line + '\n')
 			'''
-		def save_figure(dir_name='./result/temp/'):
+		def save_figure(dir_name='./result/temp'):
 			min_fig.set_size_inches(12, 9)
 			avg_fig.set_size_inches(12, 9)
 			max_fig.set_size_inches(12, 9)
-			min_fig.savefig(dir_name + 'min.png', dpi=100)
-			avg_fig.savefig(dir_name + 'avg.png', dpi=100)
-			max_fig.savefig(dir_name + 'max.png', dpi=100)
-
+			min_fig.savefig(os.path.join(dir_name, 'min.png'), dpi=100)
+			avg_fig.savefig(os.path.join(dir_name, 'avg.png'), dpi=100)
+			max_fig.savefig(os.path.join(dir_name, 'max.png'), dpi=100)
 
 		def get_multi_task_batch(batch_x, batch_y):
 			batch_y = np.transpose(batch_y, [4, 0, 1, 2, 3])
@@ -1237,6 +1237,11 @@ class CNN_RNN:
 				batch_y_sample[:100, 0, 0, 0, 0],
 				train_prediction[:100, 0, 0, 0, 0])
 			task['training_temp_loss'] = 0
+
+			if task_name == 'max_traffic':
+				if testing_accu > 0.75:
+					self._save_model(sess, '/home/mldp/ML_with_bigdata/CNN_RNN/output_model/CNN_RNN_75.ckpt')
+
 
 		def _plot_predict_vs_real(fig_instance, task_name, testing_y, testing_predict_y, training_y, training_predict_y):
 

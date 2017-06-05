@@ -1,4 +1,5 @@
 from CNN_RNN import CNN_RNN
+import CNN_RNN_config
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -567,7 +568,7 @@ def predict_MTL_train(cnn_rnn, X_array, Y_array, model_path):
 	real_min = Y_array[:, :, :, :, 2, np.newaxis]
 	real_avg = Y_array[:, :, :, :, 3, np.newaxis]
 	real_max = Y_array[:, :, :, :, 4, np.newaxis]
-
+	print(prediction_min.shape, real_min.shape)
 	''' unfeature scaling'''
 	predict_y = np.concatenate((prediction_min, prediction_avg, prediction_max, real_min, real_avg, real_max), axis=-1)
 	predict_y = unfeature_scaling(predict_y)
@@ -642,16 +643,18 @@ Y_array = copy(Y_array, new_Y_array)
 del new_X_array, new_Y_array
 
 
-X_array_train = X_array[0:200]
-Y_array_train = Y_array[0:200]
-X_array_test = X_array[X_array.shape[0] - 100:]
-Y_array_test = Y_array[Y_array.shape[0] - 100:]
+X_array_train = X_array[0:120]   # should correspond to bathc size
+Y_array_train = Y_array[0:120]	 # should correspond to bathc size
+X_array_test = X_array[X_array.shape[0] - 120:]  # should correspond to bathc size
+Y_array_test = Y_array[Y_array.shape[0] - 120:]  # should correspond to bathc size
 del X_array, Y_array
 
 
 input_data_shape = [X_array_train.shape[1], X_array_train.shape[2], X_array_train.shape[3], 1]
 output_data_shape = [Y_array_train.shape[1], Y_array_train.shape[2], Y_array_train.shape[3], 1]
-cnn_rnn = CNN_RNN(input_data_shape, output_data_shape)
+hyper_config = CNN_RNN_config.HyperParameterConfig()
+
+cnn_rnn = CNN_RNN(input_data_shape, output_data_shape, hyper_config)
 model_path = {
 	'reload_path': '/home/mldp/ML_with_bigdata/CNN_RNN/output_model/CNN_RNN_test.ckpt',
 	'save_path': '/home/mldp/ML_with_bigdata/CNN_RNN/output_model/CNN_RNN.ckpt'

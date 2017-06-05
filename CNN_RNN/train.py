@@ -3,6 +3,7 @@ from sklearn import preprocessing
 import matplotlib.pyplot as plt
 import sys
 import CNN_RNN_config
+from CNN_RNN import CNN_RNN
 import os
 sys.path.append('/home/mldp/ML_with_bigdata')
 import data_utility as du
@@ -440,9 +441,12 @@ def train():
 	# parameter
 	input_data_shape = [X_array.shape[1], X_array.shape[2], X_array.shape[3], X_array.shape[4]]
 	output_data_shape = [Y_array.shape[1], Y_array.shape[2], Y_array.shape[3], 1]
+	result_path = '/home/mldp/ML_with_bigdata/CNN_RNN/result/temp/'
+	# result_path = os.path.join(result_path,'report')
 	model_path = {
 		'reload_path': '/home/mldp/ML_with_bigdata/CNN_RNN/output_model/CNN_RNN_test.ckpt',
-		'save_path': '/home/mldp/ML_with_bigdata/CNN_RNN/output_model/CNN_RNN_test.ckpt'
+		'save_path': '/home/mldp/ML_with_bigdata/CNN_RNN/output_model/CNN_RNN_test.ckpt',
+		'result_path': result_path
 	}
 	hyper_config = CNN_RNN_config.HyperParameterConfig()
 	cnn_rnn = CNN_RNN(input_data_shape, output_data_shape, hyper_config)
@@ -462,9 +466,9 @@ def grid_search():
 	Y_array = Y_array[:, :, 10:13, 10:13, :]
 	X_array = feature_scaling(X_array)
 	Y_array = feature_scaling(Y_array)
-	model_path = '/home/mldp/ML_with_bigdata/CNN_RNN/output_model/CNN_RNN.ckpt'
-	gridsearcg = CNN_RNN_config.GridSearch(model_path, X_array, Y_array)
-	gridsearcg.search_learning_rate()
+	# model_path = '/home/mldp/ML_with_bigdata/CNN_RNN/output_model/CNN_RNN.ckpt'
+	gridsearcg = CNN_RNN_config.GridSearch(X_array, Y_array)
+	gridsearcg.random_grid_search()
 
 if __name__ == '__main__':
 	# prepare_training_data()

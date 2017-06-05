@@ -7,19 +7,20 @@ import operator
 import itertools
 from functools import reduce
 import shutil
+import random
 
 class HyperParameterConfig:
 	def __init__(self):
 		self.iter_epoch = 2000
-		self.batch_size = 100
-		self.learning_rate = 0.0005
-		self.keep_rate = 0.7
+		self.batch_size = 40
+		self.learning_rate = 0.0015
+		self.keep_rate = 0.75
 		self.weight_decay = 0.01
 
 		'''build_bi_RNN_network'''
-		self.RNN_num_layers = 3
+		self.RNN_num_layers = 2
 		self.RNN_num_step = 6
-		self.RNN_hidden_node_size = 256
+		self.RNN_hidden_node_size = 512
 		self.RNN_cell = 'LSTMcell'
 		self.RNN_cell_init_args = {'forget_bias': 1.0, 'use_peepholes': True, 'state_is_tuple': True}
 		self.RNN_init_state_noise_stddev = 0.5
@@ -61,9 +62,10 @@ class HyperParameterConfig:
 
 		'''prediction layer'''
 		self.prediction_layer_1_W_init = 'xavier'
-		self.prediction_layer_1_uints = 1024
+		self.prediction_layer_1_uints = 256
 
 		self.prediction_layer_2_W_init = 'xavier'
+		self.prediction_layer_keep_rate = 0.75
 
 	def get_variable(self):
 		# total = vars(self)
@@ -91,12 +93,15 @@ class HyperParameterConfig:
 
 
 class GridSearch():
-	def __init__(self, model_path, X_array, Y_array):
+	def __init__(self, X_array, Y_array):
 		self.X_array = X_array
 		self.Y_array = Y_array
-		model_basename = os.path.basename(model_path)
-		self.model_dirname = os.path.dirname(model_path)
-		self.model_name = os.path.splitext(model_basename)
+		# model_basename = os.path.basename(model_path)
+		# self.model_dirname = os.path.dirname(model_path)
+		# self.model_name = os.path.splitext(model_basename)
+		self.hyper_config = None
+		self.basic_result_path = ''
+		self.search_task_name = ''
 
 	def _find_in_obj(self, obj, condition, path=None):
 		if path is None:
@@ -120,8 +125,7 @@ class GridSearch():
 					new_path.append(key)
 					yield new_path
 
-	def search_learning_rate(self):
-		def find_highest_accu(obj):
+	def _find_highest_accu(self, obj):
 			key_paths = self._find_in_obj(obj, 'testing_accurcy')  # generator
 
 			key_paths = list(key_paths)
@@ -150,14 +154,15 @@ class GridSearch():
 				max_pairs.append(max_pair)
 			return max_pairs
 
+	def search_learning_rate(self):
 		hyper_config = HyperParameterConfig()
 		rate_summerize = OrderedDict()
 		# rate_list = list(range(0.0001, 0.05, 0.0005))
-		rate_array = np.arange(0.00001, 0.001, 0.00005)
+		rate_array = np.arange(0.001, 0.004, 0.0005)
 		rate_array = rate_array.tolist()
 
 		basic_result_path = '/home/mldp/ML_with_bigdata/CNN_RNN/result/search_learning_rate/'
-		shutil.rmtree(basic_result_path)
+		# shutil.rmtree(basic_result_path)
 		if not os.path.exists(basic_result_path):
 			os.makedirs(basic_result_path)
 
@@ -180,7 +185,7 @@ class GridSearch():
 
 		print('search finish!!')
 
-		max_pairs = find_highest_accu(rate_summerize)
+		max_pairs = self._find_highest_accu(rate_summerize)
 		for max_pair in max_pairs:
 			print('rate:{} in task: {} {}:{}'.format(
 				max_pair[0][0],
@@ -189,7 +194,7 @@ class GridSearch():
 				max_pair[1]))
 
 		with open(basic_result_path + 'search_rate_report.txt', 'w') as outfile:
-			json_string = json.dumps(rate_summerize, sort_keys=True, indent=4)
+			json_string = json.dumps(rate_summerize, sort_keys=False, indent=4)
 			# print(json_string)
 			outfile.write(json_string + '\n')
 			for max_pair in max_pairs:
@@ -208,7 +213,281 @@ class GridSearch():
 					print(task, ':')
 					print('\t', result)
 		'''
-	
+
+	def search_keep_rate(self):
+		hyper_config = HyperParameterConfig()
+		summerized = OrderedDict()
+
+		keep_rate_array = np.arange(0.3, 1., 0.05)
+		keep_rate_array = keep_rate_array.tolist()
+		basic_result_path = '/home/mldp/ML_with_bigdata/CNN_RNN/result/search_keep_rate/'
+
+		if not os.path.exists(basic_result_path):
+			os.makedirs(basic_result_path)
+
+		for keep_rate in keep_rate_array:
+			print('keep_rate:{}'.format(keep_rate))
+			hyper_config.keep_rate = round(float(keep_rate), 6)
+			save_model_path = self.model_dirname + '/' + self.model_name[0] + '_keep_rate_' + str(hyper_config.keep_rate) + '.ckpt'
+			result_path = basic_result_path + 'keep_rate_' + str(hyper_config.keep_rate) + '/'
+
+			if not os.path.exists(result_path):
+				os.makedirs(result_path)
+
+			model_path = {
+				'reload_path': '/home/mldp/ML_with_bigdata/CNN_RNN/output_model/CNN_RNN_test.ckpt',
+				'save_path': save_model_path,
+				'result_path': result_path
+			}
+			summerize = self._run_CNN_RNN(model_path, hyper_config)
+			summerized[str(keep_rate)] = summerize
+
+		print('search finish!!')
+		max_pairs = self._find_highest_accu(summerized)
+		for max_pair in max_pairs:
+			print('rate:{} in task: {} {}:{}'.format(
+				max_pair[0][0],
+				max_pair[0][1],
+				max_pair[0][2],
+				max_pair[1]))
+
+		with open(basic_result_path + 'search_keep_rate_report.txt', 'w') as outfile:
+			json_string = json.dumps(summerized, sort_keys=False, indent=4)
+			# print(json_string)
+			outfile.write(json_string + '\n')
+			for max_pair in max_pairs:
+				outfile.write('keep_rate:{} in task: {} {}:{} \n'.format(
+					max_pair[0][0],
+					max_pair[0][1],
+					max_pair[0][2],
+					max_pair[1]))
+
+	def search_predition_keep_rate(self):
+		self.hyper_config = HyperParameterConfig()
+		set_attr = 'prediction_layer_keep_rate'
+		iterator = np.arange(0.3, 1., 0.05)
+		self.search_task_name = 'serach_precition_keep_rate'
+		self.basic_result_path = '/home/mldp/ML_with_bigdata/CNN_RNN/result/'
+		self.basic_result_path = os.path.join(self.basic_result_path, self.search_task_name)
+		if not os.path.exists(self.basic_result_path):
+			os.makedirs(self.basic_result_path)
+
+		self._run_grid_search(iterator, set_attr)
+
+	def search_weight_decay(self):
+		self.hyper_config = HyperParameterConfig()
+		set_attr = 'weight_decay'
+		iterator = [0.0001, 0.001, 0.01, 0.1, 1, 10, 100]
+		self.search_task_name = 'search_weight_decay'
+		self.basic_result_path = '/home/mldp/ML_with_bigdata/CNN_RNN/result/'
+		self.basic_result_path = os.path.join(self.basic_result_path, self.search_task_name)
+		if not os.path.exists(self.basic_result_path):
+			os.makedirs(self.basic_result_path)
+		self._run_grid_search(iterator, set_attr)
+
+	def search_batch_size(self):
+		self.hyper_config = HyperParameterConfig()
+		set_attr = 'batch_size'
+		iterator = range(10, 130, 10)
+		self.search_task_name = 'search_batch_size'
+		self.basic_result_path = '/home/mldp/ML_with_bigdata/CNN_RNN/result/'
+		self.basic_result_path = os.path.join(self.basic_result_path, self.search_task_name)
+		if not os.path.exists(self.basic_result_path):
+			os.makedirs(self.basic_result_path)
+		self._run_grid_search(iterator, set_attr)
+
+	def search_RNN_layer(self):
+		self.hyper_config = HyperParameterConfig()
+		set_attr = 'RNN_num_layers'
+		iterator = range(2, 7, 1)
+		self.search_task_name = 'search_RNN_layer'
+		self.basic_result_path = '/home/mldp/ML_with_bigdata/CNN_RNN/result/'
+		self.basic_result_path = os.path.join(self.basic_result_path, self.search_task_name)
+		if not os.path.exists(self.basic_result_path):
+			os.makedirs(self.basic_result_path)
+		self._run_grid_search(iterator, set_attr)
+
+	def search_RNN_nodes(self):
+		self.hyper_config = HyperParameterConfig()
+		set_attr = 'RNN_hidden_node_size'
+		index = range(4, 11)
+		iterator = map(lambda x: 2 ** x, index)
+		self.search_task_name = 'search_RNN_nodes'
+		self.basic_result_path = '/home/mldp/ML_with_bigdata/CNN_RNN/result/'
+		self.basic_result_path = os.path.join(self.basic_result_path, self.search_task_name)
+		if not os.path.exists(self.basic_result_path):
+			os.makedirs(self.basic_result_path)
+		self._run_grid_search(iterator, set_attr)
+
+	def search_prediction_nodes(self):
+		self.hyper_config = HyperParameterConfig()
+		set_attr = 'prediction_layer_1_uints'
+		index = range(3, 11)
+		iterator = map(lambda x: 2 ** x, index)
+		self.search_task_name = 'search_prediction_nodes'
+		self.basic_result_path = '/home/mldp/ML_with_bigdata/CNN_RNN/result/'
+		self.basic_result_path = os.path.join(self.basic_result_path, self.search_task_name)
+		if not os.path.exists(self.basic_result_path):
+			os.makedirs(self.basic_result_path)
+		self._run_grid_search(iterator, set_attr)
+
+	def search_fully_connected_nodes(self):
+		self.hyper_config = HyperParameterConfig()
+		set_attr = 'fully_connected_units'
+		index = range(3, 11)
+		iterator = map(lambda x: 2 ** x, index)
+		self.search_task_name = 'search_fully_connected_nodes'
+		self.basic_result_path = '/home/mldp/ML_with_bigdata/CNN_RNN/result/'
+		self.basic_result_path = os.path.join(self.basic_result_path, self.search_task_name)
+		if not os.path.exists(self.basic_result_path):
+			os.makedirs(self.basic_result_path)
+		self._run_grid_search(iterator, set_attr)
+
+	def random_grid_search(self):
+		base_index = range(5, 11)
+		fully_connected_list = list(map(lambda x: 2 ** x, base_index))
+		prediction_nodes_list = list(map(lambda x: 2 ** x, base_index))
+		RNN_nodes_list = list(map(lambda x: 2 ** x, base_index))
+		RNN_layer_list = list(range(2, 5, 1))
+		batch_size_list = list(range(40, 130, 10))
+		weight_decay_list = [0.0001, 0.001, 0.01, 0.1, 1, 10, 50]
+		prediction_keep_rate_list = list(np.arange(0.5, 1., 0.05))
+		keep_rate_list = list(np.arange(0.5, 1., 0.05))
+		learning_rate_list = list(np.random.uniform(0.0001, 0.002, 100).astype(np.float32))
+		self.hyper_config = HyperParameterConfig()
+		result_summary = OrderedDict()
+
+		def random_choise(hyper_list):
+			return random.choice(hyper_list)
+
+		def set_attr(set_attribution, para):
+			setattr(self.hyper_config, set_attribution, para)
+
+		def run_random_search(run_index):
+
+			fully_connected = random_choise(fully_connected_list)
+			set_attr('fully_connected_units', fully_connected)
+
+			prediction_nodes = random_choise(prediction_nodes_list)
+			set_attr('prediction_layer_1_uints', prediction_nodes)
+
+			RNN_nodes = random_choise(RNN_nodes_list)
+			set_attr('RNN_hidden_node_size', RNN_nodes)
+
+			RNN_layer = random_choise(RNN_layer_list)
+			set_attr('RNN_num_layers', RNN_layer)
+
+			batch_size = random_choise(batch_size_list)
+			set_attr('batch_size', batch_size)
+
+			weight_decay = random_choise(weight_decay_list)
+			set_attr('weight_decay', weight_decay)
+
+			prediction_keep_rate = random_choise(prediction_keep_rate_list)
+			set_attr('prediction_layer_keep_rate', prediction_keep_rate)
+
+			keep_rate = random_choise(keep_rate_list)
+			set_attr('keep_rate', keep_rate)
+
+			learning_rate = random_choise(learning_rate_list)
+			set_attr('learning_rate', learning_rate)
+
+			save_model_path = os.path.join(
+				self.basic_result_path,
+				'_' + str(run_index),
+				self.search_task_name + '.ckpt')
+
+			result_path = os.path.join(
+				self.basic_result_path,
+				'_' + str(run_index))
+
+			model_path = {
+				'reload_path': '/home/mldp/ML_with_bigdata/CNN_RNN/output_model/CNN_RNN_test.ckpt',
+				'save_path': save_model_path,
+				'result_path': result_path
+			}
+			result = self._run_CNN_RNN(model_path, self.hyper_config)
+			return result
+
+		self.search_task_name = 'random_search'
+		self.basic_result_path = '/home/mldp/ML_with_bigdata/CNN_RNN/result/'
+		self.basic_result_path = os.path.join(self.basic_result_path, self.search_task_name)
+		report_path = os.path.join(self.basic_result_path, self.search_task_name + '.txt')
+		if not os.path.exists(self.basic_result_path):
+			os.makedirs(self.basic_result_path)
+
+		for run_index in range(200):
+			result_summary[str(run_index)] = run_random_search(run_index)
+			if run_index % 5 == 0 and run_index is not 0:
+				max_pairs = self._find_highest_accu(result_summary)
+				with open(report_path, 'w') as outfile:
+					json_string = json.dumps(result_summary, sort_keys=False, indent=4)
+					outfile.write(json_string + '\n')
+					for max_pair in max_pairs:
+						line = 'value:{} in task: {} {}:{}'.format(
+							max_pair[0][0],
+							max_pair[0][1],
+							max_pair[0][2],
+							max_pair[1])
+						print(line)
+						outfile.write(line + '\n')
+
+		print('search finish!!')
+		max_pairs = self._find_highest_accu(result_summary)
+		with open(report_path, 'w') as outfile:
+			json_string = json.dumps(result_summary, sort_keys=False, indent=4)
+			# print(json_string)
+			outfile.write(json_string + '\n')
+
+			for max_pair in max_pairs:
+				line = 'value:{} in task: {} {}:{}'.format(
+					max_pair[0][0],
+					max_pair[0][1],
+					max_pair[0][2],
+					max_pair[1])
+				print(line)
+				outfile.write(line + '\n')
+
+	def _run_grid_search(self, iterables_paras, set_attr):
+		result_summary = OrderedDict()
+
+		for para in iterables_paras:
+			setattr(self.hyper_config, set_attr, para)
+			save_model_path = os.path.join(
+				self.basic_result_path + '_' + str(para),
+				self.search_task_name + '.ckpt')
+
+			result_path = os.path.join(
+				self.basic_result_path,
+				'_' + str(para))
+
+			report_path = os.path.join(self.basic_result_path, self.search_task_name + '.txt')
+			# print(save_model_path)
+			# print(result_path)
+			model_path = {
+				'reload_path': '/home/mldp/ML_with_bigdata/CNN_RNN/output_model/CNN_RNN_test.ckpt',
+				'save_path': save_model_path,
+				'result_path': result_path
+			}
+			result = self._run_CNN_RNN(model_path, self.hyper_config)
+			result_summary[str(para)] = result
+		print('search finish!!')
+
+		max_pairs = self._find_highest_accu(result_summary)
+
+		with open(report_path, 'w') as outfile:
+			json_string = json.dumps(result_summary, sort_keys=False, indent=4)
+			# print(json_string)
+			outfile.write(json_string + '\n')
+
+			for max_pair in max_pairs:
+				line = 'value:{} in task: {} {}:{}'.format(
+					max_pair[0][0],
+					max_pair[0][1],
+					max_pair[0][2],
+					max_pair[1])
+				print(line)
+				outfile.write(line + '\n')
 
 	def _run_CNN_RNN(self, model_path, config):
 		input_data_shape = [self.X_array.shape[1], self.X_array.shape[2], self.X_array.shape[3], self.X_array.shape[4]]
