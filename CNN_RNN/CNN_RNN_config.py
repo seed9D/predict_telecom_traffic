@@ -12,9 +12,9 @@ import random
 class HyperParameterConfig:
 	def __init__(self):
 		self.iter_epoch = 2000
-		self.batch_size = 40
-		self.learning_rate = 0.0015
-		self.keep_rate = 0.75
+		self.batch_size = 100
+		self.learning_rate = 0.001
+		self.keep_rate = 0.85
 		self.weight_decay = 0.01
 
 		'''build_bi_RNN_network'''
@@ -65,7 +65,7 @@ class HyperParameterConfig:
 		self.prediction_layer_1_uints = 256
 
 		self.prediction_layer_2_W_init = 'xavier'
-		self.prediction_layer_keep_rate = 0.75
+		self.prediction_layer_keep_rate = 0.85
 
 	def get_variable(self):
 		# total = vars(self)
@@ -343,6 +343,28 @@ class GridSearch():
 			os.makedirs(self.basic_result_path)
 		self._run_grid_search(iterator, set_attr)
 
+	def _search_CNN(self):
+		def random_choise(hyper_list):
+			return random.choice(hyper_list)
+
+		base_index = range(4, 7)
+		kernal_size_list = list(map(lambda x: 2 ** x, base_index))
+		layer_1_kernel_size = random_choise(kernal_size_list)
+		layer_2_kernel_size = random_choise(kernal_size_list)
+
+		self.hyper_config.CNN_layer_1_5x5_kernel_shape[3] = layer_1_kernel_size
+		self.hyper_config.CNN_layer_1_3x3_kernel_shape[3] = layer_1_kernel_size
+		self.hyper_config.CNN_layer_2_kernel_shape[2] = layer_1_kernel_size * 2
+		self.hyper_config.CNN_layer_2_kernel_shape[3] = layer_2_kernel_size
+
+		pooling_list = ['max_pool', 'avg_pool']
+		pooling_1 = random_choise(pooling_list)
+		self.hyper_config.CNN_layer_1_5x5_pooling = pooling_1
+		self.hyper_config.CNN_layer_1_5x5_pooling = pooling_1
+		self.hyper_config.CNN_layer_1_pooling = random_choise(pooling_list)
+		self.hyper_config.CNN_layer_2_pooling = random_choise(pooling_list)
+
+
 	def random_grid_search(self):
 		base_index = range(5, 11)
 		fully_connected_list = list(map(lambda x: 2 ** x, base_index))
@@ -350,12 +372,31 @@ class GridSearch():
 		RNN_nodes_list = list(map(lambda x: 2 ** x, base_index))
 		RNN_layer_list = list(range(2, 5, 1))
 		batch_size_list = list(range(40, 130, 10))
-		weight_decay_list = [0.0001, 0.001, 0.01, 0.1, 1, 10, 50]
-		prediction_keep_rate_list = list(np.arange(0.5, 1., 0.05))
-		keep_rate_list = list(np.arange(0.5, 1., 0.05))
-		learning_rate_list = list(np.random.uniform(0.0001, 0.002, 100).astype(np.float32))
+		weight_decay_list = [0.0001, 0.001, 0.01, 0.1, 1, 10]
+		prediction_keep_rate_list = list(np.arange(0.7, 1., 0.05))
+		keep_rate_list = list(np.arange(0.7, 1., 0.05))
+		learning_rate_list = list(np.random.uniform(0.0001, 0.002, 100))
+		RNN_init_state_noise_stddev_list = list(np.random.uniform(0.001, 0.9, 100))
 		self.hyper_config = HyperParameterConfig()
 		result_summary = OrderedDict()
+
+		def delete_dir(dir_index, obj):
+			key_paths = self._find_in_obj(obj, 'testing_accurcy')
+			key_paths = list(key_paths)
+			# print(key_paths)
+			accuracy_threshold = 0.7
+
+			for key in key_paths:
+				value = reduce(operator.getitem, key, obj)
+				# key_value = [(ele, reduce(operator.getitem, ele, obj)) for ele in key]
+				# print(value)
+				if accuracy_threshold > value:
+					delete_dir = os.path.join(
+						self.basic_result_path,
+						'_' + str(dir_index))
+					shutil.rmtree(delete_dir)
+					print('delete dir!')
+					break
 
 		def random_choise(hyper_list):
 			return random.choice(hyper_list)
@@ -392,6 +433,11 @@ class GridSearch():
 			learning_rate = random_choise(learning_rate_list)
 			set_attr('learning_rate', learning_rate)
 
+			RNN_init_state_noise_stddev = random_choise(RNN_init_state_noise_stddev_list)
+			set_attr('RNN_init_state_noise_stddev', RNN_init_state_noise_stddev)
+
+			self._search_CNN()
+
 			save_model_path = os.path.join(
 				self.basic_result_path,
 				'_' + str(run_index),
@@ -418,6 +464,7 @@ class GridSearch():
 
 		for run_index in range(200):
 			result_summary[str(run_index)] = run_random_search(run_index)
+			delete_dir(run_index, result_summary[str(run_index)])
 			if run_index % 5 == 0 and run_index is not 0:
 				max_pairs = self._find_highest_accu(result_summary)
 				with open(report_path, 'w') as outfile:

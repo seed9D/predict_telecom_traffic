@@ -1238,10 +1238,14 @@ class CNN_RNN:
 				train_prediction[:100, 0, 0, 0, 0])
 			task['training_temp_loss'] = 0
 
-			if task_name == 'max_traffic':
-				if testing_accu > 0.75:
-					self._save_model(sess, '/home/mldp/ML_with_bigdata/CNN_RNN/output_model/CNN_RNN_75.ckpt')
-
+		def early_stop(epoch):
+			task_keys = self.multi_task_dic.keys()
+			task_keys = sorted(task_keys)
+			for key in task_keys:
+				test_accu = self.multi_task_dic[key]['testing_accurcy_history'][-1]
+				if test_accu < 0.65:
+					return True
+				return False
 
 		def _plot_predict_vs_real(fig_instance, task_name, testing_y, testing_predict_y, training_y, training_predict_y):
 
@@ -1323,6 +1327,10 @@ class CNN_RNN:
 						save_result_report(result_path)
 						save_figure(result_path)
 
+					if epoch % 1000 == 0 and epoch is not 0:
+						flag = early_stop(epoch)
+						if flag:
+							break
 			coord.request_stop()
 			coord.join(treads)
 			print('training finished!')
