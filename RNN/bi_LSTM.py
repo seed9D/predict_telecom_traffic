@@ -19,14 +19,14 @@ def get_data():
 	Y_list = []
 	for i, filename in enumerate(filelist):
 		data_array = du.load_array(root_dir + '/npy/hour_max/X/' + filename)
-		data_array = data_array[:, :, 50:51, 50:51, -1, np.newaxis]
+		data_array = data_array[:, :, 50:54, 50:54, -1, np.newaxis]
 		X_list.append(data_array)
 
 	filelist = du.list_all_input_file(root_dir + '/npy/hour_max/Y')
 	filelist.sort()
 	for i, filename in enumerate(filelist):
 		data_array = du.load_array(root_dir + '/npy/hour_max/Y/' + filename)
-		data_array = data_array[:, :, 50:51, 50:51, -1, np.newaxis]
+		data_array = data_array[:, :, 50:54, 50:54, -1, np.newaxis]
 		Y_list.append(data_array)
 
 	X_array = np.concatenate(X_list, axis=0)
@@ -74,7 +74,7 @@ class biRNN:
 		self.MSE = tf.reduce_mean(tf.pow(self.regression_output - self.Ys, 2), name='MSE_op')
 		MAPE = tf.reduce_mean(tf.divide(tf.abs(self.Ys - self.regression_output), tf.reduce_mean(self.Ys)), name='MAPE_OP')
 		self.accuracy = 1 - MAPE
-		optimizer = tf.train.AdamOptimizer(learning_rate=0.001)
+		optimizer = tf.train.AdamOptimizer(learning_rate=0.0001)
 
 		opt_vars = tf.trainable_variables()
 		gvs = optimizer.compute_gradients(self.MSE, var_list=opt_vars)
@@ -203,8 +203,8 @@ print('x train shape:{} X test shape:{}'.format(X_train.shape, X_test.shape))
 Y_train, Y_test = Y_data[: 8 * data_len // 10], Y_data[8 * data_len // 10:]
 print('y train shape:{} y test shape:{}'.format(Y_train.shape, Y_test.shape))
 NN = biRNN()
-# NN.fit(X_train, Y_train)
-predict = NN.predict(X_test, Y_test)
+# NN.fit(X_train[:, :, 0:1, 0:1], Y_train[:, :, 0:1, 0:1])
+predict = NN.predict(X_test[:, :, 0:1, 0:1], Y_test[:, :, 0:1, 0:1])
 predict = unfeautre_scaling(predict, scaler)
 Y_test = unfeautre_scaling(Y_test, scaler)
 evaluation(Y_test, predict)
