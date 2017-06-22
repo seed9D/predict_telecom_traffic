@@ -12,18 +12,18 @@ import random
 class HyperParameterConfig:
 	def __init__(self):
 		self.iter_epoch = 2000
-		self.batch_size = 100
-		self.learning_rate = 0.001
-		self.keep_rate = 0.85
-		self.weight_decay = 0.01
+		self.batch_size = 40
+		self.learning_rate = 0.0014
+		self.keep_rate = 0.9
+		self.weight_decay = 0.001
 
 		'''build_bi_RNN_network'''
-		self.RNN_num_layers = 2
+		self.RNN_num_layers = 4
 		self.RNN_num_step = 6
-		self.RNN_hidden_node_size = 512
+		self.RNN_hidden_node_size = 256
 		self.RNN_cell = 'LSTMcell'
 		self.RNN_cell_init_args = {'forget_bias': 1.0, 'use_peepholes': True, 'state_is_tuple': True}
-		self.RNN_init_state_noise_stddev = 0.5
+		self.RNN_init_state_noise_stddev = 0.2
 		self.RNN_initializer = 'xavier'
 
 		'''build_CNN_network'''
@@ -58,14 +58,14 @@ class HyperParameterConfig:
 
 		'''share layer Dense'''
 		self.fully_connected_W_init = 'xavier'
-		self.fully_connected_units = 1024
+		self.fully_connected_units = 512
 
 		'''prediction layer'''
 		self.prediction_layer_1_W_init = 'xavier'
 		self.prediction_layer_1_uints = 256
 
 		self.prediction_layer_2_W_init = 'xavier'
-		self.prediction_layer_keep_rate = 0.85
+		self.prediction_layer_keep_rate = 0.8
 
 	def get_variable(self):
 		# total = vars(self)
@@ -373,8 +373,8 @@ class GridSearch():
 		RNN_layer_list = list(range(2, 5, 1))
 		batch_size_list = list(range(40, 130, 10))
 		weight_decay_list = [0.0001, 0.001, 0.01, 0.1, 1, 10]
-		prediction_keep_rate_list = list(np.arange(0.7, 1., 0.05))
-		keep_rate_list = list(np.arange(0.7, 1., 0.05))
+		prediction_keep_rate_list = list(np.arange(0.7, 0.95, 0.05))
+		keep_rate_list = list(np.arange(0.7, 0.95, 0.05))
 		learning_rate_list = list(np.random.uniform(0.0001, 0.002, 100))
 		RNN_init_state_noise_stddev_list = list(np.random.uniform(0.001, 0.9, 100))
 		self.hyper_config = HyperParameterConfig()

@@ -407,15 +407,19 @@ def get_X_and_Y_array(task_num=1):
 	return func
 
 
-def feature_scaling(input_datas, feature_range=(0.1, 255)):
+def feature_scaling(input_datas, scaler=None, feature_range=(0.1, 255)):
 	# print(input_datas.shape)
 	input_shape = input_datas.shape
 	input_datas = input_datas.reshape(-1, 1)
 	# print(np.amin(input_datas))
-	min_max_scaler = preprocessing.MinMaxScaler(feature_range=feature_range)
-	output = min_max_scaler.fit_transform(input_datas)
+	if scaler:
+		output = scaler.transform(input_datas)
+	else:
+		scaler = preprocessing.MinMaxScaler(feature_range=feature_range)
+		output = scaler.fit_transform(input_datas)
+
 	output = output.reshape(input_shape)
-	return output
+	return output, scaler
 
 
 def print_Y_array(Y_array):
@@ -432,9 +436,10 @@ def print_Y_array(Y_array):
 
 def train():
 	X_array, Y_array = get_X_and_Y_array(task_num=5)
-	Y_array = Y_array[:, :, 10:13, 10:13, :]
-	X_array = feature_scaling(X_array)
-	Y_array = feature_scaling(Y_array)
+	# X_array = X_array[:, :, 10:15, 10:15, :]
+	Y_array = Y_array[:, :, 12:13, 12:13, :]
+	X_array, scaler = feature_scaling(X_array)
+	Y_array, scaler = feature_scaling(Y_array, scaler)
 
 	# X_array_2, Y_array_2 = get_X_and_Y_array(task_num=6)
 	# Y_array_2 = Y_array_2[:, :, 10:13, 10:13, :]
@@ -464,8 +469,8 @@ def train():
 def grid_search():
 	X_array, Y_array = get_X_and_Y_array(task_num=5)
 	Y_array = Y_array[:, :, 10:13, 10:13, :]
-	X_array = feature_scaling(X_array)
-	Y_array = feature_scaling(Y_array)
+	X_array, scaler = feature_scaling(X_array)
+	Y_array, scaler = feature_scaling(Y_array, scaler)
 	# model_path = '/home/mldp/ML_with_bigdata/CNN_RNN/output_model/CNN_RNN.ckpt'
 	gridsearcg = CNN_RNN_config.GridSearch(X_array, Y_array)
 	gridsearcg.random_grid_search()
@@ -474,4 +479,4 @@ if __name__ == '__main__':
 	# prepare_training_data()
 	# train()
 	grid_search()
-	
+

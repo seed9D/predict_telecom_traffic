@@ -140,21 +140,21 @@ class CNN_RNN:
 			with tf.variable_scope('RNN'):
 				network = tl.layers.FlattenLayer(input_X, name='flatten_layer_1')
 				print('rnn input {}'.format(network.outputs.get_shape().as_list()))
-				network = tl.layers.ReshapeLayer(network, shape=[-1, self.RNN_num_step, self.input_channel * self.input_vertical * self.input_vertical], name='reshape_layer_1')
+				network = tl.layers.ReshapeLayer(network, shape=[-1, self.RNN_num_step, self.input_channel * self.input_vertical * self.input_horizontal], name='reshape_layer_1')
 				network = tl.layers.BatchNormLayer(network, name='batchnorm_layer_1')
 				print('rnn input {}'.format(network.outputs.get_shape().as_list()))
 				network = tl.layers.BiRNNLayer(
 					network,
 					cell_fn=tf.nn.rnn_cell.LSTMCell,
-					n_hidden=self.RNN_hidden_node_size,
+					n_hidden=128,
 					initializer=tf.random_uniform_initializer(-0.1, 0.1),
 					n_steps=self.RNN_num_step,
 					fw_initial_state=None,
 					bw_initial_state=None,
 					return_last=True,
 					return_seq_2d=False,
-					n_layer=self.RNN_num_layers,
-					dropout=(self.keep_rate, self.keep_rate),
+					n_layer=3,
+					dropout=(0.9, 0.9),
 					name='layer_1')
 				# print('rnn output {}'.format(network.outputs.get_shape().as_list()))
 			return network
@@ -1192,7 +1192,7 @@ class CNN_RNN:
 				feed_dict = {
 					self.Xs: batch_x,
 					self.Ys: batch_y,
-					self.keep_prob: 0.7,
+					self.keep_prob: 0.85,
 					self.add_noise: 1}
 				feed_dict.update(task_dic['tl_output'].all_drop)
 				_, cost, L2_loss = sess.run([task_dic[optimizer], task_dic['cost'], task_dic['L2_loss']], feed_dict=feed_dict)
