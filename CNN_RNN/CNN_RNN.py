@@ -837,7 +837,7 @@ class CNN_RNN:
 		except Exception:
 			save_path = self.saver.save(sess, './output_model/temp.ckpt')
 		finally:
-			print('save_path{}'.format(save_path))
+			print('save_path:{}'.format(save_path))
 
 
 	def _reload_model(self, sess, model_path):
@@ -877,8 +877,11 @@ class CNN_RNN:
 
 		# Y_data = Y_data[:,np.newaxis]
 		# print(X_data[1,0,0,0,-1],Y_data[0,0,0,0,-1])
+
 		training_X = X_data[0:int(9 * X_data.shape[0] / 10)]
 		training_Y = Y_data[0:int(9 * Y_data.shape[0] / 10)]
+		# training_X = X_data  # todo
+		# training_Y = Y_data  # todo
 		testing_X = X_data[int(9 * X_data.shape[0] / 10):]
 		testing_Y = Y_data[int(9 * Y_data.shape[0] / 10):]
 
@@ -1238,14 +1241,23 @@ class CNN_RNN:
 				train_prediction[:100, 0, 0, 0, 0])
 			task['training_temp_loss'] = 0
 
-		def early_stop(epoch):
+		def early_stop(stop_type=1):
 			task_keys = self.multi_task_dic.keys()
 			task_keys = sorted(task_keys)
+			Flag = False
 			for key in task_keys:
 				test_accu = self.multi_task_dic[key]['testing_accurcy_history'][-1]
-				if test_accu < 0.65:
-					return True
-				return False
+				if stop_type:
+					if test_accu < 0.6:
+						Flag = True
+				else:
+					if test_accu < 0.74:
+						Flag = False
+						break
+					else:
+						Flag = True
+
+			return Flag
 
 		def _plot_predict_vs_real(fig_instance, task_name, testing_y, testing_predict_y, training_y, training_predict_y):
 
@@ -1322,15 +1334,17 @@ class CNN_RNN:
 						print()
 						epoch_his.append(epoch)
 						# _plot_loss_rate(epoch_his)
+
 					if epoch % 500 == 0 and epoch is not 0:
 						self._save_model(sess, model_path['save_path'])
 						save_result_report(result_path)
 						save_figure(result_path)
 
-					if epoch % 1000 == 0 and epoch is not 0:
-						flag = early_stop(epoch)
-						if flag:
-							break
+					if epoch >= 400:
+						if epoch % 100 == 0 and epoch is not 0:
+							flag = early_stop(0)
+							if flag:
+								break
 			coord.request_stop()
 			coord.join(treads)
 			print('training finished!')

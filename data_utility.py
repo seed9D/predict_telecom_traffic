@@ -2,6 +2,7 @@ import numpy as np
 import os
 
 
+
 def list_all_input_file(input_dir):
 	onlyfile = [f for f in os.listdir(input_dir) if (os.path.isfile(
 		os.path.join(input_dir, f)) and os.path.splitext(f)[1] == ".npy")]
@@ -367,4 +368,9 @@ def load_data_format(input_dir, filelist):
 	for i, array in enumerate(shift_data_array_list):
 		print('data format shape:', array.shape)
 		save_array(array, './npy/' + month + '_' + str(i))  # saving all shift array
+
+
+
+
+
 		

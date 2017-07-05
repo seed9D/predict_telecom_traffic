@@ -8,10 +8,11 @@ import itertools
 from functools import reduce
 import shutil
 import random
+from pprint import pprint
 
 class HyperParameterConfig:
 	def __init__(self):
-		self.iter_epoch = 2000
+		self.iter_epoch = 600
 		self.batch_size = 40
 		self.learning_rate = 0.0014
 		self.keep_rate = 0.9
@@ -91,6 +92,11 @@ class HyperParameterConfig:
 		with open(file_path, 'w') as outfile:
 			json.dump(key_var, outfile, sort_keys=True, indent=4)
 
+	def read_config(self, file_path='./result/temp.json'):
+		with open(file_path, 'r') as data_file:
+			data = json.load(data_file)
+		for key, value in data.items():
+			setattr(self, key, value)
 
 class GridSearch():
 	def __init__(self, X_array, Y_array):
@@ -544,6 +550,9 @@ class GridSearch():
 		cnn_rnn.create_MTL_task(self.X_array, self.Y_array[:, :, :, :, 1, np.newaxis], 'avg_traffic')
 		cnn_rnn.create_MTL_task(self.X_array, self.Y_array[:, :, :, :, 2, np.newaxis], 'max_traffic')
 		return cnn_rnn.start_MTL_train(model_path, reload=False)
+
+
+
 
 
 if __name__ == '__main__':

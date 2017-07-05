@@ -3,29 +3,17 @@ import CNN_RNN_config
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import pytz
-from sklearn import preprocessing
+from utility import feature_scaling, un_feature_scaling, set_time_zone, date_time_covert_to_str
 import os
 import sys
-from datetime import datetime
+
 sys.path.append('/home/mldp/ML_with_bigdata')
 import data_utility as du
+from multi_task_data import Prepare_Task_Data
+
 
 root_dir = '/home/mldp/ML_with_bigdata'
-y_scalar = None
-
-def set_time_zone(timestamp):
-
-	UTC_timezone = pytz.timezone('UTC')
-	Mi_timezone = pytz.timezone('Europe/Rome')
-	date_time = datetime.utcfromtimestamp(float(timestamp))
-	date_time = date_time.replace(tzinfo=UTC_timezone)
-	date_time = date_time.astimezone(Mi_timezone)
-	return date_time
-
-
-def date_time_covert_to_str(date_time):
-	return date_time.strftime('%m-%d %H')
+scalar = None
 
 
 def plot_predict_vs_real(real, predict):
@@ -493,8 +481,6 @@ def get_X_and_Y_array(task_num=1):
 		del Y_array_list
 		# X_array = feature_scaling(X_array)
 		# Y_array = feature_scaling(Y_array)
-		X_array = X_array[0: -1]  # important!!
-		Y_array = Y_array[1:]  # important!! Y should shift 10 minutes
 		return X_array, Y_array
 
 	def task_6():
@@ -565,15 +551,18 @@ def predict_MTL_train(cnn_rnn, X_array, Y_array, model_path):
 		X_array[:, :, :, :, 2:],
 		Y_array[:, :, :, :, 2:],
 		model_path)
-	real_min = Y_array[:, :, :, :, 2, np.newaxis]
-	real_avg = Y_array[:, :, :, :, 3, np.newaxis]
-	real_max = Y_array[:, :, :, :, 4, np.newaxis]
-	print(prediction_min.shape, real_min.shape)
+	# real_min = Y_array[:, :, :, :, 2, np.newaxis]
+	# real_avg = Y_array[:, :, :, :, 3, np.newaxis]
+	# real_max = Y_array[:, :, :, :, 4, np.newaxis]
+	# print(prediction_min.shape, real_min.shape)
 	''' unfeature scaling'''
-	predict_y = np.concatenate((prediction_min, prediction_avg, prediction_max, real_min, real_avg, real_max), axis=-1)
-	predict_y = unfeature_scaling(predict_y)
-	new_Y_array = unfeature_scaling(Y_array[:, :, :, :, 2:])
+	predict_y = np.concatenate((prediction_min, prediction_avg, prediction_max), axis=-1)
+	predict_y = un_feature_scaling(predict_y, scaler)
+	new_Y_array = un_feature_scaling(Y_array[:, :, :, :, 2:], scaler)
 	Y_array = copy(Y_array, new_Y_array)
+
+	Y_real_prediction = np.concatenate((Y_array, predict_y), axis=-1)  # grid_id, timestamp, real_min, real_avg, real_max, prediciton_min, prediction_avg, prediction_max
+	du.save_array(Y_real_prediction, './result/Y_real_prediction.npy')
 
 	print('-' * 20, 'task min:', '-' * 20)
 	compute_loss_rate(Y_array[:, :, :, :, 2, np.newaxis], predict_y[:, :, :, :, 0, np.newaxis])
@@ -589,6 +578,7 @@ def predict_MTL_train(cnn_rnn, X_array, Y_array, model_path):
 	print('-' * 30)
 
 
+'''
 def unfeature_scaling(input_datas):
 	input_shape = input_datas.shape
 	input_datas = input_datas.reshape(-1, 1)
@@ -605,6 +595,7 @@ def feature_scaling(input_datas):
 	output = min_max_scaler.fit_transform(input_datas)
 	output = output.reshape(input_shape)
 	return output, min_max_scaler
+'''
 
 
 def copy(old, new):
@@ -629,34 +620,46 @@ def print_Y_array(Y_array):
 	plt.plot(plot_y_list, marker='.')
 	plt.show()
 
-# prepare_predict_data()
+
+def print_training_grid_id(train_array):
+	print(train_array.shape)
+	for row in range(train_array.shape[2]):
+		for col in range(train_array.shape[3]):
+			print('grid id:{}'.format(train_array[0, 0, row, col, 0]))
 
 
-X_array, Y_array = get_X_and_Y_array(task_num=5)
+
+# X_array, Y_array = get_X_and_Y_array(task_num=5)
 # print_Y_array(Y_array[:, :, :, :, 2:])
 
+TK = Prepare_Task_Data('./npy/final')
+X_array, Y_array = TK.Task_max_min_avg(generate_data=False)
 Y_array = Y_array[:, :, 10:13, 10:13, :]
-new_X_array, _ = feature_scaling(X_array[:, :, :, :, 2:])
-new_Y_array, y_scalar = feature_scaling(Y_array[:, :, :, :, 2:])
+
+new_X_array, scaler = feature_scaling(X_array[:, :, :, :, 2:])
+new_Y_array, _ = feature_scaling(Y_array[:, :, :, :, 2:], scaler)
 X_array = copy(X_array, new_X_array)
 Y_array = copy(Y_array, new_Y_array)
 del new_X_array, new_Y_array
+hyper_config = CNN_RNN_config.HyperParameterConfig()
+hyper_config.read_config(file_path=os.path.join(root_dir, 'CNN_RNN/result/random_search_0609/_85/config.json'))
+key_var = hyper_config.get_variable()
+batch_size = key_var['batch_size']
 
-
-X_array_train = X_array[0:120]   # should correspond to bathc size
-Y_array_train = Y_array[0:120]	 # should correspond to bathc size
-X_array_test = X_array[X_array.shape[0] - 120:]  # should correspond to bathc size
-Y_array_test = Y_array[Y_array.shape[0] - 120:]  # should correspond to bathc size
+X_array_train = X_array[0:batch_size]   # should correspond to bathc size
+Y_array_train = Y_array[0:batch_size]	 # should correspond to bathc size
+X_array_test = X_array[X_array.shape[0] - batch_size:]  # should correspond to bathc size
+Y_array_test = Y_array[Y_array.shape[0] - batch_size:]  # should correspond to bathc size
 del X_array, Y_array
 
 
 input_data_shape = [X_array_train.shape[1], X_array_train.shape[2], X_array_train.shape[3], 1]
 output_data_shape = [Y_array_train.shape[1], Y_array_train.shape[2], Y_array_train.shape[3], 1]
-hyper_config = CNN_RNN_config.HyperParameterConfig()
+
 
 cnn_rnn = CNN_RNN(input_data_shape, output_data_shape, hyper_config)
 model_path = {
-	'reload_path': '/home/mldp/ML_with_bigdata/CNN_RNN/output_model/CNN_RNN_test.ckpt',
+	'reload_path': os.path.join(root_dir, 'CNN_RNN/output_model/CNN_RNN_test.ckpt'),
 	'save_path': '/home/mldp/ML_with_bigdata/CNN_RNN/output_model/CNN_RNN.ckpt'
 }
 
@@ -666,6 +669,4 @@ cnn_rnn.create_MTL_task(X_array_test, Y_array_test[:, :, :, :, 2, np.newaxis], '
 cnn_rnn.create_MTL_task(X_array_test, Y_array_test[:, :, :, :, 3, np.newaxis], 'avg_traffic')
 cnn_rnn.create_MTL_task(X_array_test, Y_array_test[:, :, :, :, 4, np.newaxis], 'max_traffic')
 predict_MTL_train(cnn_rnn, X_array_test, Y_array_test, model_path)
-predict_MTL_train(cnn_rnn, X_array_train, Y_array_train, model_path)
-
-
+# predict_MTL_train(cnn_rnn, X_array_train, Y_array_train, model_path)

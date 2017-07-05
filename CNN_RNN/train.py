@@ -1,5 +1,5 @@
 import numpy as np
-from sklearn import preprocessing
+from utility import feature_scaling
 import matplotlib.pyplot as plt
 import sys
 import CNN_RNN_config
@@ -7,6 +7,7 @@ from CNN_RNN import CNN_RNN
 import os
 sys.path.append('/home/mldp/ML_with_bigdata')
 import data_utility as du
+from multi_task_data import Prepare_Task_Data
 
 root_dir = '/home/mldp/ML_with_bigdata'
 
@@ -357,8 +358,6 @@ def get_X_and_Y_array(task_num=1):
 		del Y_array_list
 		# X_array = feature_scaling(X_array)
 		# Y_array = feature_scaling(Y_array)
-		X_array = X_array[0: -1]  # important!!
-		Y_array = Y_array[1:]  # important!! Y should shift 10 minutes
 		return X_array, Y_array
 
 	def task_6():
@@ -407,21 +406,6 @@ def get_X_and_Y_array(task_num=1):
 	return func
 
 
-def feature_scaling(input_datas, scaler=None, feature_range=(0.1, 255)):
-	# print(input_datas.shape)
-	input_shape = input_datas.shape
-	input_datas = input_datas.reshape(-1, 1)
-	# print(np.amin(input_datas))
-	if scaler:
-		output = scaler.transform(input_datas)
-	else:
-		scaler = preprocessing.MinMaxScaler(feature_range=feature_range)
-		output = scaler.fit_transform(input_datas)
-
-	output = output.reshape(input_shape)
-	return output, scaler
-
-
 def print_Y_array(Y_array):
 	print('Y array shape:{}'.format(Y_array.shape))
 	plot_y_list = []
@@ -435,9 +419,14 @@ def print_Y_array(Y_array):
 
 
 def train():
-	X_array, Y_array = get_X_and_Y_array(task_num=5)
+	# X_array, Y_array = get_X_and_Y_array(task_num=5)
+	TK = Prepare_Task_Data('./npy/final')
+	X_array, Y_array = TK.Task_max_min_avg(generate_data=False)
+	data_len = X_array.shape[0]
+	X_array = X_array[: 9 * data_len // 10, :, :, :, -1, np.newaxis]
+	Y_array = Y_array[: 9 * data_len // 10, :, :, :, 2:]
 	# X_array = X_array[:, :, 10:15, 10:15, :]
-	Y_array = Y_array[:, :, 12:13, 12:13, :]
+	Y_array = Y_array[:, :, 10:13, 10:13, :]
 	X_array, scaler = feature_scaling(X_array)
 	Y_array, scaler = feature_scaling(Y_array, scaler)
 
@@ -454,6 +443,7 @@ def train():
 		'result_path': result_path
 	}
 	hyper_config = CNN_RNN_config.HyperParameterConfig()
+	hyper_config.read_config(file_path=os.path.join(root_dir, 'CNN_RNN/result/random_search_0609/_85/config.json'))
 	cnn_rnn = CNN_RNN(input_data_shape, output_data_shape, hyper_config)
 	cnn_rnn.create_MTL_task(X_array, Y_array[:, :, :, :, 0, np.newaxis], 'min_traffic')
 	cnn_rnn.create_MTL_task(X_array, Y_array[:, :, :, :, 1, np.newaxis], 'avg_traffic')
@@ -470,13 +460,13 @@ def grid_search():
 	X_array, Y_array = get_X_and_Y_array(task_num=5)
 	Y_array = Y_array[:, :, 10:13, 10:13, :]
 	X_array, scaler = feature_scaling(X_array)
-	Y_array, scaler = feature_scaling(Y_array, scaler)
+	Y_array, _ = feature_scaling(Y_array, scaler)
 	# model_path = '/home/mldp/ML_with_bigdata/CNN_RNN/output_model/CNN_RNN.ckpt'
 	gridsearcg = CNN_RNN_config.GridSearch(X_array, Y_array)
 	gridsearcg.random_grid_search()
 
 if __name__ == '__main__':
 	# prepare_training_data()
-	# train()
-	grid_search()
+	train()
+	# grid_search()
 
