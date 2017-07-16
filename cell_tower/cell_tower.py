@@ -172,7 +172,7 @@ def plot_cell_tower_and_grid():
 
 
 # filter_cell_tower()
-# plot_filtered_cell_tower()
+plot_filtered_cell_tower()
 # assign_grid_to_cell_tower()
 
-plot_cell_tower_and_grid()
+# plot_cell_tower_and_grid()

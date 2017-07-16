@@ -91,26 +91,30 @@ def combine_data(Mi_data, Mi_data_proceesed):
 
 def clean_data(Mi_data_proceesed):
     previous_internat_traffic_activity = 0
+    len_of_Mi_data_proceesed_internet_traffic = len(Mi_data_proceesed['internat_traffic_activity'])
     for i, element in enumerate(Mi_data_proceesed['internat_traffic_activity']):
-        if Mi_data_proceesed['internat_traffic_activity'][i] < previous_internat_traffic_activity * 1 / 100:
+        if Mi_data_proceesed['internat_traffic_activity'][i] < previous_internat_traffic_activity * 1 / 100 or int(Mi_data_proceesed['internat_traffic_activity'][i]) == 0:
             try:
                 next_value = Mi_data_proceesed[
                     'internat_traffic_activity'][i + 1]
                 average = (previous_internat_traffic_activity + next_value) / 2
             except:
                 average = previous_internat_traffic_activity
-                pass
-            print('find dirty data!! id:{} timestamp:{} before:{} next:{} origin:{} new value:{}'.format(
-                Mi_data_proceesed['square_id'][i],
-                Mi_data_proceesed['timestamp'][i],
-                previous_internat_traffic_activity,
-                next_value,
-                Mi_data_proceesed['internat_traffic_activity'][i],
-                average))
-            Mi_data_proceesed['internat_traffic_activity'][i] = average
+            # print(len_of_Mi_data_proceesed, i, i + 1)
+            if len_of_Mi_data_proceesed_internet_traffic > i + 1:
+                next_squire_id = Mi_data_proceesed['square_id'][i + 1]
+                if Mi_data_proceesed['square_id'][i] == next_squire_id:
 
-        previous_internat_traffic_activity = Mi_data_proceesed[
-            'internat_traffic_activity'][i]
+                    print('find dirty data!! id:{} timestamp:{} before:{} next:{} origin:{} new value:{}'.format(
+                        Mi_data_proceesed['square_id'][i],
+                        Mi_data_proceesed['timestamp'][i],
+                        previous_internat_traffic_activity,
+                        next_value,
+                        Mi_data_proceesed['internat_traffic_activity'][i],
+                        average))
+                    Mi_data_proceesed['internat_traffic_activity'][i] = average
+
+        previous_internat_traffic_activity = Mi_data_proceesed['internat_traffic_activity'][i]
 
     return Mi_data_proceesed
 

@@ -76,6 +76,7 @@ class Prepare_Task_Data:
 		Y_array = Y_array[1:]  # important!! Y should shift 10 minutes
 
 		return X_array, Y_array
+
 	def Task_max_min_avg(self, grid_limit=[(45, 60), (45, 60)], generate_data=False):
 		# print(grid_limit)
 		task_name = 'hour_min_avg_max'
@@ -107,3 +108,9 @@ class Prepare_Task_Data:
 			return X, min_avg_max_Y
 		else:
 			return self._get_X_and_Y(task_name)
+
+
+if __name__ == '__main__':
+	TK = Prepare_Task_Data('./npy/final')
+	X_array, Y_array = TK.Task_max(grid_limit=[(45, 60), (45, 60)], generate_data=True)
+	print(X_array.shape)

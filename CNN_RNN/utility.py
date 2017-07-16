@@ -1,7 +1,24 @@
 from sklearn import preprocessing
 from datetime import datetime
 import pytz
-# import numpy as np
+import os
+import numpy as np
+
+
+def compute_row_col(grid_id):
+	grid_row_num = 100
+	grid_column_num = 100
+	row = 99 - int(grid_id / grid_row_num)  # row mapping to milan grid
+	column = grid_id % grid_column_num - 1
+	# print(row, column)
+	return int(row), int(column)
+
+
+def comput_grid_id(row, col):
+	Y = 99 - row
+	X = col + 1
+	grid_id = Y * 100 + X
+	return grid_id
 
 
 def feature_scaling(input_datas, scaler=None, feature_range=(0.1, 255)):
@@ -38,3 +55,67 @@ def set_time_zone(timestamp):
 
 def date_time_covert_to_str(date_time):
 	return date_time.strftime('%m-%d %H')
+
+
+def check_path_exist(path):
+	if not os.path.exists(path):
+		os.makedirs(path)
+
+
+def AE_loss(real, predict):
+	AE = np.absolute(real - predict)
+	AE_mean = AE.mean()
+	# print('AE:', AE_mean)
+	return AE_mean
+
+
+def RMSE_loss(real, predict):
+	MSE = (real - predict) ** 2
+	RMSE = np.sqrt(MSE.mean())
+	# print('RMSE:', RMSE)
+	return RMSE
+
+
+def MAPE_loss(real, predict):
+	mean_real = real.mean()
+	AE = np.absolute(real - predict)
+	MAPE = np.divide(AE, mean_real)
+	MAPE_mean = MAPE.mean()
+	if MAPE_mean > 1 or MAPE_mean < 0:
+		print('Error! MAPE:{} AE_mean:{} mean_real:{}'.format(MAPE_mean, AE.mean(), mean_real))
+		MAPE_mean = None
+	return MAPE_mean
+
+
+def MAPE_loss_without_real_mean(real, predict):
+	mean_real = real
+	AE = np.absolute(real - predict)
+	MAPE = np.divide(AE, mean_real)
+	MAPE_mean = MAPE.mean()
+	if MAPE_mean > 1 or MAPE_mean < 0:
+		print('Error! MAPE:{} AE_mean:{}'.format(MAPE_mean, AE.mean()))
+		# MAPE_mean = None
+	return MAPE_mean
+
+
+def find_in_obj(obj, condition, path=None):
+	if path is None:
+		path = []
+
+	if isinstance(obj, list):
+		for index, value in enumerate(obj):
+			new_path = list(path)
+			new_path.append(index)
+			for result in find_in_obj(value, condition, path=new_path):
+				yield result
+	if isinstance(obj, dict):
+		for key, value in obj.items():
+			new_path = list(path)
+			new_path.append(key)
+			for result in find_in_obj(value, condition, path=new_path):
+				yield result
+
+			if condition == key:
+				new_path = list(path)
+				new_path.append(key)
+				yield new_path

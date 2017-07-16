@@ -48,7 +48,8 @@ def one_hour_min_value():
 		filelist.sort()
 		du.load_data_hour_min(input_dir, filelist)
 
-# one_hour_average_value()
-# one_hour_max_value()
-# rolling_10_minutes()
+
+one_hour_average_value()
+one_hour_max_value()
+rolling_10_minutes()
 one_hour_min_value()

@@ -1,7 +1,7 @@
 import os
 import json
 import numpy as np
-from CNN_RNN import CNN_RNN
+from CNN_RNN import CNN_RNN_2
 from collections import OrderedDict
 import operator
 import itertools
@@ -10,14 +10,27 @@ import shutil
 import random
 from pprint import pprint
 
+
 class HyperParameterConfig:
 	def __init__(self):
-		self.iter_epoch = 600
-		self.batch_size = 40
+		self.iter_epoch = 2000
+		self.batch_size = 50
 		self.learning_rate = 0.0014
-		self.keep_rate = 0.9
+		self.keep_rate = 0.85
 		self.weight_decay = 0.001
 
+		'''share layer Dense'''
+		self.fully_connected_W_init = 'xavier'
+		self.fully_connected_units = 512
+
+		'''prediction layer'''
+		self.prediction_layer_1_W_init = 'xavier'
+		self.prediction_layer_1_uints = 64
+
+		self.prediction_layer_2_W_init = 'xavier'
+		self.prediction_layer_keep_rate = 0.85
+
+	def CNN_RNN(self):
 		'''build_bi_RNN_network'''
 		self.RNN_num_layers = 4
 		self.RNN_num_step = 6
@@ -57,16 +70,42 @@ class HyperParameterConfig:
 		self.CNN_layer_2_pooling_strides = [1, 1, 1, 1]
 		self.CNN_layer_2_pooling = 'avg_pool'
 
-		'''share layer Dense'''
-		self.fully_connected_W_init = 'xavier'
-		self.fully_connected_units = 512
 
-		'''prediction layer'''
-		self.prediction_layer_1_W_init = 'xavier'
-		self.prediction_layer_1_uints = 256
+	def CNN_RNN_2(self):
+		'''build_bi_RNN_network'''
+		self.CNN_layer_activation_fn = 'relu'
+		self.RNN_num_layers = 2
+		self.RNN_num_step = 6
+		self.RNN_hidden_node_size = 128
+		self.RNN_cell = 'LSTMcell'
+		self.RNN_cell_init_args = {'forget_bias': 1.0, 'use_peepholes': True, 'state_is_tuple': True}
+		self.RNN_init_state_noise_stddev = 0.2
+		self.RNN_initializer = 'xavier'
 
-		self.prediction_layer_2_W_init = 'xavier'
-		self.prediction_layer_keep_rate = 0.8
+		'''build_CNN_network'''
+		self.CNN_layer_1_kernel_shape = [5, 5, 1, 32]
+		self.CNN_layer_1_strides = [1, 1, 1, 1]
+		self.CNN_layer_1_conv_Winit = 'xavier'
+
+		self.CNN_layer_1_pooling = 'max_pool'
+		self.CNN_layer_1_pooling_ksize = [1, 2, 2, 1]
+		self.CNN_layer_1_pooling_strides = [1, 2, 2, 1]
+
+		self.CNN_layer_2_kernel_shape = [5, 5, 32, 64]
+		self.CNN_layer_2_strides = [1, 1, 1, 1]
+		self.CNN_layer_2_conv_Winit = 'xavier'
+
+		self.CNN_layer_2_pooling_ksize = [1, 2, 2, 1]
+		self.CNN_layer_2_pooling_strides = [1, 1, 1, 1]
+		self.CNN_layer_2_pooling = 'avg_pool'
+
+		self.CNN_layer_3_kernel_shape = [5, 5, 64, 64]
+		self.CNN_layer_3_strides = [1, 1, 1, 1]
+		self.CNN_layer_3_conv_Winit = 'xavier'
+
+		self.CNN_layer_3_pooling_ksize = [1, 2, 2, 1]
+		self.CNN_layer_3_pooling_strides = [1, 1, 1, 1]
+		self.CNN_layer_3_pooling = 'avg_pool'
 
 	def get_variable(self):
 		# total = vars(self)
@@ -97,6 +136,7 @@ class HyperParameterConfig:
 			data = json.load(data_file)
 		for key, value in data.items():
 			setattr(self, key, value)
+
 
 class GridSearch():
 	def __init__(self, X_array, Y_array):
@@ -349,7 +389,7 @@ class GridSearch():
 			os.makedirs(self.basic_result_path)
 		self._run_grid_search(iterator, set_attr)
 
-	def _search_CNN(self):
+	def _search_CNN_RNN(self):
 		def random_choise(hyper_list):
 			return random.choice(hyper_list)
 
@@ -370,8 +410,57 @@ class GridSearch():
 		self.hyper_config.CNN_layer_1_pooling = random_choise(pooling_list)
 		self.hyper_config.CNN_layer_2_pooling = random_choise(pooling_list)
 
+	def _search_CNN_RNN_2(self):
+		def random_choise(hyper_list):
+			return random.choice(hyper_list)
 
-	def random_grid_search(self):
+		pooling_list = ['max_pool', 'avg_pool']
+		ksize_list = [[1, 2, 2, 1], [1, 3, 3, 1], [1, 4, 4, 1], [1, 5, 5, 1], [1, 6, 6, 1]]
+		stride_list = [[1, 1, 1, 1], [1, 2, 2, 1], [1, 3, 3, 1], [1, 5, 5, 1], [1, 6, 6, 1]]
+
+		base_index = range(4, 7)
+		kernal_size_list = list(map(lambda x: 2 ** x, base_index))
+		kernel_height_width_list = list(range(2, 7))
+
+		layer_1_kernel_size = random_choise(kernal_size_list)
+		layer_2_kernel_size = random_choise(kernal_size_list)
+		layer_3_kernel_size = random_choise(kernal_size_list)
+
+		layer_1_kernel_height_width = random_choise(kernel_height_width_list)
+		layer_2_kernel_height_width = random_choise(kernel_height_width_list)
+		layer_3_kernel_height_width = random_choise(kernel_height_width_list)
+
+		# self.hyper_config.CNN_layer_1_kernel_shape[3] = layer_1_kernel_size
+		self.hyper_config.CNN_layer_1_kernel_shape[0] = layer_1_kernel_height_width
+		self.hyper_config.CNN_layer_1_kernel_shape[1] = layer_1_kernel_height_width
+
+		self.hyper_config.CNN_layer_1_kernel_shape[0] = layer_2_kernel_height_width
+		self.hyper_config.CNN_layer_1_kernel_shape[1] = layer_2_kernel_height_width
+		# self.hyper_config.CNN_layer_2_kernel_shape[2] = layer_1_kernel_size
+		# self.hyper_config.CNN_layer_2_kernel_shape[3] = layer_2_kernel_size
+
+		self.hyper_config.CNN_layer_3_kernel_shape[0] = layer_3_kernel_height_width
+		self.hyper_config.CNN_layer_3_kernel_shape[1] = layer_3_kernel_height_width
+		# self.hyper_config.CNN_layer_3_kernel_shape[2] = layer_2_kernel_size
+		# self.hyper_config.CNN_layer_3_kernel_shape[3] = layer_3_kernel_size
+
+		self.hyper_config.CNN_layer_1_strides = random_choise(stride_list)
+		self.hyper_config.CNN_layer_2_strides = random_choise(stride_list)
+		self.hyper_config.CNN_layer_3_strides = random_choise(stride_list)
+
+		self.hyper_config.CNN_layer_1_pooling = random_choise(pooling_list)
+		self.hyper_config.CNN_layer_2_pooling = random_choise(pooling_list)
+		self.hyper_config.CNN_layer_3_pooling = random_choise(pooling_list)
+
+		self.hyper_config.CNN_layer_1_pooling_ksize = random_choise(ksize_list)
+		self.hyper_config.CNN_layer_2_pooling_ksize = random_choise(ksize_list)
+		self.hyper_config.CNN_layer_3_pooling_ksize = random_choise(ksize_list)
+
+		self.hyper_config.CNN_layer_1_pooling_strides = random_choise(stride_list)
+		self.hyper_config.CNN_layer_2_pooling_strides = random_choise(stride_list)
+		self.hyper_config.CNN_layer_3_pooling_strides = random_choise(stride_list)
+
+	def random_grid_search(self, task_name='random_search'):
 		base_index = range(5, 11)
 		fully_connected_list = list(map(lambda x: 2 ** x, base_index))
 		prediction_nodes_list = list(map(lambda x: 2 ** x, base_index))
@@ -384,6 +473,7 @@ class GridSearch():
 		learning_rate_list = list(np.random.uniform(0.0001, 0.002, 100))
 		RNN_init_state_noise_stddev_list = list(np.random.uniform(0.001, 0.9, 100))
 		self.hyper_config = HyperParameterConfig()
+		self.hyper_config.CNN_RNN_2()
 		result_summary = OrderedDict()
 
 		def delete_dir(dir_index, obj):
@@ -411,7 +501,7 @@ class GridSearch():
 			setattr(self.hyper_config, set_attribution, para)
 
 		def run_random_search(run_index):
-
+			'''
 			fully_connected = random_choise(fully_connected_list)
 			set_attr('fully_connected_units', fully_connected)
 
@@ -441,8 +531,8 @@ class GridSearch():
 
 			RNN_init_state_noise_stddev = random_choise(RNN_init_state_noise_stddev_list)
 			set_attr('RNN_init_state_noise_stddev', RNN_init_state_noise_stddev)
-
-			self._search_CNN()
+			'''
+			self._search_CNN_RNN_2()
 
 			save_model_path = os.path.join(
 				self.basic_result_path,
@@ -458,10 +548,10 @@ class GridSearch():
 				'save_path': save_model_path,
 				'result_path': result_path
 			}
-			result = self._run_CNN_RNN(model_path, self.hyper_config)
+			result = self._run_neural_network(model_path, self.hyper_config, CNN_RNN_2)
 			return result
 
-		self.search_task_name = 'random_search'
+		self.search_task_name = task_name
 		self.basic_result_path = '/home/mldp/ML_with_bigdata/CNN_RNN/result/'
 		self.basic_result_path = os.path.join(self.basic_result_path, self.search_task_name)
 		report_path = os.path.join(self.basic_result_path, self.search_task_name + '.txt')
@@ -470,7 +560,7 @@ class GridSearch():
 
 		for run_index in range(200):
 			result_summary[str(run_index)] = run_random_search(run_index)
-			delete_dir(run_index, result_summary[str(run_index)])
+			# delete_dir(run_index, result_summary[str(run_index)])
 			if run_index % 5 == 0 and run_index is not 0:
 				max_pairs = self._find_highest_accu(result_summary)
 				with open(report_path, 'w') as outfile:
@@ -542,17 +632,14 @@ class GridSearch():
 				print(line)
 				outfile.write(line + '\n')
 
-	def _run_CNN_RNN(self, model_path, config):
+	def _run_neural_network(self, model_path, config, neural_network):
 		input_data_shape = [self.X_array.shape[1], self.X_array.shape[2], self.X_array.shape[3], self.X_array.shape[4]]
 		output_data_shape = [self.Y_array.shape[1], self.Y_array.shape[2], self.Y_array.shape[3], 1]
-		cnn_rnn = CNN_RNN(input_data_shape, output_data_shape, config)
+		cnn_rnn = neural_network(input_data_shape, output_data_shape, config)
 		cnn_rnn.create_MTL_task(self.X_array, self.Y_array[:, :, :, :, 0, np.newaxis], 'min_traffic')
 		cnn_rnn.create_MTL_task(self.X_array, self.Y_array[:, :, :, :, 1, np.newaxis], 'avg_traffic')
 		cnn_rnn.create_MTL_task(self.X_array, self.Y_array[:, :, :, :, 2, np.newaxis], 'max_traffic')
 		return cnn_rnn.start_MTL_train(model_path, reload=False)
-
-
-
 
 
 if __name__ == '__main__':
