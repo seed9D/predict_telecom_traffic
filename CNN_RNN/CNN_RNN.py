@@ -335,8 +335,9 @@ class Multitask_Neural_Network(Tf_Utility):
 		return L2_loss
 
 	def __set_training_data(self, input_x, input_y, task_name):
-		print('input_x shape:{}'.format(input_x.shape))
-		print('input_y shape:{}'.format(input_y.shape))
+
+		# print('input_x shape:{}'.format(input_x.shape))
+		# print('input_y shape:{}'.format(input_y.shape))
 		self.Y_temporal = input_y.shape[1]
 		self.Y_vertical = input_y.shape[2]
 		self.Y_horizontal = input_y.shape[3]
@@ -481,12 +482,13 @@ class Multitask_Neural_Network(Tf_Utility):
 		plt.pause(0.001)
 
 	def start_STL_predict(self, testing_x, testing_y, model_path, task_name):
-		print('input_x shape {}'.format(testing_x.shape))
-		print('input_y shape {}'.format(testing_y.shape))
-		self.print_all_layers()
+
+		print('testing_x shape {}'.format(testing_x.shape))
+		print('testing_y shape {}'.format(testing_y.shape))
+		# self.print_all_layers()
 		with tf.Session() as sess:
 			self.reload_model(sess, self.saver, model_path['reload_path'])
-			testing_loss, testing_accu, prediction = self._MTL_testing_data(sess, testing_x, testing_y[0], task_name)
+			testing_loss, testing_accu, prediction = self._MTL_testing_data(sess, testing_x, testing_y, task_name)
 
 			print('preddict finished!')
 			print('task {}: accu:{} MSE:{}'.format(task_name, testing_accu, testing_loss))
@@ -727,11 +729,17 @@ class Multitask_Neural_Network(Tf_Utility):
 		return self.__summarized_report()
 
 	def start_STL_train(self, model_path, task_name, reload=False):
+		def early_stop(epoch, task_name):
+			task = self.multi_task_dic[task_name]
+			Flag = False
+			if epoch >= 100:
+				if task['testing_accurcy_history'][-1] > 0.7:
+						Flag = True
+			return Flag
 		display_step = 50
 		epoch_his = []
 		plt.ion()
 		fig = plt.figure(task_name)
-		result_path = model_path['result_path']
 		with tf.Session() as sess:
 			coord = tf.train.Coordinator()
 			treads = tf.train.start_queue_runners(sess=sess, coord=coord)
@@ -749,16 +757,20 @@ class Multitask_Neural_Network(Tf_Utility):
 						# print()
 						epoch_his.append(epoch)
 
-				if epoch % 500 == 0 and epoch is not 0:
-					self.save_model(sess, self.saver, model_path['save_path'])
+					if epoch % 500 == 0 and epoch is not 0:
+						self.save_model(sess, self.saver, model_path['save_path'])
 
+					flag = early_stop(epoch, task_name)
+					if flag:
+						break
 			coord.request_stop()
 			coord.join(treads)
 			print('training finished!')
 			self.save_model(sess, self.saver, model_path['save_path'])
-			self.save_result_report(result_path)
+			# self.save_result_report(result_path)
 			plt.ioff()
 		# plt.show()
+
 
 class CNN_3D(Multitask_Neural_Network):
 	def __init__(self, input_data_shape, output_data_shape, config):
@@ -1673,7 +1685,6 @@ class concurrent_CNN_RNN(Multitask_Neural_Network):
 		self.prediction_layer_1_uints = config.prediction_layer_1_uints
 		self.prediction_layer_2_W_init = self.parse_initializer_method(config.prediction_layer_2_W_init)
 		self.prediction_layer_keep_rate = config.prediction_layer_keep_rate
-
 		self.hyper_config = config
 
 

@@ -1,7 +1,5 @@
 import numpy as np
-import matplotlib.pyplot as plt
 import utility
-import report_func
 import CNN_RNN_config
 from CNN_RNN import CNN_RNN, CNN_3D, RNN
 import sys
@@ -190,6 +188,12 @@ def train_CNN_RNN(X_array, Y_array):
 
 
 def train_STL_CNN_RNN_(X_array, Y_array):
+	task_index = {
+		'min_traffic': 0,
+		'avg_traffic': 1,
+		'max_traffic': 2
+	}
+
 	def run_task(X_array, Y_array, task_name):
 		input_data_shape = [X_array.shape[1], X_array.shape[2], X_array.shape[3], X_array.shape[4]]
 		output_data_shape = [Y_array.shape[1], Y_array.shape[2], Y_array.shape[3], 1]
@@ -205,19 +209,18 @@ def train_STL_CNN_RNN_(X_array, Y_array):
 		}
 		hyper_config = CNN_RNN_config.HyperParameterConfig()
 		hyper_config.read_config(file_path=os.path.join(root_dir, 'CNN_RNN/result/random_search_0609/_85/config.json'))
-		hyper_config.iter_epoch = 100
+		hyper_config.iter_epoch = 500
 		neural = CNN_RNN(input_data_shape, output_data_shape, hyper_config)
-		neural.create_MTL_task(X_array, Y_array[:, :, :, :, 0, np.newaxis], 'min_traffic')
-		neural.create_MTL_task(X_array, Y_array[:, :, :, :, 1, np.newaxis], 'avg_traffic')
-		neural.create_MTL_task(X_array, Y_array[:, :, :, :, 2, np.newaxis], 'max_traffic')
+		neural.create_MTL_task(X_array, Y_array[:, :, :, :, task_index[task_name], np.newaxis], task_name)
+		# neural.create_MTL_task(X_array, Y_array[:, :, :, :, 1, np.newaxis], 'avg_traffic')
+		# neural.create_MTL_task(X_array, Y_array[:, :, :, :, 2, np.newaxis], 'max_traffic')
 		del X_array, Y_array
 		neural.start_STL_train(model_path, task_name, reload=False)
 		return neural
 
-	max_neural = run_task(X_array, Y_array, 'max_traffic')
-	avg_neural = run_task(X_array, Y_array, 'avg_traffic')
-	min_neural = run_task(X_array, Y_array, 'min_traffic')
-	return min_neural, avg_neural, max_neural
+	run_task(X_array, Y_array, 'max_traffic')
+	run_task(X_array, Y_array, 'avg_traffic')
+	run_task(X_array, Y_array, 'min_traffic')
 
 
 def predict_(neural, X_array, Y_array, model_path, batch_size):
@@ -344,26 +347,31 @@ def predict_CNN_RNN(X_array, Y_array, scaler, Neural=None):
 	return Y_array
 
 
-def predict_STL_CNN_RNN(X_array, Y_array, scaler, Neural=None):
-	def STL_predict(neural, X_array, Y_array, model_path, batch_size, task_name):
-		def predict_remainder(neural, X_array, Y_array, model_path, batch_size, task_name):
-			array_len = X_array.shape[0]
-			n_remain = array_len % batch_size
-			new_x = X_array[array_len - batch_size:]
-			new_y = Y_array[array_len - batch_size:]
-			print('new_x, new_y', new_x.shape, new_y.shape)
-			prediction = neural.start_STL_predict(neural, new_x, new_y, model_path, task_name)
-			remainder_prediction = prediction[prediction.shape[0] - n_remain:]
-			return remainder_prediction
+def predict_STL_CNN_RNN(X_array, Y_array, scaler):
+	task_index = {
+		'min_traffic': 0,
+		'avg_traffic': 1,
+		'max_traffic': 2
+	}
 
-		y_prediction = neural.start_STL_predict(neural, X_array, Y_array, model_path)
-		# print(y_prediction.shape, Y_array.shape)
-		remain_predcition = predict_remainder(neural, X_array, Y_array, model_path, batch_size)
-		y_prediction = np.concatenate((y_prediction, remain_predcition), axis=0)
+	def run_task(X_array, Y_array, task_name, scaler):
+		def STL_predict(neural, X_array, Y_array, model_path, batch_size, task_name):
+			def predict_remainder(neural, X_array, Y_array, model_path, batch_size, task_name):
+				array_len = X_array.shape[0]
+				n_remain = array_len % batch_size
+				new_x = X_array[array_len - batch_size:]
+				new_y = Y_array[array_len - batch_size:]
+				# print('new_x, new_y', new_x.shape, new_y.shape)
+				prediction = neural.start_STL_predict(new_x, new_y, model_path, task_name)
+				remainder_prediction = prediction[prediction.shape[0] - n_remain:]
+				return remainder_prediction
+			# print(X_array.shape, Y_array.shape)
+			y_prediction = neural.start_STL_predict(X_array, Y_array, model_path, task_name)
+			# print(y_prediction.shape, Y_array.shape)
+			remain_predcition = predict_remainder(neural, X_array, Y_array, model_path, batch_size, task_name)
+			y_prediction = np.concatenate((y_prediction, remain_predcition), axis=0)
 
-		return y_prediction
-
-	def run_task(X_array, Y_array, task_name, scaler, *Neural):
+			return y_prediction
 		hyper_config = CNN_RNN_config.HyperParameterConfig()
 		hyper_config.read_config(file_path=os.path.join(
 			root_dir, 'CNN_RNN/result/random_search_0609/_85/config.json'))
@@ -375,29 +383,38 @@ def predict_STL_CNN_RNN(X_array, Y_array, scaler, Neural=None):
 			'reload_path': reload_path,
 			'save_path': '/home/mldp/ML_with_bigdata/CNN_RNN/output_model/CNN_RNN_all.ckpt'
 		}
-		if Neural:
-			neural = Neural
-		# else:
-		# 	neural = CNN_RNN(input_data_shape, output_data_shape, hyper_config)
-		# 	neural.create_MTL_task(X_array, Y_array[:, :, :, :, 2, np.newaxis], 'min_traffic')
-		# 	neural.create_MTL_task(X_array, Y_array[:, :, :, :, 3, np.newaxis], 'avg_traffic')
-		# 	neural.create_MTL_task(X_array, Y_array[:, :, :, :, 4, np.newaxis], 'max_traffic')
 
-		Y_info = Y_array[:, :, :, :, :2]
-		Y_real = Y_array[:, :, :, :, 2:]
+		input_data_shape = [X_array.shape[1], X_array.shape[2], X_array.shape[3], 1]
+		output_data_shape = [Y_array.shape[1], Y_array.shape[2], Y_array.shape[3], 1]
 
-		prediction_y = STL_predict(neural, X_array[:, :, :, :, 2:], Y_real, model_path, batch_size, task_name)
+		neural = CNN_RNN(input_data_shape, output_data_shape, hyper_config)
+		neural.create_MTL_task(X_array, Y_array[:, :, :, :, task_index[task_name], np.newaxis], task_name)
+		# neural.create_MTL_task(X_array, Y_array[:, :, :, :, task_index['avg_traffic'], np.newaxis], 'avg_traffic')
+		# neural.create_MTL_task(X_array, Y_array[:, :, :, :, task_index['max_traffic'], np.newaxis], 'max_traffic')
+
+		y_task_real = Y_array[:, :, :, :, task_index[task_name], np.newaxis]
+		prediction_y = STL_predict(neural, X_array, y_task_real, model_path, batch_size, task_name)
 		prediction_y = utility.un_feature_scaling(prediction_y, scaler)
-		Y_real = utility.un_feature_scaling(Y_real, scaler)
-		Y_array = np.concatenate((Y_info, Y_real, prediction_y), axis=-1)
-		return Y_array
-	min_neural, avg_neural, max_neural = Neural
-	min_Y_array = run_task(X_array[:, :, :, :, 2:], Y_array[:, :, :, :, 2:3], 'min_traffic', scaler, min_neural)
-	avg_Y_array = run_task(X_array[:, :, :, :, 2:], Y_array[:, :, :, :, 3:4], 'min_traffic', scaler, avg_neural)
-	max_Y_array = run_task(X_array[:, :, :, :, 2:], Y_array[:, :, :, :, 4:5], 'min_traffic', scaler, max_neural)
-	print(min_Y_array.shape, avg_Y_array.shape, max_Y_array.shape)
-
-	return Y_array
+		y_task_real = utility.un_feature_scaling(y_task_real, scaler)
+		Y_task_real_prediction = np.concatenate((y_task_real, prediction_y), axis=-1)
+		return Y_task_real_prediction
+	# print('X', X_array.shape)
+	min_Y_real_prediction = run_task(X_array[:, :, :, :, 2:], Y_array[:, :, :, :, 2:], 'min_traffic', scaler)
+	avg_Y_real_prediction = run_task(X_array[:, :, :, :, 2:], Y_array[:, :, :, :, 2:], 'avg_traffic', scaler)
+	max_Y_real_prediction = run_task(X_array[:, :, :, :, 2:], Y_array[:, :, :, :, 2:], 'max_traffic', scaler)
+	# print(min_Y_real_prediction.shape, avg_Y_real_prediction.shape, max_Y_real_prediction.shape)
+	Y_info = Y_array[:, :, :, :, :2]
+	# print(Y_info.shape)
+	Y_real_prediction = np.concatenate((
+		Y_info,
+		min_Y_real_prediction[:, :, :, :, 0, np.newaxis],
+		avg_Y_real_prediction[:, :, :, :, 0, np.newaxis],
+		max_Y_real_prediction[:, :, :, :, 0, np.newaxis],
+		min_Y_real_prediction[:, :, :, :, 1, np.newaxis],
+		avg_Y_real_prediction[:, :, :, :, 1, np.newaxis],
+		max_Y_real_prediction[:, :, :, :, 1, np.newaxis]), axis=-1)
+	print('Y_real_prediction', Y_real_prediction.shape)
+	return Y_real_prediction
 
 def predict_ARIMA(input_array):
 	def try_differen_order(data_array, order_):
@@ -616,11 +633,11 @@ def loop_STL_CNN_RNN():
 			print('row_center:{} col_center:{}'.format(row_center, col_center))
 			row_range, col_range = compute_range_by_center(row_center, col_center)
 			X_train, Y_train, X_test, Y_test, scaler = get_network_input_and_output(X_all_train, Y_all_train, X_all_test, Y_all_test, row_range, col_range)
-			min_neural, avg_neural, max_neural = train_STL_CNN_RNN_(X_train[:, :, :, :, -1, np.newaxis], Y_train[:, :, :, :, 2:])
+			train_STL_CNN_RNN_(X_train[:, :, :, :, -1, np.newaxis], Y_train[:, :, :, :, 2:])
 
 			X_all = np.concatenate((X_train, X_test), axis=0)
 			Y_all = np.concatenate((Y_train, Y_test), axis=0)
-			traffic_data = predict_STL_CNN_RNN(X_all, Y_all, scaler, min_neural, avg_neural, max_neural)
+			traffic_data = predict_STL_CNN_RNN(X_all, Y_all, scaler)
 			store_report(traffic_data, store_path, row_center, col_center)
 			for i in range(traffic_data.shape[0]):
 				for j in range(traffic_data.shape[1]):
