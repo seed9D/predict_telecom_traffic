@@ -338,32 +338,45 @@ class CDR_to_Throughput(Env_Config):
 		return cell_grid
 
 	def _get_hour_CDR_internt_traffic(self, grid_list):
-		traffic_array_path = './result/real_prediction_traffic_array.npy'
-		traffic_array = du.load_array(traffic_array_path)
+		source_path = os.path.join(root_dir, 'offloading/npy/real_prediction_traffic_array.npy')
+		traffic_array = du.load_array(source_path)
+		traffic_array = np.transpose(traffic_array, (2, 3, 0, 1, 4))
 		traffic_list = []
-		for grid in grid_list:
+		for search_grid_id in grid_list:
 			# print('grid:{}'.format(grid))
-			row, column = compute_row_col(grid)
+			# row, column = compute_row_col(grid)
 			# print(row, column)
-			grid_traffic = traffic_array[:, :, row, column]
+			for row_index in range(traffic_array.shape[0]):
+				for col_index in range(traffic_array.shape[1]):
+					grid_id = traffic_array[row_index, col_index, 0, 0, 0]
+					if search_grid_id == grid_id:
+						grid_traffic = traffic_array[row_index, col_index, :, :]
 			traffic_list.append(grid_traffic)
 
 		traffic_array = np.stack(traffic_list)  # (grid_num, 1487, 1, 8)
-		print(traffic_array.shape)
+		print('hour_CDR_internt_traffic shape', traffic_array.shape)
 		return traffic_array
 
-	def _get_10mins_CDR_internet_traffic(self, grid_list, reload=False):
-		target_path = './npy/10min_CDR_internet_traffic.npy'
-
+	def _get_10mins_CDR_internet_traffic(self, grid_list, reload=True):
+		target_path = './npy/10min_CDR_internet_traffic_temp.npy'
+		source_path = os.path.join(root_dir, 'offloading/npy/10min_CDR_internet_traffic.npy')
 		if reload:
-			TK = Prepare_Task_Data('./npy/final/')
-			X_array, _ = TK.Task_max(grid_limit=[(0, 100), (0, 100)], generate_data=True)  # only need max here
+			# TK = Prepare_Task_Data('./npy/final/')
+			# X_array, _ = TK.Task_max(grid_limit=[(0, 100), (0, 100)], generate_data=True)  # only need max here
+			X_array = du.load_array(source_path)
+			X_array = np.transpose(X_array, (2, 3, 0, 1, 4))
 			array_list = []
-			for grid_id in grid_list:
-				row, column = compute_row_col(grid_id)
-				array_list.append(X_array[:, :, row, column, (0, 1, -1)])  # grid_id, timestamp, internet traffic
+			for search_grid_id in grid_list:
+				# row, column = compute_row_col(grid_id)
+				for row_index in range(X_array.shape[0]):
+					for col_index in range(X_array.shape[1]):
+						grid_id = X_array[row_index, col_index, 0, 0, 0]
+						if search_grid_id == grid_id:
+							new_x = X_array[row_index, col_index]
+							new_x = new_x[:, :, (0, 1, -1)]
+							array_list.append(new_x)  # grid_id, timestamp, internet traffic
 			_10mins_CDR_internet_traffic = np.stack(array_list)
-			# print(grid_array.shape)
+			print('_10mins_CDR_internet_traffic shape', _10mins_CDR_internet_traffic.shape)  # (grid_number, 1487, 6, 3)
 			du.save_array(_10mins_CDR_internet_traffic, target_path)
 		else:
 			_10mins_CDR_internet_traffic = du.load_array(target_path)
@@ -377,7 +390,7 @@ class CDR_to_Throughput(Env_Config):
 		self.cell_info = cell_grid[cell_index]
 		print('cell info', self.cell_info)
 		traffic_hour_real_prediciton_CDR_array = self._get_hour_CDR_internt_traffic(self.grid_list)
-		_10mins_CDR_internet_traffic = self._get_10mins_CDR_internet_traffic(self.grid_list, reload=False)
+		_10mins_CDR_internet_traffic = self._get_10mins_CDR_internet_traffic(self.grid_list, reload=True)
 
 		# self.CDR_threshold = self._evaluate_CDR_threshold(_10mins_CDR_internet_traffic)
 		# self._evaluate_saturation_factor()
@@ -388,7 +401,7 @@ class CDR_to_Throughput(Env_Config):
 		self._10mins_internet_traffic_demand = self._calculate_internet_traffic_demand(self._10mins_CDR_internet_traffic)
 
 	def _calculate_internet_traffic_demand(self, CDR_internet_traffic):
-		print(CDR_internet_traffic.shape)  # (1487, 6, 2)
+		print('CDR_internet_traffic shape', CDR_internet_traffic.shape)  # (1487, 6, 2)
 		internet_traffic_demand = np.zeros_like(CDR_internet_traffic, dtype=None, order='K', subok=True)
 		for hour_index in range(CDR_internet_traffic.shape[0]):
 			for ten_minutes_index in range(CDR_internet_traffic.shape[1]):
@@ -398,7 +411,7 @@ class CDR_to_Throughput(Env_Config):
 		return internet_traffic_demand
 
 	def _combine_grid_CDR(self, CDR_internet_traffic, slice_range=(2, 8)):
-		# print(CDR_internet_traffic.shape)
+		print('CDR_internet_traffic', CDR_internet_traffic.shape)
 		range_len = slice_range[1] - slice_range[0]
 		combine_grid_CDR = np.zeros((CDR_internet_traffic.shape[1], CDR_internet_traffic.shape[2], range_len + 1))
 		CDR_internet_traffic = np.transpose(CDR_internet_traffic, (1, 2, 0, 3))
@@ -561,8 +574,9 @@ class CDR_to_Throughput(Env_Config):
 
 
 class Milano_env(Env_Config):
-	def __init__(self):
+	def __init__(self, cell_index):
 		super().__init__()
+		self.cell_index = cell_index
 		self.n_small_cell = 5
 		self.action_space = list(range(0, 11))
 		self.n_actions = len(self.action_space)
@@ -570,7 +584,7 @@ class Milano_env(Env_Config):
 		self._get_throghput_data()
 
 	def _get_throghput_data(self):
-		CDR_2_thr = CDR_to_Throughput(cell_index=867)
+		CDR_2_thr = CDR_to_Throughput(cell_index=self.cell_index)
 		# self.hour_traffic_throughput_array = CDR_2_thr.hour_traffic_throughput_array  # (?, 1, 7) 7: gird_id, timestamp, real_min, real_avg, real_max, prediction_min, prediction_avg, prediction_max
 		# self.ten_minutes_traffic_throughput_array = CDR_2_thr.ten_minutes_traffic_throughput_array  # (?, 6, 2): 6: one hour 6 data. 3: timestamp, network_traffic
 		self.cell_info = CDR_2_thr.cell_info
@@ -582,9 +596,10 @@ class Milano_env(Env_Config):
 		# print('one hour traffic shape', one_hour_traffic.shape, '10 minutes traffice shape', _10min_traffic.shape)
 		num_of_cell = 1 + num_of_small_cell
 		epoch_time = 60 * 10  # seconds
-		total_power_consumptino = 0
+		total_power_consumption = 0
 		totol_internet_traffic = 0
-
+		macro_load_list = []
+		
 		def get_Macro_power(radio_type):
 			if radio_type == 'UMTS':
 				Power = self.p_total_UMTS
@@ -659,7 +674,7 @@ class Milano_env(Env_Config):
 				Small_energy_consumption = epoch_time * self.P_Small_cst + self.P_Small_tx_power_factor * small_load_rate * epoch_time * self.P_Small_tx
 				small_cell_energy_efficiency = small_each_responsible_interent_traffic / Small_energy_consumption
 				# print('Small cell:load_rate:{:.4f}, energy_consumption:{:.4f} energy_effi:{:.4f}'.format(small_load_rate, Small_energy_consumption, small_cell_energy_efficiency))
-				total_power_consumptino += Small_energy_consumption * 4
+				total_power_consumption += Small_energy_consumption * 4
 				totol_internet_traffic += small_each_responsible_interent_traffic * 4
 			else:
 				macro_resposible_interent_traffic = request_internet_traffic_demand
@@ -669,20 +684,35 @@ class Milano_env(Env_Config):
 			macro_load_rate = macro_cell_load_time / epoch_time
 			macro_energy_comsumption = epoch_time * self.P_Macro_cst + self.P_Macro_tx_power_factor * self.P_Macro_tx * macro_load_rate * epoch_time
 			macro_energy_efficiency = macro_resposible_interent_traffic / macro_energy_comsumption
-			print('Macro cell:load_rate:{:.4f}, energy_consumption:{:.4f} energy_effi:{:.4f}'.format(macro_load_rate, macro_energy_comsumption, macro_energy_efficiency))
-
-			total_power_consumptino += macro_energy_comsumption
+			# print('Macro cell:load_rate:{:.4f}, energy_consumption:{:.4f} energy_effi:{:.4f}'.format(macro_load_rate, macro_energy_comsumption, macro_energy_efficiency))
+			macro_load_list.append(macro_load_rate)
+			total_power_consumption += macro_energy_comsumption
 			totol_internet_traffic += macro_resposible_interent_traffic
 
-		location_energy_effi = totol_internet_traffic / total_power_consumptino
+		location_energy_effi = totol_internet_traffic / total_power_consumption
 		# print('hour location_energy_effi', location_energy_effi)
-		return location_energy_effi
+		return location_energy_effi, macro_load_list
+
+	def _reward(self, _10min_traffic, action):
+		threshold = 0.7
+		energy_effi, macro_load_rate_list = self._calculate_energy_efficiency(_10min_traffic, action)
+		reward = energy_effi
+		for macro_load_rate in macro_load_rate_list:
+			if macro_load_rate > threshold:
+				macro_load_rate_Eva = np.exp(macro_load_rate - threshold)
+				reward -= macro_load_rate_Eva
+			else:
+				macro_load_rate_Eva = np.exp(threshold - macro_load_rate)
+				reward += macro_load_rate_Eva
+
+		print('energy effi:{} macro load list:{} reward:{}'.format(energy_effi, macro_load_rate_list, reward))
+		return reward, energy_effi
 
 	def step(self, action):
 		done = False
 		try:
 			env = next(self.env_iter)
-			reward = self._calculate_energy_efficiency(env[1], action)
+			reward = self._reward(env[1], action)
 			env = env[0][0, 4:]
 		except StopIteration:
 			print('StopIteration')

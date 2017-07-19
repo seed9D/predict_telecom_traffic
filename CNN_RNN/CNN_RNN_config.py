@@ -1,7 +1,7 @@
 import os
 import json
 import numpy as np
-from CNN_RNN import CNN_RNN_2
+# from CNN_RNN import CNN_RNN_2
 from collections import OrderedDict
 import operator
 import itertools

@@ -4,7 +4,6 @@ import matplotlib.pyplot as plt
 import numpy as np
 from math import sqrt
 import os
-import CNN_RNN_config
 
 
 class Tf_Utility:
@@ -1687,9 +1686,3 @@ class concurrent_CNN_RNN(Multitask_Neural_Network):
 		self.hyper_config = config
 
 
-if __name__ == '__main__':
-	X_data_shape = [6, 15, 15, 1]
-	Y_data_shape = [1, 3, 3, 1]
-	hyper_config = CNN_RNN_config.HyperParameterConfig()
-	neural = CNN_3D(X_data_shape, Y_data_shape, hyper_config)
-	neural.print_all_layers()

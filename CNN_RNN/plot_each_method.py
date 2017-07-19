@@ -447,7 +447,7 @@ def evaluate_MTL_and_STL():
 			row, col = utility.compute_row_col(grid_id)
 			data_array[row, col] = value
 
-		plt.imshow(data_array.T, vmin=-50, vmax=50, cmap=plt.get_cmap('bwr'))
+		plt.imshow(data_array.T, vmin=-10, vmax=10, cmap=plt.get_cmap('bwr'))
 		plt.grid(True)
 		plt.colorbar()
 		plt.show()
