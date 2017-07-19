@@ -222,75 +222,90 @@ def evaluate_accuracy_composition():
 	def plot_count_bar(data_frame, title):
 		bins = np.arange(0, 1.1, 0.1, dtype=np.float)
 		# print(task_max_df)
-		cats_CNN_RNN = pd.cut(data_frame['CNN_RNN'], bins)
-		cats_CNN_3D = pd.cut(data_frame['CNN_3D'], bins)
+		cats_CNN_RNN_MTL = pd.cut(data_frame['CNN RNN(MTL)'], bins)
+		cats_CNN_RNN_STL = pd.cut(data_frame['CNN RNN(STL)'], bins)
+		cats_CNN_3D = pd.cut(data_frame['CNN 3D'], bins)
 		cats_RNN = pd.cut(data_frame['RNN'], bins)
 		cats_ARIMA = pd.cut(data_frame['ARIMA'], bins)
 		# print(cats)
-		CNN_RNN_grouped = data_frame['CNN_RNN'].groupby(cats_CNN_RNN)
-		CNN_3D_grouped = data_frame['CNN_3D'].groupby(cats_CNN_3D)
+		CNN_RNN_MTL_grouped = data_frame['CNN RNN(MTL)'].groupby(cats_CNN_RNN_MTL)
+		CNN_RNN_STL_grouped = data_frame['CNN RNN(STL)'].groupby(cats_CNN_RNN_STL)
+		CNN_3D_grouped = data_frame['CNN 3D'].groupby(cats_CNN_3D)
 		RNN_grouped = data_frame['RNN'].groupby(cats_RNN)
 		ARIMA_grouped = data_frame['ARIMA'].groupby(cats_ARIMA)
 
-		CNN_RNN_bin_counts = CNN_RNN_grouped.count()
+		CNN_RNN_MTL_bin_counts = CNN_RNN_MTL_grouped.count()
+		CNN_RNN_STL_bin_counts = CNN_RNN_STL_grouped.count()
 		CNN_3D_bin_counts = CNN_3D_grouped.count()
 		RNN_bin_counts = RNN_grouped.count()
 		ARIMA_bin_counts = ARIMA_grouped.count()
 		# print(CNN_3D_bin_counts)
 
-		bin_counts = pd.concat([ARIMA_bin_counts, RNN_bin_counts, CNN_3D_bin_counts, CNN_RNN_bin_counts], axis=1)
-		bin_counts.columns = ['ARIMA', 'RNN', 'CNN_3D', 'CNN_RNN']
+		bin_counts = pd.concat([ARIMA_bin_counts, RNN_bin_counts, CNN_3D_bin_counts, CNN_RNN_MTL_bin_counts, CNN_RNN_STL_bin_counts], axis=1)
+		bin_counts.columns = ['ARIMA', 'RNN', 'CNN 3D', 'CNN RNN(MTL)', 'CNN RNN(STL)']
 		bin_counts.index = ['0~10', '10~20', '20~30', '30~40', '40~50', '50~60', '60~70', '70~80', '80~90', '90~100']
 		bin_counts.index.name = 'Accuracy %'
 		ax = bin_counts.plot(kind='bar', alpha=0.7, rot=0, width=0.8)
 		for p in ax.patches:
 			ax.annotate(str(int(p.get_height())), xy=(p.get_x(), p.get_height()))
 
-		plt.legend()
+		plt.legend(loc='upper left', fontsize = 'large')
 		plt.title(title)
 		plt.ylabel('number of grids')
 		# print(bin_counts)
 
-	def convert_to_data_frame_by_task(CNN_RNN, CNN_3D, RNN, ARIMA):
+	def plot_KDE(data_frame, title):
+		data_frame = data_frame[['ARIMA', 'RNN', 'CNN 3D', 'CNN RNN(MTL)', 'CNN RNN(STL)']]
+		ax = data_frame.plot(kind='kde', title=title + ' KDE plot')
+		ax.set_xlabel('Accuracy')
+		ax.set_xlim(0.1, 1)
+
+	def convert_to_data_frame_by_task(CNN_RNN, CNN_3D, RNN, ARIMA, CNN_RNN_STL):
 		CNN_RNN_key_paths = list(utility.find_in_obj(CNN_RNN, 'Accuracy'))
 		CNN_3D_key_paths = list(utility.find_in_obj(CNN_3D, 'Accuracy'))
 		RNN_key_paths = list(utility.find_in_obj(RNN, 'Accuracy'))
 		ARIMA_key_paths = list(utility.find_in_obj(ARIMA, 'Accuracy'))
+		CNN_RNN_STL_key_paths = list(utility.find_in_obj(CNN_RNN_STL, 'Accuracy'))
 
 		CNN_RNN_accu_dict = task_value(CNN_RNN, CNN_RNN_key_paths)
 		CNN_3D_accu_dict = task_value(CNN_3D, CNN_3D_key_paths)
 		RNN_accu_dict = task_value(RNN, RNN_key_paths)
 		ARIMA_accu_dict = task_value(ARIMA, ARIMA_key_paths)
+		CNN_RNN_STL_accu_dict = task_value(CNN_RNN_STL, CNN_RNN_STL_key_paths)
 		# print(CNN_RNN_accu_dict['task_max'][-1], CNN_3D_accu_dict['task_max'][-1])
 
 		task_max_df = pd.DataFrame({
-			'CNN_RNN': CNN_RNN_accu_dict['task_max'],
-			'CNN_3D': CNN_3D_accu_dict['task_max'],
+			'CNN RNN(MTL)': CNN_RNN_accu_dict['task_max'],
+			'CNN RNN(STL)': CNN_RNN_STL_accu_dict['task_max'],
+			'CNN 3D': CNN_3D_accu_dict['task_max'],
 			'RNN': RNN_accu_dict['task_max'],
 			'ARIMA': ARIMA_accu_dict['task_max']})
 		task_max_df = task_max_df.dropna(axis=0, how='any')
 		# print(task_max_df.shape)
 
 		task_avg_df = pd.DataFrame({
-			'CNN_RNN': CNN_RNN_accu_dict['task_avg'],
-			'CNN_3D': CNN_3D_accu_dict['task_avg'],
+			'CNN RNN(MTL)': CNN_RNN_accu_dict['task_avg'],
+			'CNN RNN(STL)': CNN_RNN_STL_accu_dict['task_avg'],
+			'CNN 3D': CNN_3D_accu_dict['task_avg'],
 			'RNN': RNN_accu_dict['task_avg'],
 			'ARIMA': ARIMA_accu_dict['task_avg']})
 		task_avg_df = task_avg_df.dropna(axis=0, how='any')
 
 		task_min_df = pd.DataFrame({
-			'CNN_RNN': CNN_RNN_accu_dict['task_min'],
-			'CNN_3D': CNN_3D_accu_dict['task_min'],
+			'CNN RNN(MTL)': CNN_RNN_accu_dict['task_min'],
+			'CNN RNN(STL)': CNN_RNN_STL_accu_dict['task_min'],
+			'CNN 3D': CNN_3D_accu_dict['task_min'],
 			'RNN': RNN_accu_dict['task_min'],
 			'ARIMA': ARIMA_accu_dict['task_min']})
 		task_min_df = task_min_df.dropna(axis=0, how='any')
 
 		return task_min_df, task_avg_df, task_max_df
 
-	CNN_RNN_all_grid_result = './result/CNN_RNN/all_grid_result_report.txt'
+	CNN_RNN_all_grid_result = './result/CNN_RNN/all_grid_result_report_0718.txt'
 	CNN_3D_all_grid_result = './result/CNN_3D/all_grid_result_report.txt'
 	RNN_all_grid_result = './result/RNN/all_grid_result_report.txt'
 	ARIMA_all_grid_result = './result/ARIMA/all_grid_result_report.txt'
+	CNN_RNN_STL_all_grid_result = './result/CNN_RNN_STL/all_grid_result_report.txt'
 
 	with open(CNN_RNN_all_grid_result, 'r') as fp:
 		CNN_RNN = json.load(fp, encoding=None)
@@ -304,22 +319,35 @@ def evaluate_accuracy_composition():
 	with open(ARIMA_all_grid_result, 'r') as fp:
 		ARIMA = json.load(fp, encoding=None)
 
-	task_min, task_avg, task_max = convert_to_data_frame_by_task(CNN_RNN, CNN_3D, RNN, ARIMA)
+	with open(CNN_RNN_STL_all_grid_result, 'r') as fp:
+		CNN_RNN_STL = json.load(fp, encoding=None)
+
+	task_min, task_avg, task_max = convert_to_data_frame_by_task(CNN_RNN, CNN_3D, RNN, ARIMA, CNN_RNN_STL)
+	
 	print(task_min.describe())
 	print(task_avg.describe())
 	print(task_max.describe())
+
 	# task_min.plot.hist()
 	# task_avg.hist()
 	# task_max.plot.hist()
-	plot_count_bar(task_min, 'Task min')
-	plot_count_bar(task_avg, 'Task avg')
-	plot_count_bar(task_max, 'Task max')
+	plot_KDE(task_min, 'Task Min')
+	plot_KDE(task_avg, 'Task avg')
+	plot_KDE(task_max, 'Task Max')
+	# task_avg.plot(kind='kde')
+	plot_count_bar(task_min, 'Task Min')
+	plot_count_bar(task_avg, 'Task Avg')
+	plot_count_bar(task_max, 'Task Max')
 
 	plt.show()
 
 
 def evaluate_different_method():
 	def evaluate_performance(Y_real_prediction_array, file_path):
+		def print_total_report(task_report):
+			for task_name, ele in task_report.items():
+				print('{}: Accuracy:{:.4f} MAE:{:.4f} RMSE:{:.4f}'.format(task_name, ele['Accuracy'], ele['AE'], ele['RMSE']))
+
 		row_center_list = list(range(40, 80, 3))
 		col_center_list = list(range(30, 70, 3))
 		row_range = (row_center_list[0], row_center_list[-1])
@@ -340,28 +368,124 @@ def evaluate_different_method():
 		testing_real = testing_data[:, :, :, :, 2:5]
 		testing_prediction = testing_data[:, :, :, :, 5:]
 		report_dict = report_func.report_loss_accu(testing_info, testing_real, testing_prediction, file_path)
-		print(report_dict['total'])
+		print_total_report(report_dict['total'])
+		# print(report_dict['total'])
 	CNN_RNN_all_grid_path = './result/CNN_RNN/all_real_prediction_traffic_array.npy'
-	CNN_3D_all_grid_path = './result/CNN_3D/all_real_prediction_traffic_array.npy'
-	RNN_all_grid_path = './result/RNN/all_real_prediction_traffic_array.npy'
+	CNN_3D_all_grid_path = './result/CNN_3D/all_real_prediction_traffic_array_0718.npy'
+	RNN_all_grid_path = './result/RNN/all_real_prediction_traffic_array_0718.npy'
 	ARIMA_all_grid_path = './result/ARIMA/all_real_prediction_traffic_array.npy'
+	CNN_RNN_STL_all_grid_path = './result/CNN_RNN_STL/all_real_prediction_traffic_array_0715.npy'
 
-	CNN_RNN_array = du.load_array(CNN_RNN_all_grid_path)
-	CNN_3D_array = du.load_array(CNN_3D_all_grid_path)
-	RNN_array = du.load_array(RNN_all_grid_path)
+	# CNN_RNN_array = du.load_array(CNN_RNN_all_grid_path)
+	# CNN_3D_array = du.load_array(CNN_3D_all_grid_path)
+	# RNN_array = du.load_array(RNN_all_grid_path)
 	ARIMA_array = du.load_array(ARIMA_all_grid_path)
+	# CNN_RNN_STL_array = du.load_array(CNN_RNN_STL_all_grid_path)
 
-	evaluate_performance(CNN_RNN_array, './result/CNN_RNN/all_grid_result_report.txt')
-	evaluate_performance(CNN_3D_array, './result/CNN_3D/all_grid_result_report.txt')
-	evaluate_performance(RNN_array, './result/RNN/all_grid_result_report.txt')
+	# evaluate_performance(CNN_RNN_array, './result/CNN_RNN/all_grid_result_report.txt')
+	# evaluate_performance(CNN_3D_array, './result/CNN_3D/all_grid_result_report.txt')
+	# evaluate_performance(RNN_array, './result/RNN/all_grid_result_report.txt')
 	evaluate_performance(ARIMA_array, './result/ARIMA/all_grid_result_report.txt')
-	del CNN_RNN_array, CNN_3D_array, RNN_array, ARIMA_array
+	# evaluate_performance(CNN_RNN_STL_array, './result/CNN_RNN_STL/all_grid_result_report.txt')
+
+
+def evaluate_MTL_and_STL():
+	def task_value(obj, key_paths):
+		key_paths.sort(key=itemgetter(1), reverse=False)  # sorted by task_name
+		uni_task_key = []
+		task_groups = []
+		for k, g in groupby(key_paths, lambda x: x[1]):  # group by task
+			uni_task_key.append(k)
+			task_groups.append(list(g))
+		task_value_dict = {}
+		for task_index, each_task_name in enumerate(uni_task_key):
+			each_task_group = task_groups[task_index]
+			task_iter = iter(each_task_group)
+			# values = [reduce(getitem, ele, obj) for ele in task_iter]
+			grid_id_accu_list = []
+			for ele in task_iter:
+				accu = reduce(getitem, ele, obj)
+				grid_id_accu_list.append((ele[0], accu))  # (grid_id, accu)
+				grid_id_accu_list = sorted(grid_id_accu_list, key=itemgetter(0))  # sort by grid id
+			task_value_dict[each_task_name] = grid_id_accu_list
+
+		return task_value_dict
+
+	def convert_to_data_frame_by_task(method_dict):
+
+		def get_data_frame(method_dict, task_name):
+			MTL_task_df = pd.DataFrame({
+				'Grid_id': [ele[0] for ele in method_dict['CNN_RNN_MTL'][task_name]],
+				'MTL': [ele[1] for ele in method_dict['CNN_RNN_MTL'][task_name]]})
+			MTL_task_df = MTL_task_df.set_index('Grid_id')
+
+			STL_task_df = pd.DataFrame({
+				'Grid_id': [ele[0] for ele in method_dict['CNN_RNN_STL'][task_name]],
+				'STL': [ele[1] for ele in method_dict['CNN_RNN_STL'][task_name]]})
+			STL_task_df = STL_task_df.set_index('Grid_id')
+			task_df = pd.concat([MTL_task_df, STL_task_df], axis=1, join='outer')
+			task_df = task_df.dropna(axis=0, how='any')
+			return task_df
+
+		for key, obj in method_dict.items():
+			obj_key_path = list(utility.find_in_obj(obj, 'Accuracy'))  # key_path :[grid_id, task_type, 'Accuracy']
+			acc_dict = task_value(obj, obj_key_path)
+			method_dict[key] = acc_dict
+
+		max_df = get_data_frame(method_dict, 'task_max')
+		avg_df = get_data_frame(method_dict, 'task_avg')
+		min_df = get_data_frame(method_dict, 'task_min')
+		return min_df, avg_df, max_df
+		# print(method_dict)
+
+	def plot_improvement_heat_map(task_df):
+		improve_df = (task_df.loc[:, 'MTL'] - task_df.loc[:, 'STL']) * 100
+		improve_df.drop('total', inplace=True)
+		data_array = np.zeros([100, 100], dtype=float)
+		for i, value in enumerate(improve_df.values):
+			grid_id = int(improve_df.index[i])
+			row, col = utility.compute_row_col(grid_id)
+			data_array[row, col] = value
+
+		plt.imshow(data_array.T, vmin=-50, vmax=50, cmap=plt.get_cmap('bwr'))
+		plt.grid(True)
+		plt.colorbar()
+		plt.show()
+
+	def compare_two_task(task_df):
+		task_df['larger'] = task_df.apply(lambda x: 'MTL' if x['MTL'] > x['STL'] else 'STL', axis=1)
+		print(task_df.describe())
+		df_larger = task_df.loc[task_df['larger'] == 'MTL']
+		# df_larger['impove'] = task_df.apply(lambda x: (x['MTL'] - x['STL']), axis=1)
+		df_improve = (df_larger.loc[:, 'MTL'] - df_larger.loc[:, 'STL']) * 100
+		print(df_improve.describe())
+		# print(task_df['larger'].value_counts())
+		
+
+	CNN_RNN_MTL_all_grid_result = './result/CNN_RNN/all_grid_result_report_0718.txt'
+	CNN_RNN_STL_all_grid_result = './result/CNN_RNN_STL/all_grid_result_report.txt'
+
+	with open(CNN_RNN_MTL_all_grid_result, 'r') as fp:
+		CNN_RNN_MTL = json.load(fp, encoding=None)
+
+	with open(CNN_RNN_STL_all_grid_result, 'r') as fp:
+		CNN_RNN_STL = json.load(fp, encoding=None)
+
+	method_dict = {
+		'CNN_RNN_MTL': CNN_RNN_MTL,
+		'CNN_RNN_STL': CNN_RNN_STL
+	}
+	min_task, avg_task, max_task = convert_to_data_frame_by_task(method_dict)
+	# compare_two_task(min_task)
+	# compare_two_task(avg_task)
+	compare_two_task(max_task)
+	plot_improvement_heat_map(max_task)
 
 
 if __name__ == '__main__':
-	evaluate_different_method()
-	evaluate_accuracy_composition()
-
+	evaluate_MTL_and_STL()
+	# evaluate_different_method()
+	# evaluate_accuracy_composition()
 
 '''
 

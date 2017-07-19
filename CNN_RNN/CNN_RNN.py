@@ -612,6 +612,7 @@ class Multitask_Neural_Network(Tf_Utility):
 			task_keys = self.multi_task_dic.keys()
 			task_keys = sorted(task_keys)
 			Flag = False
+			'''
 			if epoch >= 600:
 				if self.multi_task_dic['max_traffic']['testing_accurcy_history'][-1] > 0.75:
 					if self.multi_task_dic['avg_traffic']['testing_accurcy_history'][-1] > 0.75:
@@ -628,7 +629,7 @@ class Multitask_Neural_Network(Tf_Utility):
 				if self.multi_task_dic['min_traffic']['testing_accurcy_history'][-1] < 0.7:
 					Flag = True
 			'''
-			if epoch >= 600:
+			if epoch >= 500:
 				if self.multi_task_dic['max_traffic']['testing_accurcy_history'][-1] > 0.74:
 					if self.multi_task_dic['avg_traffic']['testing_accurcy_history'][-1] > 0.74:
 						Flag = True
@@ -638,13 +639,11 @@ class Multitask_Neural_Network(Tf_Utility):
 				if self.multi_task_dic['avg_traffic']['testing_accurcy_history'][-1] > 0.8:
 					if self.multi_task_dic['max_traffic']['testing_accurcy_history'][-1] > 0.70:
 						Flag = True
-			'''
-			'''
-			if epoch >= 1000:
+
+			if epoch >= 800:
 				if self.multi_task_dic['max_traffic']['testing_accurcy_history'][-1] > 0.70:
 					if self.multi_task_dic['avg_traffic']['testing_accurcy_history'][-1] > 0.70:
 						Flag = True
-			'''
 			'''
 			for key in task_keys:
 				test_accu = self.multi_task_dic[key]['testing_accurcy_history'][-1]
@@ -769,12 +768,12 @@ class Multitask_Neural_Network(Tf_Utility):
 			self.save_model(sess, self.saver, model_path['save_path'])
 			# self.save_result_report(result_path)
 			plt.ioff()
-		# plt.show()
+		# plt.show()—
 
 
 class CNN_3D(Multitask_Neural_Network):
 	def __init__(self, input_data_shape, output_data_shape, config):
-		super().__init__(input_data_shape, output_data_shape, config)
+		# super().__init__(input_data_shape, output_data_shape, config)
 
 		tl_output = self.__build_3D_CNN(self.Xs)
 		self.build_flatten_layer(tl_output)

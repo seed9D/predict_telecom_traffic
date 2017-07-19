@@ -168,7 +168,7 @@ def train_RNN(X_array, Y_array):
 def train_CNN_RNN(X_array, Y_array):
 	input_data_shape = [X_array.shape[1], X_array.shape[2], X_array.shape[3], X_array.shape[4]]
 	output_data_shape = [Y_array.shape[1], Y_array.shape[2], Y_array.shape[3], 1]
-	result_path = '/home/mldp/ML_with_bigdata/CNN_RNN/result/CNN_RNN/'
+	result_path = '/home/mldp/ML_with_bigdata/CNN_RNN/result/CNN_RNN_STL/'
 	utility.check_path_exist(result_path)
 	model_path = {
 		'reload_path': '/home/mldp/ML_with_bigdata/CNN_RNN/output_model/CNN_RNN_all.ckpt',
@@ -177,7 +177,7 @@ def train_CNN_RNN(X_array, Y_array):
 	}
 	hyper_config = CNN_RNN_config.HyperParameterConfig()
 	hyper_config.read_config(file_path=os.path.join(root_dir, 'CNN_RNN/result/random_search_0609/_85/config.json'))
-	hyper_config.iter_epoch = 800
+	hyper_config.iter_epoch = 1000
 	neural = CNN_RNN(input_data_shape, output_data_shape, hyper_config)
 	neural.create_MTL_task(X_array, Y_array[:, :, :, :, 0, np.newaxis], 'min_traffic')
 	neural.create_MTL_task(X_array, Y_array[:, :, :, :, 1, np.newaxis], 'avg_traffic')
@@ -430,7 +430,7 @@ def predict_ARIMA(input_array):
 	data_info = input_array[:, :2]
 	data_array = input_array[:, 2:]
 
-	order_list = [(3, 1, 3), (3, 0, 3), (3, 1, 2), (3, 0, 0), (3, 1, 1), (3, 0, 2), (2, 1, 3), (2, 0, 3), (2, 1, 2), (2, 1, 1), (2, 0, 1), (1, 1, 3), (1, 1, 2), (1, 1, 1), (1, 1, 0), (2, 1, 0), (2, 0, 0), (0, 0, 3), (1, 0, 0), (0, 0, 2), (0, 0, 1)]
+	order_list = [(3, 1, 3), (3, 1, 2), (3, 1, 1), (2, 1, 3), (2, 1, 2), (2, 1, 1), (1, 1, 3), (1, 1, 2), (1, 1, 1), (3, 0, 3), (3, 0, 0), (3, 0, 2), (2, 0, 3), (2, 0, 1), (1, 1, 0), (2, 1, 0), (2, 0, 0), (0, 0, 3), (1, 0, 0), (0, 0, 2), (0, 0, 1)]
 	arima = MTL_ARIMA_Model(order_list)
 	arima.set_MTL_data_set(data_array[:, 0], data_array[:, 1], data_array[:, 2])
 	arima.MTL_predict()
@@ -481,8 +481,10 @@ def loop_CNN_RNN():
 	'''
 	traffic_array = np.zeros([1487, 1, grid_row_num, grid_column_num, 8], dtype=float)
 
-	store_path = os.path.join(root_dir, 'CNN_RNN/result/CNN_RNN', 'loop_report.txt')
-	os.remove(store_path)
+	base_dir = os.path.join(root_dir, 'CNN_RNN/result/CNN_RNN')
+	store_path = os.path.join(base_dir, 'loop_report.txt')
+	if os.path.exists(store_path):
+		os.remove(store_path)
 	for row_center in row_center_list:
 		for col_center in col_center_list:
 			print('row_center:{} col_center:{}'.format(row_center, col_center))
@@ -505,8 +507,8 @@ def loop_CNN_RNN():
 								i, j, row, col]
 							# print(traffic_array[i, j, row_index, col_index])
 
-		du.save_array(traffic_array, './result/CNN_RNN/all_real_prediction_traffic_array.npy')
-	du.save_array(traffic_array, './result/CNN_RNN/all_real_prediction_traffic_array.npy')
+		du.save_array(traffic_array, os.path.join(base_dir, 'all_real_prediction_traffic_array.npy'))
+	du.save_array(traffic_array, os.path.join(base_dir, 'all_real_prediction_traffic_array.npy'))
 
 
 def loop_CNN_3D():
@@ -623,9 +625,9 @@ def loop_STL_CNN_RNN():
 	row_center_list = list(range(40, 80, 3))
 	col_center_list = list(range(30, 70, 3))
 	traffic_array = np.zeros([1487, 1, grid_row_num, grid_column_num, 8], dtype=float)
-
-	store_path = os.path.join(root_dir, 'CNN_RNN/result/CNN_RNN_STL', 'loop_report.txt')
-	utility.check_path_exist(os.path.join(root_dir, 'CNN_RNN/result/CNN_RNN_STL'))
+	base_dir = os.path.join(root_dir, 'CNN_RNN/result/CNN_RNN_STL')
+	store_path = os.path.join(base_dir, 'loop_report.txt')
+	utility.check_path_exist(base_dir)
 	if os.path.exists(store_path):
 		os.remove(store_path)
 	for row_center in row_center_list:
@@ -650,8 +652,8 @@ def loop_STL_CNN_RNN():
 								i, j, row, col]
 							# print(traffic_array[i, j, row_index, col_index])
 
-		du.save_array(traffic_array, './result/CNN_RNN/all_real_prediction_traffic_array.npy')
-	du.save_array(traffic_array, './result/CNN_RNN/all_real_prediction_traffic_array.npy')
+		du.save_array(traffic_array, os.path.josin(base_dir, 'all_real_prediction_traffic_array.npy'))
+	du.save_array(traffic_array, os.path.josin(base_dir, 'all_real_prediction_traffic_array.npy'))
 
 
 def train_different_method():
@@ -674,8 +676,8 @@ def loop_different_method():
 	# loop_CNN_RNN()
 	# loop_CNN_3D()
 	# loop_RNN()
-	# loop_ARIMA()
-	loop_STL_CNN_RNN()
+	loop_ARIMA()
+	# loop_STL_CNN_RNN()
 
 
 if __name__ == '__main__':

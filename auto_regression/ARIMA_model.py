@@ -108,10 +108,10 @@ class MTL_ARIMA_Model(ARIMA_Model):
 				else:
 					accu = self.__evaluate_by_task(each_key)
 					print('task name:{} order:{} accu:{}'.format(each_key, order, accu))
-					if accu > 0.3 and accu <= 0.82:
+					if accu > 0.3 and accu <= 0.9:
 						print(each_key, order)
 						break
-					if accu > 0.82:
+					if accu > 0.9:
 						best_keep_index = order_index
 					else:
 						keep_index = order_index
