@@ -12,6 +12,9 @@ import sys
 sys.path.append('/home/mldp/ML_with_bigdata')
 import data_utility as du
 
+logger = utility.setlog()
+root_dir = '/home/mldp/ML_with_bigdata'
+
 method_LM_result_path = '/home/qiuhui/processed_data/'
 method_CNN_RNN_result_path = '/home/mldp/ML_with_bigdata/CNN_RNN/result/CNN_RNN/Y_real_prediction.npy'
 method_CNN_3D_result_path = '/home/mldp/ML_with_bigdata/CNN_RNN/result/CNN_3D/Y_real_prediction.npy'
@@ -107,7 +110,6 @@ def plot_all_task_together(plot_dict):
 	ax_min = fig.add_subplot(311)
 	ax_avg = fig.add_subplot(312)
 	ax_max = fig.add_subplot(313)
-
 
 	min_dict = {
 		'real': plot_dict['real'][:, 0],
@@ -222,90 +224,115 @@ def evaluate_accuracy_composition():
 	def plot_count_bar(data_frame, title):
 		bins = np.arange(0, 1.1, 0.1, dtype=np.float)
 		# print(task_max_df)
-		cats_CNN_RNN_MTL = pd.cut(data_frame['CNN RNN(MTL)'], bins)
-		cats_CNN_RNN_STL = pd.cut(data_frame['CNN RNN(STL)'], bins)
-		cats_CNN_3D = pd.cut(data_frame['CNN 3D'], bins)
-		cats_RNN = pd.cut(data_frame['RNN'], bins)
-		cats_ARIMA = pd.cut(data_frame['ARIMA'], bins)
+		cats_CNN_RNN_MTL = pd.cut(data_frame['CNN-RNN(MTL)'], bins)
+		cats_CNN_RNN_STL = pd.cut(data_frame['CNN-RNN(STL)'], bins)
+		cats_CNN_RNN_without_task = pd.cut(data_frame['CNN-RNN(*)'], bins)
+		cats_CNN_3D = pd.cut(data_frame['3D CNN(MTL)'], bins)
+		cats_RNN = pd.cut(data_frame['RNN(MTL)'], bins)
+		cats_ARIMA = pd.cut(data_frame['ARIMA(STL)'], bins)
+		cats_LM = pd.cut(data_frame['LM(STL)'], bins)
 		# print(cats)
-		CNN_RNN_MTL_grouped = data_frame['CNN RNN(MTL)'].groupby(cats_CNN_RNN_MTL)
-		CNN_RNN_STL_grouped = data_frame['CNN RNN(STL)'].groupby(cats_CNN_RNN_STL)
-		CNN_3D_grouped = data_frame['CNN 3D'].groupby(cats_CNN_3D)
-		RNN_grouped = data_frame['RNN'].groupby(cats_RNN)
-		ARIMA_grouped = data_frame['ARIMA'].groupby(cats_ARIMA)
+		CNN_RNN_MTL_grouped = data_frame['CNN-RNN(MTL)'].groupby(cats_CNN_RNN_MTL)
+		CNN_RNN_STL_grouped = data_frame['CNN-RNN(STL)'].groupby(cats_CNN_RNN_STL)
+		CNN_RNN_without_task_grouped = data_frame['CNN-RNN(*)'].groupby(cats_CNN_RNN_without_task)
+		CNN_3D_grouped = data_frame['3D CNN(MTL)'].groupby(cats_CNN_3D)
+		RNN_grouped = data_frame['RNN(MTL)'].groupby(cats_RNN)
+		ARIMA_grouped = data_frame['ARIMA(STL)'].groupby(cats_ARIMA)
+		LM_grouped = data_frame['LM(STL)'].groupby(cats_LM)
 
 		CNN_RNN_MTL_bin_counts = CNN_RNN_MTL_grouped.count()
 		CNN_RNN_STL_bin_counts = CNN_RNN_STL_grouped.count()
+		CNN_RNN_without_task_bin_counts = CNN_RNN_without_task_grouped.count()
 		CNN_3D_bin_counts = CNN_3D_grouped.count()
 		RNN_bin_counts = RNN_grouped.count()
 		ARIMA_bin_counts = ARIMA_grouped.count()
+		LM_bin_counts = LM_grouped.count()
 		# print(CNN_3D_bin_counts)
 
-		bin_counts = pd.concat([ARIMA_bin_counts, RNN_bin_counts, CNN_3D_bin_counts, CNN_RNN_MTL_bin_counts, CNN_RNN_STL_bin_counts], axis=1)
-		bin_counts.columns = ['ARIMA', 'RNN', 'CNN 3D', 'CNN RNN(MTL)', 'CNN RNN(STL)']
+		bin_counts = pd.concat([ARIMA_bin_counts, LM_bin_counts, RNN_bin_counts, CNN_3D_bin_counts, CNN_RNN_without_task_bin_counts, CNN_RNN_STL_bin_counts, CNN_RNN_MTL_bin_counts], axis=1)
+		bin_counts.columns = ['ARIMA(STL)', 'LM(STL)', 'RNN(MTL)', '3D CNN(MTL)', 'CNN-RNN(*)', 'CNN-RNN(STL)', 'CNN-RNN(MTL)']
 		bin_counts.index = ['0~10', '10~20', '20~30', '30~40', '40~50', '50~60', '60~70', '70~80', '80~90', '90~100']
 		bin_counts.index.name = 'Accuracy %'
-		ax = bin_counts.plot(kind='bar', alpha=0.7, rot=0, width=0.8)
+		ax = bin_counts.plot(kind='bar', alpha=0.7, rot=0, width=0.8, figsize=(8, 4.6))
 		for p in ax.patches:
 			ax.annotate(str(int(p.get_height())), xy=(p.get_x(), p.get_height()))
 
-		plt.legend(loc='upper left', fontsize = 'large')
+		plt.legend(loc='upper left', fontsize='large')
 		plt.title(title)
-		plt.ylabel('number of grids')
+		plt.xlabel('Accuracy %', size=15)
+		plt.ylabel('Number of grids', size=15)
+		plt.xlim([2.5, 8.5])
 		# print(bin_counts)
 
 	def plot_KDE(data_frame, title):
-		data_frame = data_frame[['ARIMA', 'RNN', 'CNN 3D', 'CNN RNN(MTL)', 'CNN RNN(STL)']]
+		data_frame = data_frame[['ARIMA(STL)', 'LM(STL)', 'RNN(MTL)', '3D CNN(MTL)', 'CNN-RNN(*)', 'CNN-RNN(STL)', 'CNN-RNN(MTL)']]
 		ax = data_frame.plot(kind='kde', title=title + ' KDE plot')
 		ax.set_xlabel('Accuracy')
 		ax.set_xlim(0.1, 1)
+		ax.legend(loc='upper left', fontsize='large')
 
-	def convert_to_data_frame_by_task(CNN_RNN, CNN_3D, RNN, ARIMA, CNN_RNN_STL):
+	def convert_to_data_frame_by_task(CNN_RNN, CNN_3D, RNN, ARIMA, CNN_RNN_STL, CNN_RNN_without_task, LM):
 		CNN_RNN_key_paths = list(utility.find_in_obj(CNN_RNN, 'Accuracy'))
 		CNN_3D_key_paths = list(utility.find_in_obj(CNN_3D, 'Accuracy'))
 		RNN_key_paths = list(utility.find_in_obj(RNN, 'Accuracy'))
 		ARIMA_key_paths = list(utility.find_in_obj(ARIMA, 'Accuracy'))
 		CNN_RNN_STL_key_paths = list(utility.find_in_obj(CNN_RNN_STL, 'Accuracy'))
+		CNN_RNN_without_task_key_paths = list(utility.find_in_obj(CNN_RNN_without_task, 'Accuracy'))
+		LM_key_paths = list(utility.find_in_obj(LM, 'Accuracy'))
 
 		CNN_RNN_accu_dict = task_value(CNN_RNN, CNN_RNN_key_paths)
 		CNN_3D_accu_dict = task_value(CNN_3D, CNN_3D_key_paths)
 		RNN_accu_dict = task_value(RNN, RNN_key_paths)
 		ARIMA_accu_dict = task_value(ARIMA, ARIMA_key_paths)
 		CNN_RNN_STL_accu_dict = task_value(CNN_RNN_STL, CNN_RNN_STL_key_paths)
+		CNN_RNN_without_task_accu_dict = task_value(CNN_RNN_without_task, CNN_RNN_without_task_key_paths)
+		LM_accu_dict = task_value(LM, LM_key_paths)
 		# print(CNN_RNN_accu_dict['task_max'][-1], CNN_3D_accu_dict['task_max'][-1])
 
 		task_max_df = pd.DataFrame({
-			'CNN RNN(MTL)': CNN_RNN_accu_dict['task_max'],
-			'CNN RNN(STL)': CNN_RNN_STL_accu_dict['task_max'],
-			'CNN 3D': CNN_3D_accu_dict['task_max'],
-			'RNN': RNN_accu_dict['task_max'],
-			'ARIMA': ARIMA_accu_dict['task_max']})
-		task_max_df = task_max_df.dropna(axis=0, how='any')
+			'CNN-RNN(MTL)': CNN_RNN_accu_dict['task_max'],
+			'CNN-RNN(STL)': CNN_RNN_STL_accu_dict['task_max'],
+			'CNN-RNN(*)': CNN_RNN_without_task_accu_dict['task_max'],
+			'3D CNN(MTL)': CNN_3D_accu_dict['task_max'],
+			'RNN(MTL)': RNN_accu_dict['task_max'],
+			'LM(STL)': LM_accu_dict['task_max'],
+			'ARIMA(STL)': ARIMA_accu_dict['task_max']})
+		# task_max_df = task_max_df.dropna(axis=0, how='any')
+		task_max_df = task_max_df.fillna(0)
 		# print(task_max_df.shape)
 
 		task_avg_df = pd.DataFrame({
-			'CNN RNN(MTL)': CNN_RNN_accu_dict['task_avg'],
-			'CNN RNN(STL)': CNN_RNN_STL_accu_dict['task_avg'],
-			'CNN 3D': CNN_3D_accu_dict['task_avg'],
-			'RNN': RNN_accu_dict['task_avg'],
-			'ARIMA': ARIMA_accu_dict['task_avg']})
-		task_avg_df = task_avg_df.dropna(axis=0, how='any')
+			'CNN-RNN(MTL)': CNN_RNN_accu_dict['task_avg'],
+			'CNN-RNN(STL)': CNN_RNN_STL_accu_dict['task_avg'],
+			'CNN-RNN(*)': CNN_RNN_without_task_accu_dict['task_avg'],
+			'3D CNN(MTL)': CNN_3D_accu_dict['task_avg'],
+			'RNN(MTL)': RNN_accu_dict['task_avg'],
+			'LM(STL)': LM_accu_dict['task_avg'],
+			'ARIMA(STL)': ARIMA_accu_dict['task_avg']})
+		# task_avg_df = task_avg_df.dropna(axis=0, how='any')
+		task_avg_df = task_avg_df.fillna(0)
 
 		task_min_df = pd.DataFrame({
-			'CNN RNN(MTL)': CNN_RNN_accu_dict['task_min'],
-			'CNN RNN(STL)': CNN_RNN_STL_accu_dict['task_min'],
-			'CNN 3D': CNN_3D_accu_dict['task_min'],
-			'RNN': RNN_accu_dict['task_min'],
-			'ARIMA': ARIMA_accu_dict['task_min']})
-		task_min_df = task_min_df.dropna(axis=0, how='any')
+			'CNN-RNN(MTL)': CNN_RNN_accu_dict['task_min'],
+			'CNN-RNN(STL)': CNN_RNN_STL_accu_dict['task_min'],
+			'CNN-RNN(*)': CNN_RNN_without_task_accu_dict['task_min'],
+			'3D CNN(MTL)': CNN_3D_accu_dict['task_min'],
+			'RNN(MTL)': RNN_accu_dict['task_min'],
+			'LM(STL)': LM_accu_dict['task_min'],
+			'ARIMA(STL)': ARIMA_accu_dict['task_min']})
+		# task_min_df = task_min_df.dropna(axis=0, how='any')
+		task_avg_df = task_avg_df.fillna(0)
+		# task_min_df = task_min_df.fillna(0)
 
 		return task_min_df, task_avg_df, task_max_df
 
 	CNN_RNN_all_grid_result = './result/CNN_RNN/all_grid_result_report_0718.txt'
 	CNN_3D_all_grid_result = './result/CNN_3D/all_grid_result_report.txt'
 	RNN_all_grid_result = './result/RNN/all_grid_result_report.txt'
-	ARIMA_all_grid_result = './result/ARIMA/all_grid_result_report.txt'
+	ARIMA_all_grid_result = './result/ARIMA/all_grid_result_report_0719.txt'
 	CNN_RNN_STL_all_grid_result = './result/CNN_RNN_STL/all_grid_result_report.txt'
+	CNN_RNN_without_task_all_grid_result = './result/CNN_RNN_without_task/all_grid_result_report.txt'
+	LM_all_grid_result = './result/LM/all_grid_result_report.txt'
 
 	with open(CNN_RNN_all_grid_result, 'r') as fp:
 		CNN_RNN = json.load(fp, encoding=None)
@@ -322,8 +349,14 @@ def evaluate_accuracy_composition():
 	with open(CNN_RNN_STL_all_grid_result, 'r') as fp:
 		CNN_RNN_STL = json.load(fp, encoding=None)
 
-	task_min, task_avg, task_max = convert_to_data_frame_by_task(CNN_RNN, CNN_3D, RNN, ARIMA, CNN_RNN_STL)
-	
+	with open(CNN_RNN_without_task_all_grid_result, 'r') as fp:
+		CNN_RNN_without_task = json.load(fp, encoding=None)
+
+	with open(LM_all_grid_result, 'r') as fp:
+		LM = json.load(fp, encoding=None)
+
+	task_min, task_avg, task_max = convert_to_data_frame_by_task(CNN_RNN, CNN_3D, RNN, ARIMA, CNN_RNN_STL, CNN_RNN_without_task, LM)
+
 	print(task_min.describe())
 	print(task_avg.describe())
 	print(task_max.describe())
@@ -343,7 +376,7 @@ def evaluate_accuracy_composition():
 
 
 def evaluate_different_method():
-	def evaluate_performance(Y_real_prediction_array, file_path):
+	def evaluate_performance(Y_real_prediction_array, file_path, divide_threshold=None):
 		def print_total_report(task_report):
 			for task_name, ele in task_report.items():
 				print('{}: Accuracy:{:.4f} MAE:{:.4f} RMSE:{:.4f}'.format(task_name, ele['Accuracy'], ele['AE'], ele['RMSE']))
@@ -354,7 +387,8 @@ def evaluate_different_method():
 		col_range = (col_center_list[0], col_center_list[-1])
 		# print((row_range[1] - row_range[0]) * (col_range[1] -  col_range[0]))
 		array_len = Y_real_prediction_array.shape[0]
-		divide_threshold = (9 * array_len) // 10
+		if not divide_threshold:
+			divide_threshold = (9 * array_len) // 10
 
 		Y_real_prediction_array = Y_real_prediction_array[:, :, row_range[0]: row_range[1], col_range[0]: col_range[1]]
 		training_data = Y_real_prediction_array[:divide_threshold]
@@ -370,24 +404,31 @@ def evaluate_different_method():
 		report_dict = report_func.report_loss_accu(testing_info, testing_real, testing_prediction, file_path)
 		print_total_report(report_dict['total'])
 		# print(report_dict['total'])
-	CNN_RNN_all_grid_path = './result/CNN_RNN/all_real_prediction_traffic_array.npy'
+	
+	CNN_RNN_all_grid_path = './result/CNN_RNN/all_real_prediction_traffic_array_0718.npy'
 	CNN_3D_all_grid_path = './result/CNN_3D/all_real_prediction_traffic_array_0718.npy'
 	RNN_all_grid_path = './result/RNN/all_real_prediction_traffic_array_0718.npy'
 	ARIMA_all_grid_path = './result/ARIMA/all_real_prediction_traffic_array.npy'
 	CNN_RNN_STL_all_grid_path = './result/CNN_RNN_STL/all_real_prediction_traffic_array_0715.npy'
 
+	CNN_RNN_without_task_all_grid_path = './result/CNN_RNN_without_task/all_real_prediction_traffic_array_split_min_avg_max.npy'
+	LM_all_grid_path = './result/LM/all_real_prediction_traffic_array.npy'
+
 	# CNN_RNN_array = du.load_array(CNN_RNN_all_grid_path)
 	# CNN_3D_array = du.load_array(CNN_3D_all_grid_path)
 	# RNN_array = du.load_array(RNN_all_grid_path)
-	ARIMA_array = du.load_array(ARIMA_all_grid_path)
+	# ARIMA_array = du.load_array(ARIMA_all_grid_path)
 	# CNN_RNN_STL_array = du.load_array(CNN_RNN_STL_all_grid_path)
+	# CNN_RNN_without_task_array = du.load_array(CNN_RNN_without_task_all_grid_path)
+	LM_array = du.load_array(LM_all_grid_path)
 
 	# evaluate_performance(CNN_RNN_array, './result/CNN_RNN/all_grid_result_report.txt')
 	# evaluate_performance(CNN_3D_array, './result/CNN_3D/all_grid_result_report.txt')
 	# evaluate_performance(RNN_array, './result/RNN/all_grid_result_report.txt')
-	evaluate_performance(ARIMA_array, './result/ARIMA/all_grid_result_report.txt')
+	# evaluate_performance(ARIMA_array, './result/ARIMA/all_grid_result_report.txt')
 	# evaluate_performance(CNN_RNN_STL_array, './result/CNN_RNN_STL/all_grid_result_report.txt')
-
+	# evaluate_performance(CNN_RNN_without_task_array, './result/CNN_RNN_without_task/all_grid_result_report.txt')
+	evaluate_performance(LM_array, './result/LM/all_grid_result_report.txt', 0)
 
 def evaluate_MTL_and_STL():
 	def task_value(obj, key_paths):
@@ -460,7 +501,6 @@ def evaluate_MTL_and_STL():
 		df_improve = (df_larger.loc[:, 'MTL'] - df_larger.loc[:, 'STL']) * 100
 		print(df_improve.describe())
 		# print(task_df['larger'].value_counts())
-		
 
 	CNN_RNN_MTL_all_grid_result = './result/CNN_RNN/all_grid_result_report_0718.txt'
 	CNN_RNN_STL_all_grid_result = './result/CNN_RNN_STL/all_grid_result_report.txt'
@@ -476,73 +516,245 @@ def evaluate_MTL_and_STL():
 		'CNN_RNN_STL': CNN_RNN_STL
 	}
 	min_task, avg_task, max_task = convert_to_data_frame_by_task(method_dict)
+	# print(max_task.idxmax())
 	# compare_two_task(min_task)
 	# compare_two_task(avg_task)
-	compare_two_task(max_task)
+	# compare_two_task(max_task)
 	plot_improvement_heat_map(max_task)
 
 
-if __name__ == '__main__':
-	evaluate_MTL_and_STL()
-	# evaluate_different_method()
-	# evaluate_accuracy_composition()
+def evaluate_CNN_RNN_without_task():
+	def search_grid(data_array, grid_id):
+		array = np.transpose(data_array, (2, 3, 0, 1, 4))
+		for row in range(array.shape[0]):
+			for col in range(array.shape[1]):
+				if grid_id == array[row, col, 0, 0, 0]:
+					return row, col
+		return 0, 0
 
-'''
+	def get_data():
+		method_result_path = os.path.join(root_dir, 'CNN_RNN/result/CNN_RNN_without_task/all_real_prediction_traffic_array.npy')
+		result_array = du.load_array(method_result_path)
 
-def get_quihui_result(search_grid_id):
-	min_file = os.path.join(method_1_result_path, str(search_grid_id) + '_min.npy')
-	avg_file = os.path.join(method_1_result_path, str(search_grid_id) + '_avg.npy')
-	max_file = os.path.join(method_1_result_path, str(search_grid_id) + '_max.npy')
+		row_center_list = list(range(40, 80, 3))
+		col_center_list = list(range(30, 70, 3))
+		row_range = range(row_center_list[0] - 1, row_center_list[-1] + 1)
+		col_range = range(col_center_list[0] - 1, col_center_list[-1] + 1)
+		logger.info('row_range {}:{} col_range: {}:{}'.format(row_range[0], row_range[-1], col_range[0], col_range[-1]))
+		result_array = result_array[:-1, :, :row_range[-1] - row_range[0] + 1, :col_range[-1] - col_range[0] + 1]
+		logger.debug('result_array shape:{}'.format(result_array.shape))
+		return result_array
 
-	min_array = du.load_array(min_file)[-100:]
-	avg_array = du.load_array(avg_file)[-100:]
-	max_array = du.load_array(max_file)[-100:]
-	
-	min_array = np.reshape(min_array, (100, 1, 1), order='C')
-	avg_array = np.reshape(avg_array, (100, 1, 1), order='C')
-	max_array = np.reshape(max_array, (100, 1, 1), order='C')
+	def evaluate_performance(real, prediction):
+		# data_array_len = real.shape[0]
 
-	qiuhui_array = np.concatenate((min_array, avg_array, max_array), axis=-1)
-	# print(qiuhui_array.shape)
-	return qiuhui_array
+		# test_real = real[9 * data_array_len // 10:]
+		# test_prediction = prediction[9 * data_array_len // 10:]
 
+		MAPE_loss = utility.MAPE_loss(real, prediction)
+		AE_loss = utility.AE_loss(real, prediction)
+		RMSE_loss = utility.RMSE_loss(real, prediction)
+		# MAPE_train = utility.MAPE_loss(train_array[:, :, :, :, 2, np.newaxis], train_array[:, :, :, :, 3, np.newaxis])
+		# print('test accu:{} test AE:{} test RMSE:{}'.format(1 - MAPE_test, AE_test, RMSE_test))
+		return 1 - MAPE_loss, AE_loss, RMSE_loss
 
-def get_CNN_RNN_result(search_grid_id):
-	def search(search_array, search_grid_id):
-		for row in range(CNN_RNN_result.shape[2]):
-			for col in range(CNN_RNN_result.shape[3]):
-				grid_id_ = CNN_RNN_result[0, 0, row, col, 0]
-				if int(search_grid_id) == int(grid_id_):
-					return CNN_RNN_result[:, :, row, col, :]
+	def calculate_min_avg_max(data_array):
+		new_data_array = np.zeros((data_array.shape[0], 1, 100, 100, 8))  # hour, 1, row, col, (grid_id, timestmap, real_min, real_avg, real_max, preidiction_min, prediction_avg, prediction_max)
+		data_array = np.transpose(data_array, (0, 2, 3, 1, 4))  # hour, row, col, 10min, feature
+		for i in range(data_array.shape[0]):
+			for row in range(data_array.shape[1]):
+				for col in range(data_array.shape[2]):
+					real_max_value = np.amax(data_array[i, row, col, :, 2])
+					prediction_max_value = np.amax(data_array[i, row, col, :, 3])
 
-	CNN_RNN_result = du.load_array(method_CNN_RNN_result_path)
+					real_min_value = np.amin(data_array[i, row, col, :, 2])
+					prediction_min_value = np.amin(data_array[i, row, col, :, 3])
 
-	return search(CNN_RNN_result, search_grid_id)
+					real_avg_value = np.mean(data_array[i, row, col, :, 2])
+					prediction_avg_value = np.mean(data_array[i, row, col, :, 3])
 
+					grid_id = data_array[i, row, col, 0, 0]
+					timestamp = data_array[i, row, col, 0, 1]
+					row_index, col_index = utility.compute_row_col(grid_id)
+					new_data_array[i, 0, row_index, col_index, 0] = grid_id
+					new_data_array[i, 0, row_index, col_index, 1] = timestamp
+					new_data_array[i, 0, row_index, col_index, 2] = real_min_value
+					new_data_array[i, 0, row_index, col_index, 3] = real_avg_value
+					new_data_array[i, 0, row_index, col_index, 4] = real_max_value
+					new_data_array[i, 0, row_index, col_index, 5] = prediction_min_value
+					new_data_array[i, 0, row_index, col_index, 6] = prediction_avg_value
+					new_data_array[i, 0, row_index, col_index, 7] = prediction_max_value
+					# logger.info('grid_id:{} real:{} prediction:{}'.format(int(grid_id), real_max_value, prediction_max_value))
 
-def plot_result(info_real, CNN_RNN, qiuhui):
-	def plot_task(task_name, task_info, task_real, task_cnn_rnn, task_quihui):
-		fig = plt.figure()
-		plt.xlabel('time sequence')
-		plt.ylabel('activity strength')
+		return new_data_array
 
-		plt.plot(task_real, label='real', marker='.')
-		plt.plot(task_cnn_rnn, label='CNN_RNN', marker='.')
-		plt.plot(task_quihui, label='??', marker='.')
-		plt.title(task_name + ': grid_id ' + str(task_info[0]))
-		plt.grid()
-		plt.legend()
+	def plot_CNN_RNN_without_task(data_arrray, grid_id, interval=6):
+		logger.debug('data_arrray :{}'.format(data_arrray.shape))
+		# plot_row = 10
+		# plot_col = 30
+		plot_row, plot_col = search_grid(data_arrray, grid_id)
+		# result_array_len = result_array.shape[0]
+		logger.info('plot_row:{} plot_col:{}'.format(plot_row, plot_col))
+		plot_real = data_arrray[:, :, plot_row, plot_col, 2].reshape(-1, 1)
+		plot_prediction = data_arrray[:, :, plot_row, plot_col, 3].reshape(-1, 1)
+		plt_info = data_arrray[:, :, plot_row, plot_col, :2].reshape(-1, 2)
+		report_func.plot_predict_vs_real(plt_info, plot_real, plot_prediction, 'CNN-RNN(*) prediction on ', interval)
 
-	plot_task('min', info_real[0, 0, (0, 1)], info_real[:, 0, 2], CNN_RNN[:, 0, 0], qiuhui[:, 0, 0])
-	plot_task('avg', info_real[0, 0, (0, 1)], info_real[:, 0, 3], CNN_RNN[:, 0, 1], qiuhui[:, 0, 1])
-	plot_task('max', info_real[0, 0, (0, 1)], info_real[:, 0, 4], CNN_RNN[:, 0, 2], qiuhui[:, 0, 2])
+	def evaluate_one_grid(origin_array, real_preidction, grid_id=4867):
+		logger.info('origin_array shape:{} real_preidction shape:{}'.format(origin_array.shape, real_preidction.shape))
+		plot_CNN_RNN_without_task(origin_array[-149:], grid_id, 24)
+		row, col = search_grid(real_preidction, grid_id)
 
+		accu_min, AE_min, RMSE_min = evaluate_performance(real_preidction[-149:, :, row: row + 1, col: col + 1, 2], real_preidction[-149:, :, row: row + 1, col: col + 1, 5])
+		accu_avg, AE_avg, RMSE_avg = evaluate_performance(real_preidction[-149:, :, row: row + 1, col: col + 1, 3], real_preidction[-149:, :, row: row + 1, col: col + 1, 6])
+		accu_max, AE_max, RMSE_max = evaluate_performance(real_preidction[-149:, :, row: row + 1, col: col + 1, 4], real_preidction[-149:, :, row: row + 1, col: col + 1, 7])
+		logger.info('grid id:{} MIN accu:{} AE:{} RMSE:{}'.format(grid_id, accu_min, AE_min, RMSE_min))
+		logger.info('grid id:{} AVG accu:{} AE:{} RMSE:{}'.format(grid_id, accu_avg, AE_avg, RMSE_avg))
+		logger.info('grid id:{} MAX accu:{} AE:{} RMSE:{}'.format(grid_id, accu_max, AE_max, RMSE_max))
+
+		plot_CNN_RNN_without_task(real_preidction[-149:, :, :, :, (0, 1, 4, 7)], grid_id, 2)
+
+	reload = None
+	result_array = get_data()
+	accu, AE, RMSE = evaluate_performance(result_array[-149:, :, :, :, 2], result_array[-149:, :, :, :, 3])
+	logger.info('total data: test accu:{} test AE:{} test RMSE:{}'.format(accu, AE, RMSE))
+	if reload:
+		real_preidction = calculate_min_avg_max(result_array)
+		du.save_array(real_preidction, os.path.join(root_dir, 'CNN_RNN/result/CNN_RNN_without_task/all_real_prediction_traffic_array_split_min_avg_max.npy'))
+	else:
+		real_preidction = du.load_array(os.path.join(root_dir, 'CNN_RNN/result/CNN_RNN_without_task/all_real_prediction_traffic_array_split_min_avg_max.npy'))
+	print()
+	accu_min, AE_min, RMSE_min = evaluate_performance(real_preidction[-149:, :, :, :, 2], real_preidction[-149:, :, :, :, 5])
+	accu_avg, AE_avg, RMSE_avg = evaluate_performance(real_preidction[-149:, :, :, :, 3], real_preidction[-149:, :, :, :, 6])
+	accu_max, AE_max, RMSE_max = evaluate_performance(real_preidction[-149:, :, :, :, 4], real_preidction[-149:, :, :, :, 7])
+	logger.info('MIN accu:{} AE:{} RMSE:{}'.format(accu_min, AE_min, RMSE_min))
+	logger.info('AVG accu:{} AE:{} RMSE:{}'.format(accu_avg, AE_avg, RMSE_avg))
+	logger.info('MAX accu:{} AE:{} RMSE:{}'.format(accu_max, AE_max, RMSE_max))
+
+	evaluate_one_grid(result_array, real_preidction, 4867)
 	plt.show()
 
-for each_grid_id in plot_grid_id_list:
-	CNN_RNN = get_CNN_RNN_result(each_grid_id)
-	info_real = CNN_RNN[:, :, :5]
-	CNN_RNN = CNN_RNN[:, :, 5:]
-	qiuhui = get_quihui_result(each_grid_id)
-	plot_result(info_real, CNN_RNN, qiuhui)
-'''
+
+def evaluate_MTL_and_without_task():
+	def plot_method_together_1(plot_dict, title_name, interval=6):
+
+		def plot_by_axis(axis, xlabel_list, plot_dict):
+			method_name = plot_dict['name']
+			x_len = len(xlabel_list)
+			axis.plot(range(x_len), plot_dict['real'], label='Real', color='k')
+			axis.plot(range(x_len), plot_dict['prediction'], label='Prediction', color='r', linestyle='--')
+			axis.set_xticks(list(range(0, x_len, interval)))
+			axis.set_xticklabels(xlabel_list[0:x_len:interval], rotation=45)
+
+			axis.grid()
+			axis.legend()
+			axis.set_title(method_name)
+
+		def get_xlabel(timestamps):
+			xlabel_list = []
+			for timestamp in timestamps:
+				datetime = utility.set_time_zone(timestamp)
+				xlabel_list.append(utility.date_time_covert_to_str(datetime))
+			return xlabel_list
+
+		fig, ax = plt.subplots(2, 1, figsize=(10, 4))
+		logger.debug('ax shape:{}'.format(ax.shape))
+		index = 0
+		for method_key, method in plot_dict.items():
+			xlabel_list = get_xlabel(method['info'][:, 1])
+			plot_by_axis(ax[index], xlabel_list, method)
+			index += 1
+
+	def plot_method_together_2(plot_dict, title_name, interval=6):
+		def get_xlabel(timestamps):
+			xlabel_list = []
+			for timestamp in timestamps:
+				datetime = utility.set_time_zone(timestamp)
+				xlabel_list.append(utility.date_time_covert_to_str(datetime))
+			return xlabel_list
+
+		fig, ax = plt.subplots(1, 1, figsize=(10, 4))
+		key_list = list(plot_dict.keys())
+		xlabel_list = get_xlabel(plot_dict[key_list[0]]['info'][:, 1])
+		x_len = len(xlabel_list)
+		real = plot_dict[key_list[0]]['real']
+		grid_id = plot_dict[key_list[0]]['info'][0, 0]
+		logger.debug('grid_id:{} xlabel_list len:{} real shape:{}'.format(grid_id, x_len, real.shape))
+		ax.plot(range(x_len), real, label='Real', color='k')
+
+		for method_key, method_dict in plot_dict.items():
+			ax.plot(range(x_len), method_dict['prediction'], label=str(method_key), color=method_dict['color'], linestyle='--')
+
+		ax.set_xticks(list(range(0, x_len, interval)))
+		ax.set_xticklabels(xlabel_list[0:x_len:interval], rotation=45)
+		ax.set_title(title_name + ' grid id ' + str(int(grid_id)))
+		ax.set_xlabel('Times')
+		ax.set_ylabel('Number of CDRs')
+		ax.grid()
+		ax.legend()
+
+	def plot_together(MTL_array, without_task_array):
+		plt_dict = {}
+		grid_id = 4867
+		row_index, col_index = utility.compute_row_col(grid_id)
+		logger.info('row_index:{} col_index:{}'.format(row_index, col_index))
+
+		plot_MTL_real_min = MTL_array[-149:, :, row_index, col_index, 2].reshape(-1, 1)  # min
+		plot_MTL_real_avg = MTL_array[-149:, :, row_index, col_index, 3].reshape(-1, 1)  # avg
+		plot_MTL_real_max = MTL_array[-149:, :, row_index, col_index, 4].reshape(-1, 1)  # max
+
+
+		plot_MTL_predinction_min = MTL_array[-149:, :, row_index, col_index, 5].reshape(-1, 1)  # min
+		plot_MTL_predinction_avg = MTL_array[-149:, :, row_index, col_index, 6].reshape(-1, 1)  # avg
+		plot_MTL_predinction_max = MTL_array[-149:, :, row_index, col_index, 7].reshape(-1, 1)  # max
+
+		plot_without_task_array_real_min = without_task_array[-149:, :, row_index, col_index, 2].reshape(-1, 1)  # min
+		plot_without_task_array_real_avg = without_task_array[-149:, :, row_index, col_index, 3].reshape(-1, 1)  # avg
+		plot_without_task_array_real_max = without_task_array[-149:, :, row_index, col_index, 4].reshape(-1, 1)  # max
+
+
+		plot_without_task_array_predinction_min = without_task_array[-149:, :, row_index, col_index, 5].reshape(-1, 1)  # min
+		plot_without_task_array_predinction_avg = without_task_array[-149:, :, row_index, col_index, 6].reshape(-1, 1)  # avg
+		plot_without_task_array_predinction_max = without_task_array[-149:, :, row_index, col_index, 7].reshape(-1, 1)  # max
+
+		plt_MTL_dict = {
+			'name': 'CNN-RNN(MTL)',
+			'real': plot_MTL_real_max,
+			'prediction': plot_MTL_predinction_max,
+			'info': MTL_array[-149:, :, row_index, col_index, :2].reshape(-1, 2),
+			'color': 'r'
+		}
+
+		plt_without_task_dict = {
+			'name': 'CNN-RNN(*)',
+			'real': plot_without_task_array_real_max,
+			'prediction': plot_without_task_array_predinction_max,
+			'info': without_task_array[-149:, :, row_index, col_index, :2].reshape(-1, 2),
+			'color': 'dimgray'
+		}
+		plt_dict['CNN-RNN(MTL)'] = plt_MTL_dict
+		plt_dict['CNN-RNN(*)'] = plt_without_task_dict
+
+		plot_method_together_2(plt_dict, 'Max traffic prediction on')
+		plt.show()
+
+	def get_data():
+		CNN_RNN_all_grid_path = './result/CNN_RNN/all_real_prediction_traffic_array_0718.npy'
+		CNN_RNN_without_task_all_grid_path = './result/CNN_RNN_without_task/all_real_prediction_traffic_array_split_min_avg_max.npy'
+		CNN_RNN_MTL_array = du.load_array(CNN_RNN_all_grid_path)
+		CNN_RNN_without_task_array = du.load_array(CNN_RNN_without_task_all_grid_path)
+		CNN_RNN_MTL_array = CNN_RNN_MTL_array[:-1]
+		logger.info('CNN_RNN_MTL_array shape:{} CNN_RNN_without_task_array shape:{}'.format(CNN_RNN_MTL_array.shape, CNN_RNN_without_task_array.shape))
+		return CNN_RNN_MTL_array, CNN_RNN_without_task_array
+
+	CNN_RNN_MTL_array, CNN_RNN_without_task_array = get_data()
+	plot_together(CNN_RNN_MTL_array, CNN_RNN_without_task_array)
+
+
+if __name__ == '__main__':
+	# evaluate_MTL_and_STL()
+	# evaluate_different_method()
+	# evaluate_accuracy_composition()
+	# plot_method()
+	# evaluate_CNN_RNN_without_task()
+	evaluate_MTL_and_without_task()

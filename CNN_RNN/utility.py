@@ -3,6 +3,28 @@ from datetime import datetime
 import pytz
 import os
 import numpy as np
+import logging
+
+
+def setlog(logger_name='logger'):
+	logger_name = logger_name
+	logger = logging.getLogger(name=logger_name)
+	logger.setLevel(logging.DEBUG)
+	log_path = './log.log'
+	fh = logging.FileHandler(log_path, mode='w')
+	fh.setLevel(logging.WARN)
+	console = logging.StreamHandler()
+	console.setLevel(logging.DEBUG)
+
+	fmt = '%(levelname)s:[%(filename)s %(funcName)s:%(lineno)d] %(message)s'
+	formatter = logging.Formatter(fmt=fmt, datefmt=None)
+
+	fh.setFormatter(formatter)
+	console.setFormatter(formatter)
+
+	logger.addHandler(fh)
+	logger.addHandler(console)
+	return logger
 
 
 def compute_row_col(grid_id):

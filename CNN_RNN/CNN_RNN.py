@@ -758,9 +758,9 @@ class Multitask_Neural_Network(Tf_Utility):
 					if epoch % 500 == 0 and epoch is not 0:
 						self.save_model(sess, self.saver, model_path['save_path'])
 
-					flag = early_stop(epoch, task_name)
-					if flag:
-						break
+					# flag = early_stop(epoch, task_name)
+					# if flag:
+						# break
 			coord.request_stop()
 			coord.join(treads)
 			print('training finished!')

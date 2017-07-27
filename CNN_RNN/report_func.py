@@ -4,7 +4,7 @@ import numpy as np
 import json
 
 
-def plot_predict_vs_real(info, real, predict, title_name):
+def plot_predict_vs_real(info, real, predict, title_name, interval=6):
 	def get_xlabel(timestamps):
 		xlabel_list = []
 		for timestamp in timestamps:
@@ -14,17 +14,19 @@ def plot_predict_vs_real(info, real, predict, title_name):
 
 	x_len = info.shape[0]
 	xlabel_list = get_xlabel(info[:, 1])
-	fig = plt.figure()
-	plt.xlabel('time sequence')
-	plt.ylabel('number of CDR')
+	fig, ax = plt.subplots(1, 1, figsize=(10, 4))
+	ax.set_xlabel('Time sequence')
+	ax.set_ylabel('Number of CDRs')
 
-	plt.plot(range(x_len), real, label='Real', color='k')
-	plt.plot(range(x_len), predict, label='Predictoin', color='r', linestyle='--')
+	ax.plot(range(x_len), real, label='Real', color='k')
+	ax.plot(range(x_len), predict, label='Predictoin', color='r', linestyle='--')
 	# plt.xticks(list(range(0, x_len, 12)), xlabel_list[:x_len:2], rotation=45)
 	# plt.set_xticklabels()
-	plt.title(title_name + ' grid_id:' + str(int(info[0, 0])))
-	plt.grid()
-	plt.legend()
+	ax.set_xticks(list(range(0, x_len, interval)))
+	ax.set_xticklabels(xlabel_list[0:x_len:interval], rotation=45)
+	ax.set_title(title_name + ' grid id ' + str(int(info[0, 0])))
+	ax.grid()
+	ax.legend()
 	return fig
 
 

@@ -13,6 +13,8 @@ root_dir = '/home/mldp/ML_with_bigdata'
 grid_row_num = 100
 grid_column_num = 100
 
+logger = utility.setlog()
+
 def get_trainina_data():
 	TK = Prepare_Task_Data('./npy/final')
 	X_array, Y_array = TK.Task_max_min_avg(generate_data=True)
@@ -223,6 +225,32 @@ def train_STL_CNN_RNN_(X_array, Y_array):
 	run_task(X_array, Y_array, 'min_traffic')
 
 
+def train_CNN_RNN_without_task(X_array, Y_array):
+	logger.debug('X_array:{} Y_array:{}'.format(X_array.shape, Y_array.shape))
+	input_data_shape = [X_array.shape[1], X_array.shape[2], X_array.shape[3], X_array.shape[4]]
+	output_data_shape = [Y_array.shape[1], Y_array.shape[2], Y_array.shape[3], 1]
+	result_path = '/home/mldp/ML_with_bigdata/CNN_RNN/result/CNN_RNN_without_task'
+	# result_path = os.path.join(result_path, task_name)
+	reload_path = '/home/mldp/ML_with_bigdata/CNN_RNN/output_model/' + 'CNN_RNN_without_task.ckpt'
+
+	utility.check_path_exist(result_path)
+	model_path = {
+		'reload_path': reload_path,
+		'save_path': reload_path,
+		'result_path': result_path
+	}
+	hyper_config = CNN_RNN_config.HyperParameterConfig()
+	hyper_config.read_config(file_path=os.path.join(root_dir, 'CNN_RNN/result/random_search_0609/_85/config.json'))
+	hyper_config.iter_epoch = 500
+	neural = CNN_RNN(input_data_shape, output_data_shape, hyper_config)
+	neural.create_MTL_task(X_array, Y_array, '_traffic')
+	# neural.create_MTL_task(X_array, Y_array[:, :, :, :, 1, np.newaxis], 'avg_traffic')
+	# neural.create_MTL_task(X_array, Y_array[:, :, :, :, 2, np.newaxis], 'max_traffic')
+	del X_array, Y_array
+	neural.start_STL_train(model_path, '_traffic', reload=False)
+	return neural
+
+
 def predict_(neural, X_array, Y_array, model_path, batch_size):
 
 	def predict_MTL_train(neural, X_array, Y_array, model_path):
@@ -324,16 +352,15 @@ def predict_CNN_RNN(X_array, Y_array, scaler, Neural=None):
 	key_var = hyper_config.get_variable()
 	batch_size = key_var['batch_size']
 	model_path = {
-		'reload_path': os.path.join(root_dir, 'CNN_RNN/output_model/CNN_RNN_all.ckpt'),
-		'save_path': '/home/mldp/ML_with_bigdata/CNN_RNN/output_model/CNN_RNN_all.ckpt'
+		'reload_path': os.path.join(root_dir, 'CNN_RNN/output_model/CNN_RNN_without_task.ckpt'),
+		'save_path': '/home/mldp/ML_with_bigdata/CNN_RNN/output_model/CNN_RNN_without_task.ckpt'
 	}
 	if Neural:
 		neural = Neural
 	else:
 		neural = CNN_RNN(input_data_shape, output_data_shape, hyper_config)
-		neural.create_MTL_task(X_array, Y_array[:, :, :, :, 2, np.newaxis], 'min_traffic')
-		neural.create_MTL_task(X_array, Y_array[:, :, :, :, 3, np.newaxis], 'avg_traffic')
-		neural.create_MTL_task(X_array, Y_array[:, :, :, :, 4, np.newaxis], 'max_traffic')
+		neural.create_MTL_task(X_array, Y_array[:, :, :, :, -1, np.newaxis], '_traffic')
+
 	Y_info = Y_array[:, :, :, :, :2]
 	Y_real = Y_array[:, :, :, :, 2:]
 
@@ -344,6 +371,60 @@ def predict_CNN_RNN(X_array, Y_array, scaler, Neural=None):
 
 	# du.save_array(Y_array, './result/CNN_RNN/Y_real_prediction.npy')
 
+	return Y_array
+
+
+def predict_CNN_RNN_without_task(X_array, Y_array, scaler):
+	def run_task(X_array, Y_array, task_name, scaler):
+		def STL_predict(neural, X_array, Y_array, model_path, batch_size, task_name):
+			def predict_remainder(neural, X_array, Y_array, model_path, batch_size, task_name):
+				array_len = X_array.shape[0]
+				n_remain = array_len % batch_size
+				new_x = X_array[array_len - batch_size:]
+				new_y = Y_array[array_len - batch_size:]
+				# print('new_x, new_y', new_x.shape, new_y.shape)
+				prediction = neural.start_STL_predict(new_x, new_y, model_path, task_name)
+				remainder_prediction = prediction[prediction.shape[0] - n_remain:]
+				return remainder_prediction
+			# print(X_array.shape, Y_array.shape)
+			y_prediction = neural.start_STL_predict(X_array, Y_array, model_path, task_name)
+			# print(y_prediction.shape, Y_array.shape)
+			remain_predcition = predict_remainder(neural, X_array, Y_array, model_path, batch_size, task_name)
+			y_prediction = np.concatenate((y_prediction, remain_predcition), axis=0)
+
+			return y_prediction
+		hyper_config = CNN_RNN_config.HyperParameterConfig()
+		hyper_config.read_config(file_path=os.path.join(
+			root_dir, 'CNN_RNN/result/random_search_0609/_85/config.json'))
+		key_var = hyper_config.get_variable()
+		batch_size = key_var['batch_size']
+
+		reload_path = '/home/mldp/ML_with_bigdata/CNN_RNN/output_model/' + 'CNN_RNN_without_task.ckpt'
+		model_path = {
+			'reload_path': reload_path,
+			'save_path': '/home/mldp/ML_with_bigdata/CNN_RNN/output_model/CNN_RNN_without_task.ckpt'
+		}
+
+		input_data_shape = [X_array.shape[1], X_array.shape[2], X_array.shape[3], 1]
+		output_data_shape = [Y_array.shape[1], Y_array.shape[2], Y_array.shape[3], 1]
+
+		neural = CNN_RNN(input_data_shape, output_data_shape, hyper_config)
+		neural.create_MTL_task(X_array, Y_array[:, :, :, :, -1, np.newaxis], task_name)
+		# neural.create_MTL_task(X_array, Y_array[:, :, :, :, task_index['avg_traffic'], np.newaxis], 'avg_traffic')
+		# neural.create_MTL_task(X_array, Y_array[:, :, :, :, task_index['max_traffic'], np.newaxis], 'max_traffic')
+
+		y_task_real = Y_array[:, :, :, :, -1, np.newaxis]
+		prediction_y = STL_predict(neural, X_array, y_task_real, model_path, batch_size, task_name)
+		prediction_y = utility.un_feature_scaling(prediction_y, scaler)
+		y_task_real = utility.un_feature_scaling(y_task_real, scaler)
+		Y_task_real_prediction = np.concatenate((y_task_real, prediction_y), axis=-1)
+		return Y_task_real_prediction
+
+	Y_real_prediction = run_task(X_array[:, :, :, :, 2:], Y_array[:, :, :, :, 2:], '_traffic', scaler)
+	logger.debug('Y_real_prediction shape {}'.format(Y_real_prediction.shape))
+	Y_info = Y_array[:, :, :, :, :2]
+	Y_array = np.concatenate((Y_info, Y_real_prediction), axis=-1)
+	logger.debug('Y_array shape {}'.format(Y_array.shape))
 	return Y_array
 
 
@@ -416,16 +497,8 @@ def predict_STL_CNN_RNN(X_array, Y_array, scaler):
 	print('Y_real_prediction', Y_real_prediction.shape)
 	return Y_real_prediction
 
+
 def predict_ARIMA(input_array):
-	def try_differen_order(data_array, order_):
-		try:
-			arima = ARIMA_Model(order=order_)
-			arima.set_training_set(data_array[:, 0], data_array[:, 1], data_array[:, 2])
-			arima.MTL_predict()
-			# arima.evaluate()
-		except:
-			arima = None
-		return arima
 	# print(input_array.shape)
 	data_info = input_array[:, :2]
 	data_array = input_array[:, 2:]
@@ -458,17 +531,25 @@ def compute_range_by_center(row_center, col_center):
 
 def store_report(Y_array, file_path, row_center, col_center):
 	data_len = Y_array.shape[0]
-	min_MAPE_test = utility.MAPE_loss(Y_array[9 * data_len // 10:, :, :, :, 2, np.newaxis], Y_array[9 * data_len // 10:, :, :, :, 5, np.newaxis])
-	avg_MAPE_test = utility.MAPE_loss(Y_array[9 * data_len // 10:, :, :, :, 3, np.newaxis], Y_array[9 * data_len // 10:, :, :, :, 6, np.newaxis])
-	max_MAPE_test = utility.MAPE_loss(Y_array[9 * data_len // 10:, :, :, :, 4, np.newaxis], Y_array[9 * data_len // 10:, :, :, :, 7, np.newaxis])
-	if min_MAPE_test and avg_MAPE_test and max_MAPE_test:
-		print('min accu', 1 - min_MAPE_test)
-		print('avg accu', 1 - avg_MAPE_test)
-		print('max accu', 1 - max_MAPE_test)
-		string_ = 'row center:{} col center:{} min accu:{:.4f} avg accu:{:.4f} max accu:{:.4f}\n'.format(row_center, col_center, 1 - min_MAPE_test, 1 - avg_MAPE_test, 1 - max_MAPE_test)
+	MAPE_test = utility.MAPE_loss(Y_array[9 * data_len // 10:, :, :, :, 2, np.newaxis], Y_array[9 * data_len // 10:, :, :, :, 3, np.newaxis])
+	if MAPE_test:
+		print('accu', 1 - MAPE_test)
+		string_ = 'row center:{} col center:{} accu:{:.4f}\n'.format(row_center, col_center, 1 - MAPE_test)
 		print(string_)
 		with open(file_path, 'a',) as f:
 			f.write(string_)
+	
+	# # min_MAPE_test = utility.MAPE_loss(Y_array[9 * data_len // 10:, :, :, :, 2, np.newaxis], Y_array[9 * data_len // 10:, :, :, :, 5, np.newaxis])
+	# # avg_MAPE_test = utility.MAPE_loss(Y_array[9 * data_len // 10:, :, :, :, 3, np.newaxis], Y_array[9 * data_len // 10:, :, :, :, 6, np.newaxis])
+	# # max_MAPE_test = utility.MAPE_loss(Y_array[9 * data_len // 10:, :, :, :, 4, np.newaxis], Y_array[9 * data_len // 10:, :, :, :, 7, np.newaxis])
+	# if min_MAPE_test and avg_MAPE_test and max_MAPE_test:
+	# 	print('min accu', 1 - min_MAPE_test)
+	# 	print('avg accu', 1 - avg_MAPE_test)
+	# 	print('max accu', 1 - max_MAPE_test)
+	# 	string_ = 'row center:{} col center:{} min accu:{:.4f} avg accu:{:.4f} max accu:{:.4f}\n'.format(row_center, col_center, 1 - min_MAPE_test, 1 - avg_MAPE_test, 1 - max_MAPE_test)
+	# 	print(string_)
+	# 	with open(file_path, 'a',) as f:
+	# 		f.write(string_)
 
 
 def loop_CNN_RNN():
@@ -652,8 +733,66 @@ def loop_STL_CNN_RNN():
 								i, j, row, col]
 							# print(traffic_array[i, j, row_index, col_index])
 
-		du.save_array(traffic_array, os.path.josin(base_dir, 'all_real_prediction_traffic_array.npy'))
-	du.save_array(traffic_array, os.path.josin(base_dir, 'all_real_prediction_traffic_array.npy'))
+		du.save_array(traffic_array, os.path.join(base_dir, 'all_real_prediction_traffic_array.npy'))
+	du.save_array(traffic_array, os.path.join(base_dir, 'all_real_prediction_traffic_array.npy'))
+
+
+def loop_CNN_RNN_without_task():
+	def generate_tain_and_test():
+		X_all_train, _, X_all_test, _ = get_all_data()
+		all_data = np.concatenate((X_all_train, X_all_test), axis=0)
+		del X_all_train, X_all_test
+		X_all = all_data[:-1]
+		Y_all = all_data[1:]
+		del all_data
+		data_len = X_all.shape[0]
+		X_all_train, X_all_test = X_all[: 9 * data_len // 10], X_all[9 * data_len // 10:]
+		Y_all_train, Y_all_test = Y_all[: 9 * data_len // 10], Y_all[9 * data_len // 10:]
+		return X_all_train, Y_all_train, X_all_test, Y_all_test
+
+	X_all_train, Y_all_train, X_all_test, Y_all_test = generate_tain_and_test()
+	logger.debug('{} {} {} {}'.format(X_all_train.shape, Y_all_train.shape, X_all_test.shape, Y_all_test.shape))
+	row_center_list = list(range(40, 80, 3))
+	col_center_list = list(range(30, 70, 3))
+	row_shift = row_center_list[0]
+	col_shift = col_center_list[0]
+	traffic_array = np.zeros([1487, 6, grid_row_num - row_shift - 10, grid_column_num - col_shift - 20, 4], dtype=float)
+
+	base_dir = os.path.join(root_dir, 'CNN_RNN/result/CNN_RNN_without_task')
+	store_path = os.path.join(base_dir, 'loop_report.txt')
+	utility.check_path_exist(base_dir)
+	if os.path.exists(store_path):
+		os.remove(store_path)
+	for row_center in row_center_list:
+		for col_center in col_center_list:
+			print('row_center:{} col_center:{}'.format(row_center, col_center))
+			row_range, col_range = compute_range_by_center(row_center, col_center)
+			X_train, Y_train, X_test, Y_test, scaler = get_network_input_and_output(X_all_train, Y_all_train, X_all_test, Y_all_test, row_range, col_range)
+			logger.debug('X_train:{} Y_train:{} Y_train:{} X_test:{}'.format(X_train.shape, Y_train.shape, X_test.shape, Y_test.shape))
+			train_CNN_RNN_without_task(X_train[:, :, :, :, -1, np.newaxis], Y_train[:, :, :, :, -1, np.newaxis])
+
+			X_all = np.concatenate((X_train, X_test), axis=0)
+			Y_all = np.concatenate((Y_train, Y_test), axis=0)
+			traffic_data = predict_CNN_RNN_without_task(X_all, Y_all, scaler)
+			logger.debug('traffice data shape:{}'.format(traffic_data.shape))
+			store_report(traffic_data, store_path, row_center, col_center)
+			for i in range(traffic_data.shape[0]):
+				for j in range(traffic_data.shape[1]):
+					for row in range(traffic_data.shape[2]):
+						for col in range(traffic_data.shape[3]):
+							grid_id = traffic_data[i, j, row, col, 0]
+							if grid_id == 0:
+								continue
+							row_index, col_index = utility.compute_row_col(grid_id)
+							if row_index not in range(39, 81) or col_index not in range(29, 71):
+								continue
+							# print(row_index, col_index)
+							# logger.debug('grid id:{} row index:{} col_index:{}'.format(grid_id, row_index, col_index))
+							# logger.debug('row_center:{} col_center:{}'.format(row_center, col_center))
+							traffic_array[i, j, row_index - row_shift, col_index - col_shift] = traffic_data[
+								i, j, row, col]
+		du.save_array(traffic_array, os.path.join(base_dir, 'all_real_prediction_traffic_array.npy'))
+	du.save_array(traffic_array, os.path.join(base_dir, 'all_real_prediction_traffic_array.npy'))
 
 
 def train_different_method():
@@ -676,8 +815,9 @@ def loop_different_method():
 	# loop_CNN_RNN()
 	# loop_CNN_3D()
 	# loop_RNN()
-	loop_ARIMA()
+	# loop_ARIMA()
 	# loop_STL_CNN_RNN()
+	loop_CNN_RNN_without_task()
 
 
 if __name__ == '__main__':
