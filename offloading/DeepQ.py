@@ -14,7 +14,7 @@ class DeepQNetwork:
 		memory_size=500,
 		batch_size=32,
 		e_greedy_increment=None):
-
+		tf.reset_default_graph()
 		self.n_actions = n_actions
 		self.n_features = n_features
 		self.lr = learning_rate
@@ -23,14 +23,17 @@ class DeepQNetwork:
 		self.replace_target_iter = replace_target_iter
 		self.memory_size = memory_size
 		self.batch_size = batch_size
-		self.nl1 = 1024
+		self.nl1 = 512
+		self.nl1_5 = 512
 		self.epsilon_increment = e_greedy_increment
 
 		self.epsilon = 0 if e_greedy_increment is not None else self.epsilon_max
 
 		self.learn_step_couter = 0
 		self.memory = np.zeros((self.memory_size, n_features * 2 + 2), dtype=float, order='C')
-		self.sess = tf.Session()
+		config = tf.ConfigProto()
+		config.gpu_options.per_process_gpu_memory_fraction = 0.25
+		self.sess = tf.Session(config=config)
 		self._build_net()
 		self.saver = tf.train.Saver()
 		self.sess.run(tf.global_variables_initializer())
@@ -43,15 +46,21 @@ class DeepQNetwork:
 				b1 = tf.get_variable('b1', [1, n_l1], initializer=b_initializer, collections=c_names)
 				l1 = tf.nn.relu(tf.matmul(s, w1) + b1)
 
+			with tf.variable_scope('l1_5'):
+				w1_5 = tf.get_variable('w1_5', [n_l1, self.nl1_5], initializer=w_initializer, collections=c_names)
+				b1_5 = tf.get_variable('b1_5', [1, self.nl1_5], initializer=b_initializer, collections=c_names)
+				l1_5 = tf.nn.relu(tf.matmul(l1, w1_5) + b1_5)
+
 			with tf.variable_scope('l2'):
-				w2 = tf.get_variable('w2', [n_l1, self.n_actions], initializer=w_initializer, collections=c_names)
+				w2 = tf.get_variable('w2', [self.nl1_5, self.n_actions], initializer=w_initializer, collections=c_names)
 				b2 = tf.get_variable('b2', [1, self.n_actions], initializer=b_initializer, collections=c_names)
-				out = tf.matmul(l1, w2) + b2
+				out = tf.matmul(l1_5, w2) + b2
 			return out
 
 		self.s = tf.placeholder(tf.float32, [None, self.n_features], name='s')
 		self.s_ = tf.placeholder(tf.float32, [None, self.n_features], name='s_')
 
+		# self.keep_prob_ph = tf.placeholder(tf.float32, name='keep_prob')
 		self.r = tf.placeholder(tf.float32, [None, ], name='r')
 		self.a = tf.placeholder(tf.int32, [None, ], name='a')
 
@@ -62,7 +71,7 @@ class DeepQNetwork:
 
 		with tf.variable_scope('target_net'):
 			c_names = ['target_net_params', tf.GraphKeys.GLOBAL_VARIABLES]
-			self.q_next = build_layers(self.s, c_names, n_l1, w_initializer, b_initializer)
+			self.q_next = build_layers(self.s_, c_names, n_l1, w_initializer, b_initializer)
 
 		with tf.variable_scope('q_target'):
 			q_target = self.r + self.gamma * tf.reduce_max(self.q_next, axis=1, name='Qmax_s_')
@@ -104,7 +113,7 @@ class DeepQNetwork:
 	def learn(self):
 		if self.learn_step_couter % self.replace_target_iter == 0:
 			self._replace_target_params()
-			print('\n targert_params_replaced\n')
+			# print('\n targert_params_replaced\n')
 
 		if self.memory_couter > self.memory_size:
 			sample_index = np.random.choice(self.memory_size, size=self.batch_size, replace=True, p=None)
@@ -118,7 +127,7 @@ class DeepQNetwork:
 				self.s: batch_memory[:, :self.n_features],
 				self.a: batch_memory[:, self.n_features],
 				self.r: batch_memory[:, self.n_features + 1],
-				self.s_: batch_memory[:, -self.n_features:],
+				self.s_: batch_memory[:, -self.n_features:]
 			})
 		self.cost_his.append(cost)
 
