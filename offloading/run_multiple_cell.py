@@ -43,11 +43,26 @@ def filter_cell_index():
 					grid_id_list.append(int(grid_id))
 		return grid_id_list
 
-	evaluate_threshold = 0.75
+	def filter_by_range(Y_real_prediction_array):
+		Y_real_prediction_array = np.transpose(Y_real_prediction_array, (2, 3, 0, 1, 4))
+		grid_id_list = []
+		row_range = list(range(30, 50))
+		col_range = list(range(30, 50))
+		for row_index in range(Y_real_prediction_array.shape[0]):
+			for col_index in range(Y_real_prediction_array.shape[1]):
+				info = Y_real_prediction_array[row_index, col_index, :, 0, :2]
+				if row_index in row_range and col_index in col_range:
+					grid_id = info[0, 0]
+					# print('grid id:{} accu:{}'.format(grid_id, Accu))
+					grid_id_list.append(int(grid_id))
+		return grid_id_list
+
 	all_real_prediction_traffic_array_path = os.path.join(root_dir, 'offloading/npy/real_prediction/hour_traffic_array.npy')
 
 	CNN_RNN_MTL_array = du.load_array(all_real_prediction_traffic_array_path)
-	grid_id_list = evaluate_performance(CNN_RNN_MTL_array, evaluate_threshold)
+	# evaluate_threshold = 0.75
+	# grid_id_list = evaluate_performance(CNN_RNN_MTL_array, evaluate_threshold)
+	grid_id_list = filter_by_range(CNN_RNN_MTL_array)
 	cell_grids = get_cell_tower_grid_pair()
 	cell_index_list = []
 	for cell_grid in cell_grids:
