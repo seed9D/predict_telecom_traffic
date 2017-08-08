@@ -5,7 +5,9 @@ import os
 import numpy as np
 import logging
 
-root_dir = '~/home'
+root_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+# root_dir = '~/home'
+
 
 def setlog(logger_name='logger'):
 	logger_name = logger_name
