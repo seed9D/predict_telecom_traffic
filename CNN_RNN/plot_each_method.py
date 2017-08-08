@@ -9,199 +9,199 @@ import os
 import report_func
 import utility
 import sys
-sys.path.append('/home/mldp/ML_with_bigdata')
+sys.path.append(utility.root_dir)
 import data_utility as du
 
 logger = utility.setlog()
-root_dir = '/home/mldp/ML_with_bigdata'
+root_dir = utility.root_dir
 
-method_LM_result_path = '/home/qiuhui/processed_data/'
-method_CNN_RNN_result_path = '/home/mldp/ML_with_bigdata/CNN_RNN/result/CNN_RNN/Y_real_prediction.npy'
-method_CNN_3D_result_path = '/home/mldp/ML_with_bigdata/CNN_RNN/result/CNN_3D/Y_real_prediction.npy'
-method_RNN_result_path = '/home/mldp/ML_with_bigdata/CNN_RNN/result/RNN/Y_real_prediction.npy'
+# method_LM_result_path = '/home/qiuhui/processed_data/'
+# method_CNN_RNN_result_path = '/home/mldp/ML_with_bigdata/CNN_RNN/result/CNN_RNN/Y_real_prediction.npy'
+# method_CNN_3D_result_path = '/home/mldp/ML_with_bigdata/CNN_RNN/result/CNN_3D/Y_real_prediction.npy'
+# method_RNN_result_path = '/home/mldp/ML_with_bigdata/CNN_RNN/result/RNN/Y_real_prediction.npy'
 
-plot_grid_id_list = [4258, 4456, 4457]
-time_shift = 2
-
-
-def get_CNN_RNN():
-	CNN_RNN_prediction = du.load_array(method_CNN_RNN_result_path)
-	info = CNN_RNN_prediction[time_shift:, :, :, :, :2]
-	real = CNN_RNN_prediction[time_shift:, :, :, :, 2:5]
-	CNN_RNN_prediction = CNN_RNN_prediction[time_shift:, :, :, :, 5:]
-	return info, real, CNN_RNN_prediction
+# plot_grid_id_list = [4258, 4456, 4457]
+# time_shift = 2
 
 
-def get_CNN_3D():
-	CNN_3D_prediction = du.load_array(method_CNN_3D_result_path)
-	info = CNN_3D_prediction[time_shift:, :, :, :, :2]
-	real = CNN_3D_prediction[time_shift:, :, :, :, 2:5]
-	CNN_3D_prediction = CNN_3D_prediction[time_shift:, :, :, :, 5:]
-	return info, real, CNN_3D_prediction
+# def get_CNN_RNN():
+# 	CNN_RNN_prediction = du.load_array(method_CNN_RNN_result_path)
+# 	info = CNN_RNN_prediction[time_shift:, :, :, :, :2]
+# 	real = CNN_RNN_prediction[time_shift:, :, :, :, 2:5]
+# 	CNN_RNN_prediction = CNN_RNN_prediction[time_shift:, :, :, :, 5:]
+# 	return info, real, CNN_RNN_prediction
 
 
-def get_RNN():
-	RNN_prediction = du.load_array(method_RNN_result_path)
-	info = RNN_prediction[time_shift:, :, :, :, :2]
-	real = RNN_prediction[time_shift:, :, :, :, 2:5]
-	RNN_prediction = RNN_prediction[time_shift:, :, :, :, 5:]
-	return info, real, RNN_prediction
+# def get_CNN_3D():
+# 	CNN_3D_prediction = du.load_array(method_CNN_3D_result_path)
+# 	info = CNN_3D_prediction[time_shift:, :, :, :, :2]
+# 	real = CNN_3D_prediction[time_shift:, :, :, :, 2:5]
+# 	CNN_3D_prediction = CNN_3D_prediction[time_shift:, :, :, :, 5:]
+# 	return info, real, CNN_3D_prediction
 
 
-def get_LM(grid_id, task_name):
-	min_file = os.path.join(method_LM_result_path, str(grid_id) + '_' + task_name + '.npy')
-	min_array = du.load_array(min_file)
-	return min_array
+# def get_RNN():
+# 	RNN_prediction = du.load_array(method_RNN_result_path)
+# 	info = RNN_prediction[time_shift:, :, :, :, :2]
+# 	real = RNN_prediction[time_shift:, :, :, :, 2:5]
+# 	RNN_prediction = RNN_prediction[time_shift:, :, :, :, 5:]
+# 	return info, real, RNN_prediction
 
 
-def plot_all_method_together(plot_dict, task_name):
-	def get_xlabel(timestamps):
-		xlabel_list = []
-		for timestamp in timestamps:
-			datetime = utility.set_time_zone(timestamp)
-			xlabel_list.append(utility.date_time_covert_to_str(datetime))
-		return xlabel_list
-
-	xlabel_list = get_xlabel(plot_dict['info'][:, 1])
-	x_len = len(xlabel_list)
-	grid_id = plot_dict['info'][0, 0]
-	fig, ax = plt.subplots(1, 1)
-	ax.set_xlabel('time sequence')
-	ax.set_ylabel('number of CDR')
-
-	ax.plot(range(x_len), plot_dict['real'], label='Real', color='k')
-	ax.plot(range(x_len), plot_dict['CNN_RNN'], label='CNN_RNN', marker='.')
-	ax.plot(range(x_len), plot_dict['CNN_3D'], label='CNN_3D', linestyle='--')
-	ax.plot(range(x_len), plot_dict['RNN'], label='RNN', marker='v')
-	# ax.plot(range(x_len), plot_dict['LM'], label='Levenberg–Marquardt', marker='x')
-	ax.set_xticks(list(range(0, x_len, 2)))
-	ax.set_xticklabels(xlabel_list[0:x_len:2], rotation=45)
-	ax.set_title(task_name + ' Grid id: ' + str(int(grid_id)))
-	ax.grid()
-	ax.legend()
-
-	return fig
+# def get_LM(grid_id, task_name):
+# 	min_file = os.path.join(method_LM_result_path, str(grid_id) + '_' + task_name + '.npy')
+# 	min_array = du.load_array(min_file)
+# 	return min_array
 
 
-def plot_all_task_together(plot_dict):
-	def get_xlabel(timestamps):
-		xlabel_list = []
-		for timestamp in timestamps:
-			datetime = utility.set_time_zone(timestamp)
-			xlabel_list.append(utility.date_time_covert_to_str(datetime))
-		return xlabel_list
+# def plot_all_method_together(plot_dict, task_name):
+# 	def get_xlabel(timestamps):
+# 		xlabel_list = []
+# 		for timestamp in timestamps:
+# 			datetime = utility.set_time_zone(timestamp)
+# 			xlabel_list.append(utility.date_time_covert_to_str(datetime))
+# 		return xlabel_list
 
-	def plot_by_task(axis, xlabel_list, plot_dict, task_name):
-		x_len = len(xlabel_list)
-		axis.plot(range(x_len), plot_dict['real'], label='Real', color='k')
-		axis.plot(range(x_len), plot_dict['CNN_RNN'], label='CNN_RNN', linestyle='--')
-		axis.plot(range(x_len), plot_dict['CNN_3D'], label='CNN_3D', linestyle='--')
-		axis.plot(range(x_len), plot_dict['RNN'], label='RNN', linestyle='--')
-		axis.set_xticks(list(range(0, x_len, 6)))
-		axis.set_xticklabels(xlabel_list[0:x_len:6], rotation=45)
+# 	xlabel_list = get_xlabel(plot_dict['info'][:, 1])
+# 	x_len = len(xlabel_list)
+# 	grid_id = plot_dict['info'][0, 0]
+# 	fig, ax = plt.subplots(1, 1)
+# 	ax.set_xlabel('time sequence')
+# 	ax.set_ylabel('number of CDR')
 
-		axis.grid()
-		axis.legend()
-		axis.set_title(task_name)
+# 	ax.plot(range(x_len), plot_dict['real'], label='Real', color='k')
+# 	ax.plot(range(x_len), plot_dict['CNN_RNN'], label='CNN_RNN', marker='.')
+# 	ax.plot(range(x_len), plot_dict['CNN_3D'], label='CNN_3D', linestyle='--')
+# 	ax.plot(range(x_len), plot_dict['RNN'], label='RNN', marker='v')
+# 	# ax.plot(range(x_len), plot_dict['LM'], label='Levenberg–Marquardt', marker='x')
+# 	ax.set_xticks(list(range(0, x_len, 2)))
+# 	ax.set_xticklabels(xlabel_list[0:x_len:2], rotation=45)
+# 	ax.set_title(task_name + ' Grid id: ' + str(int(grid_id)))
+# 	ax.grid()
+# 	ax.legend()
 
-	xlabel_list = get_xlabel(plot_dict['info'][:, 1])
-	grid_id = plot_dict['info'][0, 0]
-	fig = plt.figure()
-	ax_min = fig.add_subplot(311)
-	ax_avg = fig.add_subplot(312)
-	ax_max = fig.add_subplot(313)
-
-	min_dict = {
-		'real': plot_dict['real'][:, 0],
-		'CNN_RNN': plot_dict['CNN_RNN'][:, 0],
-		'RNN': plot_dict['RNN'][:, 0],
-		'CNN_3D': plot_dict['CNN_3D'][:, 0]
-	}
-	plot_by_task(ax_min, xlabel_list, min_dict, 'Task_min')
-
-	avg_dict = {
-		'real': plot_dict['real'][:, 1],
-		'CNN_RNN': plot_dict['CNN_RNN'][:, 1],
-		'RNN': plot_dict['RNN'][:, 1],
-		'CNN_3D': plot_dict['CNN_3D'][:, 1]
-	}
-	plot_by_task(ax_avg, xlabel_list, avg_dict, 'Task_avg')
-
-	max_dict = {
-		'real': plot_dict['real'][:, 2],
-		'CNN_RNN': plot_dict['CNN_RNN'][:, 2],
-		'RNN': plot_dict['RNN'][:, 2],
-		'CNN_3D': plot_dict['CNN_3D'][:, 2]
-	}
-	plot_by_task(ax_max, xlabel_list, max_dict, 'Task_max')
-	plt.xlabel('time sequence')
-	plt.ylabel('number of CDR')
-	plt.title('Grid id:' + str(int(grid_id)))
+# 	return fig
 
 
-def plot_min_task_all_together(plot_dict):
-	row = 0
-	col = 0
-	interval = (9, 40)
+# def plot_all_task_together(plot_dict):
+# 	def get_xlabel(timestamps):
+# 		xlabel_list = []
+# 		for timestamp in timestamps:
+# 			datetime = utility.set_time_zone(timestamp)
+# 			xlabel_list.append(utility.date_time_covert_to_str(datetime))
+# 		return xlabel_list
 
-	plot_dict_min = {
-		'info': plot_dict['info'][interval[0]:interval[1], 0, row, col],
-		'real': plot_dict['real'][interval[0]:interval[1], 0, row, col, 0],
-		'CNN_RNN': plot_dict['CNN_RNN'][interval[0]:interval[1], 0, row, col, 0],
-		'CNN_3D': plot_dict['CNN_3D'][interval[0]:interval[1], 0, row, col, 0],
-		'RNN': plot_dict['RNN'][interval[0]:interval[1], 0, row, col, 0]
-	}
+# 	def plot_by_task(axis, xlabel_list, plot_dict, task_name):
+# 		x_len = len(xlabel_list)
+# 		axis.plot(range(x_len), plot_dict['real'], label='Real', color='k')
+# 		axis.plot(range(x_len), plot_dict['CNN_RNN'], label='CNN_RNN', linestyle='--')
+# 		axis.plot(range(x_len), plot_dict['CNN_3D'], label='CNN_3D', linestyle='--')
+# 		axis.plot(range(x_len), plot_dict['RNN'], label='RNN', linestyle='--')
+# 		axis.set_xticks(list(range(0, x_len, 6)))
+# 		axis.set_xticklabels(xlabel_list[0:x_len:6], rotation=45)
 
-	grid_id = int(plot_dict_min['info'][0, 0])
-	LM_array = get_LM(grid_id, 'min')[interval[0]:interval[1]]
-	plot_dict_min['LM'] = LM_array
-	# print(plot_dict_min['CNN_3D'].shape)
-	# print(LM_array.shape)
-	plot_all_method_together(plot_dict_min, 'Task_min')
+# 		axis.grid()
+# 		axis.legend()
+# 		axis.set_title(task_name)
+
+# 	xlabel_list = get_xlabel(plot_dict['info'][:, 1])
+# 	grid_id = plot_dict['info'][0, 0]
+# 	fig = plt.figure()
+# 	ax_min = fig.add_subplot(311)
+# 	ax_avg = fig.add_subplot(312)
+# 	ax_max = fig.add_subplot(313)
+
+# 	min_dict = {
+# 		'real': plot_dict['real'][:, 0],
+# 		'CNN_RNN': plot_dict['CNN_RNN'][:, 0],
+# 		'RNN': plot_dict['RNN'][:, 0],
+# 		'CNN_3D': plot_dict['CNN_3D'][:, 0]
+# 	}
+# 	plot_by_task(ax_min, xlabel_list, min_dict, 'Task_min')
+
+# 	avg_dict = {
+# 		'real': plot_dict['real'][:, 1],
+# 		'CNN_RNN': plot_dict['CNN_RNN'][:, 1],
+# 		'RNN': plot_dict['RNN'][:, 1],
+# 		'CNN_3D': plot_dict['CNN_3D'][:, 1]
+# 	}
+# 	plot_by_task(ax_avg, xlabel_list, avg_dict, 'Task_avg')
+
+# 	max_dict = {
+# 		'real': plot_dict['real'][:, 2],
+# 		'CNN_RNN': plot_dict['CNN_RNN'][:, 2],
+# 		'RNN': plot_dict['RNN'][:, 2],
+# 		'CNN_3D': plot_dict['CNN_3D'][:, 2]
+# 	}
+# 	plot_by_task(ax_max, xlabel_list, max_dict, 'Task_max')
+# 	plt.xlabel('time sequence')
+# 	plt.ylabel('number of CDR')
+# 	plt.title('Grid id:' + str(int(grid_id)))
 
 
-def plot_avg_task_all_together(plot_dict):
-	row = 2
-	col = 0
-	interval = (100, 131)
-	plot_dict_avg = {
-		'info': plot_dict['info'][interval[0]:interval[1], 0, row, col],
-		'real': plot_dict['real'][interval[0]:interval[1], 0, row, col, 1],
-		'CNN_RNN': plot_dict['CNN_RNN'][interval[0]:interval[1], 0, row, col, 1],
-		'CNN_3D': plot_dict['CNN_3D'][interval[0]:interval[1], 0, row, col, 1],
-		'RNN': plot_dict['RNN'][interval[0]:interval[1], 0, row, col, 1]
-	}
-	grid_id = int(plot_dict_avg['info'][0, 0])
+# def plot_min_task_all_together(plot_dict):
+# 	row = 0
+# 	col = 0
+# 	interval = (9, 40)
 
-	plot_all_method_together(plot_dict_avg, 'Task_avg')
+# 	plot_dict_min = {
+# 		'info': plot_dict['info'][interval[0]:interval[1], 0, row, col],
+# 		'real': plot_dict['real'][interval[0]:interval[1], 0, row, col, 0],
+# 		'CNN_RNN': plot_dict['CNN_RNN'][interval[0]:interval[1], 0, row, col, 0],
+# 		'CNN_3D': plot_dict['CNN_3D'][interval[0]:interval[1], 0, row, col, 0],
+# 		'RNN': plot_dict['RNN'][interval[0]:interval[1], 0, row, col, 0]
+# 	}
+
+# 	grid_id = int(plot_dict_min['info'][0, 0])
+# 	LM_array = get_LM(grid_id, 'min')[interval[0]:interval[1]]
+# 	plot_dict_min['LM'] = LM_array
+# 	# print(plot_dict_min['CNN_3D'].shape)
+# 	# print(LM_array.shape)
+# 	plot_all_method_together(plot_dict_min, 'Task_min')
 
 
-def get_each_method():
-	info, real, CNN_RNN_prediction = get_CNN_RNN()
-	_, _, CNN_3D_prediction = get_CNN_3D()
-	_, _, RNN_prediction = get_RNN()
+# def plot_avg_task_all_together(plot_dict):
+# 	row = 2
+# 	col = 0
+# 	interval = (100, 131)
+# 	plot_dict_avg = {
+# 		'info': plot_dict['info'][interval[0]:interval[1], 0, row, col],
+# 		'real': plot_dict['real'][interval[0]:interval[1], 0, row, col, 1],
+# 		'CNN_RNN': plot_dict['CNN_RNN'][interval[0]:interval[1], 0, row, col, 1],
+# 		'CNN_3D': plot_dict['CNN_3D'][interval[0]:interval[1], 0, row, col, 1],
+# 		'RNN': plot_dict['RNN'][interval[0]:interval[1], 0, row, col, 1]
+# 	}
+# 	grid_id = int(plot_dict_avg['info'][0, 0])
 
-	plot_dict = {
-		'info': info,
-		'real': real,
-		'CNN_RNN': CNN_RNN_prediction,
-		'CNN_3D': CNN_3D_prediction,
-		'RNN': RNN_prediction
-	}
-	# row = 0
-	# col = 0
-	# plot_dict_1 ={
-	# 	'info': info[:, 0, row, col],
-	# 	'real': real[:, 0, row, col],
-	# 	'CNN_RNN': CNN_RNN_prediction[:, 0, row, col],
-	# 	'CNN_3D': CNN_3D_prediction[:, 0, row, col],
-	# 	'RNN': RNN_prediction[:, 0, row, col]
-	# }
-	# plot_all_task_together(plot_dict_1)
-	# plot_min_task_all_together(plot_dict)
-	# 
-	plot_avg_task_all_together(plot_dict)
-	plt.show()
+# 	plot_all_method_together(plot_dict_avg, 'Task_avg')
+
+
+# def get_each_method():
+# 	info, real, CNN_RNN_prediction = get_CNN_RNN()
+# 	_, _, CNN_3D_prediction = get_CNN_3D()
+# 	_, _, RNN_prediction = get_RNN()
+
+# 	plot_dict = {
+# 		'info': info,
+# 		'real': real,
+# 		'CNN_RNN': CNN_RNN_prediction,
+# 		'CNN_3D': CNN_3D_prediction,
+# 		'RNN': RNN_prediction
+# 	}
+# 	# row = 0
+# 	# col = 0
+# 	# plot_dict_1 ={
+# 	# 	'info': info[:, 0, row, col],
+# 	# 	'real': real[:, 0, row, col],
+# 	# 	'CNN_RNN': CNN_RNN_prediction[:, 0, row, col],
+# 	# 	'CNN_3D': CNN_3D_prediction[:, 0, row, col],
+# 	# 	'RNN': RNN_prediction[:, 0, row, col]
+# 	# }
+# 	# plot_all_task_together(plot_dict_1)
+# 	# plot_min_task_all_together(plot_dict)
+# 	# 
+# 	plot_avg_task_all_together(plot_dict)
+# 	plt.show()
 
 
 def evaluate_accuracy_composition():
@@ -756,5 +756,5 @@ if __name__ == '__main__':
 	# evaluate_different_method()
 	# evaluate_accuracy_composition()
 	# plot_method()
-	# evaluate_CNN_RNN_without_task()
-	evaluate_MTL_and_without_task()
+	evaluate_CNN_RNN_without_task()
+	# evaluate_MTL_and_without_task()

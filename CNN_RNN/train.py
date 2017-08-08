@@ -1,15 +1,15 @@
 import numpy as np
-from utility import feature_scaling
+from utility import feature_scaling, root_dir
 import matplotlib.pyplot as plt
 import sys
 import CNN_RNN_config
 from CNN_RNN import CNN_RNN, CNN_3D, RNN, concurrent_CNN_RNN
 import os
-sys.path.append('/home/mldp/ML_with_bigdata')
+sys.path.append(root_dir)
 import data_utility as du
 from multi_task_data import Prepare_Task_Data
 
-root_dir = '/home/mldp/ML_with_bigdata'
+# root_dir = '/home/mldp/ML_with_bigdata'
 
 def print_Y_array(Y_array):
 	print('Y array shape:{}'.format(Y_array.shape))
@@ -40,11 +40,11 @@ def train():
 	# parameter
 	input_data_shape = [X_array.shape[1], X_array.shape[2], X_array.shape[3], X_array.shape[4]]
 	output_data_shape = [Y_array.shape[1], Y_array.shape[2], Y_array.shape[3], 1]
-	result_path = '/home/mldp/ML_with_bigdata/CNN_RNN/result/temp/'
+	result_path = './result/temp/'
 	# result_path = os.path.join(result_path,'report')
 	model_path = {
-		'reload_path': '/home/mldp/ML_with_bigdata/CNN_RNN/output_model/CNN_RNN_test.ckpt',
-		'save_path': '/home/mldp/ML_with_bigdata/CNN_RNN/output_model/CNN_RNN_test.ckpt',
+		'reload_path': './output_model/CNN_RNN_test.ckpt',
+		'save_path': './output_model/CNN_RNN_test.ckpt',
 		'result_path': result_path
 	}
 	hyper_config = CNN_RNN_config.HyperParameterConfig()

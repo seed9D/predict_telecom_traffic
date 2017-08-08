@@ -4,12 +4,12 @@ import CNN_RNN_config
 from CNN_RNN import CNN_RNN, CNN_3D, RNN
 import sys
 import os
-sys.path.append('/home/mldp/ML_with_bigdata')
+sys.path.append(utility.root_dir)
 import data_utility as du
 from multi_task_data import Prepare_Task_Data
 from auto_regression.ARIMA_model import MTL_ARIMA_Model
 
-root_dir = '/home/mldp/ML_with_bigdata'
+root_dir = utility.root_dir
 grid_row_num = 100
 grid_column_num = 100
 
@@ -128,11 +128,11 @@ def get_network_input_and_output(X_all_train, Y_all_train, X_all_test, Y_all_tes
 def train_CNN_3D(X_array, Y_array):
 	input_data_shape = [X_array.shape[1], X_array.shape[2], X_array.shape[3], X_array.shape[4]]
 	output_data_shape = [Y_array.shape[1], Y_array.shape[2], Y_array.shape[3], 1]
-	result_path = '/home/mldp/ML_with_bigdata/CNN_RNN/result/CNN_3D/'
+	result_path = './result/CNN_3D/'
 	utility.check_path_exist(result_path)
 	model_path = {
-		'reload_path': '/home/mldp/ML_with_bigdata/CNN_RNN/output_model/CNN_3D_all.ckpt',
-		'save_path': '/home/mldp/ML_with_bigdata/CNN_RNN/output_model/CNN_3D_all.ckpt',
+		'reload_path': './output_model/CNN_3D_all.ckpt',
+		'save_path': './output_model/CNN_3D_all.ckpt',
 		'result_path': result_path
 	}
 	hyper_config = CNN_RNN_config.HyperParameterConfig()
@@ -149,11 +149,11 @@ def train_CNN_3D(X_array, Y_array):
 def train_RNN(X_array, Y_array):
 	input_data_shape = [X_array.shape[1], X_array.shape[2], X_array.shape[3], X_array.shape[4]]
 	output_data_shape = [Y_array.shape[1], Y_array.shape[2], Y_array.shape[3], 1]
-	result_path = '/home/mldp/ML_with_bigdata/CNN_RNN/result/RNN/'
+	result_path = './result/RNN/'
 	utility.check_path_exist(result_path)
 	model_path = {
-		'reload_path': '/home/mldp/ML_with_bigdata/CNN_RNN/output_model/RNN_all.ckpt',
-		'save_path': '/home/mldp/ML_with_bigdata/CNN_RNN/output_model/RNN_all.ckpt',
+		'reload_path': './output_model/RNN_all.ckpt',
+		'save_path': './output_model/RNN_all.ckpt',
 		'result_path': result_path
 	}
 	hyper_config = CNN_RNN_config.HyperParameterConfig()
@@ -170,11 +170,11 @@ def train_RNN(X_array, Y_array):
 def train_CNN_RNN(X_array, Y_array):
 	input_data_shape = [X_array.shape[1], X_array.shape[2], X_array.shape[3], X_array.shape[4]]
 	output_data_shape = [Y_array.shape[1], Y_array.shape[2], Y_array.shape[3], 1]
-	result_path = '/home/mldp/ML_with_bigdata/CNN_RNN/result/CNN_RNN_STL/'
+	result_path = './result/CNN_RNN_STL/'
 	utility.check_path_exist(result_path)
 	model_path = {
-		'reload_path': '/home/mldp/ML_with_bigdata/CNN_RNN/output_model/CNN_RNN_all.ckpt',
-		'save_path': '/home/mldp/ML_with_bigdata/CNN_RNN/output_model/CNN_RNN_all.ckpt',
+		'reload_path': './output_model/CNN_RNN_all.ckpt',
+		'save_path': './output_model/CNN_RNN_all.ckpt',
 		'result_path': result_path
 	}
 	hyper_config = CNN_RNN_config.HyperParameterConfig()
@@ -199,7 +199,7 @@ def train_STL_CNN_RNN_(X_array, Y_array):
 	def run_task(X_array, Y_array, task_name):
 		input_data_shape = [X_array.shape[1], X_array.shape[2], X_array.shape[3], X_array.shape[4]]
 		output_data_shape = [Y_array.shape[1], Y_array.shape[2], Y_array.shape[3], 1]
-		result_path = '/home/mldp/ML_with_bigdata/CNN_RNN/result/CNN_RNN'
+		result_path = './result/CNN_RNN'
 		result_path = os.path.join(result_path, task_name)
 		reload_path = '/home/mldp/ML_with_bigdata/CNN_RNN/output_model/' + 'CNN_RNN_' + str(task_name) + '.ckpt'
 
@@ -229,9 +229,9 @@ def train_CNN_RNN_without_task(X_array, Y_array):
 	logger.debug('X_array:{} Y_array:{}'.format(X_array.shape, Y_array.shape))
 	input_data_shape = [X_array.shape[1], X_array.shape[2], X_array.shape[3], X_array.shape[4]]
 	output_data_shape = [Y_array.shape[1], Y_array.shape[2], Y_array.shape[3], 1]
-	result_path = '/home/mldp/ML_with_bigdata/CNN_RNN/result/CNN_RNN_without_task'
+	result_path = '.result/CNN_RNN_without_task'
 	# result_path = os.path.join(result_path, task_name)
-	reload_path = '/home/mldp/ML_with_bigdata/CNN_RNN/output_model/' + 'CNN_RNN_without_task.ckpt'
+	reload_path = './output_model/' + 'CNN_RNN_without_task.ckpt'
 
 	utility.check_path_exist(result_path)
 	model_path = {
@@ -288,8 +288,8 @@ def predict_RNN(X_array, Y_array, scaler, Neural=None):
 	key_var = hyper_config.get_variable()
 	batch_size = key_var['batch_size']
 	model_path = {
-		'reload_path': os.path.join(root_dir, 'CNN_RNN/output_model/RNN_all.ckpt'),
-		'save_path': '/home/mldp/ML_with_bigdata/CNN_RNN/output_model/RNN_all.ckpt'
+		'reload_path': './output_model/RNN_all.ckpt',
+		'save_path': './output_model/RNN_all.ckpt'
 	}
 	if Neural:
 		neural = Neural
@@ -319,8 +319,8 @@ def predict_3D_CNN(X_array, Y_array, scaler, Neural=None):
 	key_var = hyper_config.get_variable()
 	batch_size = key_var['batch_size']
 	model_path = {
-		'reload_path': os.path.join(root_dir, 'CNN_RNN/output_model/CNN_3D_all.ckpt'),
-		'save_path': '/home/mldp/ML_with_bigdata/CNN_RNN/output_model/CNN_3D_all.ckpt'
+		'reload_path': './output_model/CNN_3D_all.ckpt',
+		'save_path': './output_model/CNN_3D_all.ckpt'
 	}
 	if Neural:
 		neural = Neural
@@ -352,8 +352,8 @@ def predict_CNN_RNN(X_array, Y_array, scaler, Neural=None):
 	key_var = hyper_config.get_variable()
 	batch_size = key_var['batch_size']
 	model_path = {
-		'reload_path': os.path.join(root_dir, 'CNN_RNN/output_model/CNN_RNN_without_task.ckpt'),
-		'save_path': '/home/mldp/ML_with_bigdata/CNN_RNN/output_model/CNN_RNN_without_task.ckpt'
+		'reload_path': './output_model/CNN_RNN_without_task.ckpt',
+		'save_path': './output_model/CNN_RNN_without_task.ckpt'
 	}
 	if Neural:
 		neural = Neural
@@ -399,10 +399,10 @@ def predict_CNN_RNN_without_task(X_array, Y_array, scaler):
 		key_var = hyper_config.get_variable()
 		batch_size = key_var['batch_size']
 
-		reload_path = '/home/mldp/ML_with_bigdata/CNN_RNN/output_model/' + 'CNN_RNN_without_task.ckpt'
+		reload_path = './output_model/' + 'CNN_RNN_without_task.ckpt'
 		model_path = {
 			'reload_path': reload_path,
-			'save_path': '/home/mldp/ML_with_bigdata/CNN_RNN/output_model/CNN_RNN_without_task.ckpt'
+			'save_path': reload_path
 		}
 
 		input_data_shape = [X_array.shape[1], X_array.shape[2], X_array.shape[3], 1]
@@ -459,10 +459,10 @@ def predict_STL_CNN_RNN(X_array, Y_array, scaler):
 		key_var = hyper_config.get_variable()
 		batch_size = key_var['batch_size']
 
-		reload_path = '/home/mldp/ML_with_bigdata/CNN_RNN/output_model/' + 'CNN_RNN_' + str(task_name) + '.ckpt'
+		reload_path = './output_model/' + 'CNN_RNN_' + str(task_name) + '.ckpt'
 		model_path = {
 			'reload_path': reload_path,
-			'save_path': '/home/mldp/ML_with_bigdata/CNN_RNN/output_model/CNN_RNN_all.ckpt'
+			'save_path': reload_path
 		}
 
 		input_data_shape = [X_array.shape[1], X_array.shape[2], X_array.shape[3], 1]
@@ -601,7 +601,7 @@ def loop_CNN_3D():
 	gird_id, timestamp, real_min, real_avg, real_max, prediction_min, prediction_avg, prediction_max
 	'''
 	traffic_array = np.zeros([1487, 1, grid_row_num, grid_column_num, 8], dtype=float)
-	store_path = os.path.join(root_dir, 'CNN_RNN/result/CNN_3D', 'loop_report.txt')
+	store_path = os.path.join('./result/CNN_3D', 'loop_report.txt')
 	os.remove(store_path)
 	for row_center in row_center_list:
 		for col_center in col_center_list:
@@ -642,7 +642,7 @@ def loop_RNN():
 	gird_id, timestamp, real_min, real_avg, real_max, prediction_min, prediction_avg, prediction_max
 	'''
 	traffic_array = np.zeros([1487, 1, grid_row_num, grid_column_num, 8], dtype=float)
-	store_path = os.path.join(root_dir, 'CNN_RNN/result/RNN', 'loop_report.txt')
+	store_path = os.path.join('./result/RNN', 'loop_report.txt')
 	os.remove(store_path)
 	for row_center in row_center_list:
 		for col_center in col_center_list:
@@ -680,7 +680,7 @@ def loop_ARIMA():
 	col_range = range(col_center_list[0], col_center_list[-1] + 1)
 
 	traffic_array = np.zeros([1487, 1, grid_row_num, grid_column_num, 8], dtype=float)
-	store_path = os.path.join(root_dir, 'CNN_RNN/result/ARIMA', 'loop_report.txt')
+	store_path = os.path.join('./result/ARIMA', 'loop_report.txt')
 	utility.check_path_exist(os.path.join(root_dir, 'CNN_RNN/result/ARIMA'))
 	if os.path.exists(store_path):
 		os.remove(store_path)
@@ -706,7 +706,7 @@ def loop_STL_CNN_RNN():
 	row_center_list = list(range(40, 80, 3))
 	col_center_list = list(range(30, 70, 3))
 	traffic_array = np.zeros([1487, 1, grid_row_num, grid_column_num, 8], dtype=float)
-	base_dir = os.path.join(root_dir, 'CNN_RNN/result/CNN_RNN_STL')
+	base_dir = os.path.join('./result/CNN_RNN_STL')
 	store_path = os.path.join(base_dir, 'loop_report.txt')
 	utility.check_path_exist(base_dir)
 	if os.path.exists(store_path):
@@ -758,7 +758,7 @@ def loop_CNN_RNN_without_task():
 	col_shift = col_center_list[0]
 	traffic_array = np.zeros([1487, 6, grid_row_num - row_shift - 10, grid_column_num - col_shift - 20, 4], dtype=float)
 
-	base_dir = os.path.join(root_dir, 'CNN_RNN/result/CNN_RNN_without_task')
+	base_dir = os.path.join('./result/CNN_RNN_without_task')
 	store_path = os.path.join(base_dir, 'loop_report.txt')
 	utility.check_path_exist(base_dir)
 	if os.path.exists(store_path):

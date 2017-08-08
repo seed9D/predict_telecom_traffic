@@ -5,6 +5,7 @@ import os
 import numpy as np
 import logging
 
+root_dir = '~/home'
 
 def setlog(logger_name='logger'):
 	logger_name = logger_name
@@ -141,3 +142,7 @@ def find_in_obj(obj, condition, path=None):
 				new_path = list(path)
 				new_path.append(key)
 				yield new_path
+
+
+if __name__ == "__main__":
+	print(compute_row_col(5669))

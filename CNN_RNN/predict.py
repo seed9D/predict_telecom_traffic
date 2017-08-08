@@ -3,14 +3,14 @@ import CNN_RNN_config
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-from utility import feature_scaling, un_feature_scaling, set_time_zone, date_time_covert_to_str
+from utility import feature_scaling, un_feature_scaling, set_time_zone, date_time_covert_to_str, root_dir
 import os
 import sys
-sys.path.append('/home/mldp/ML_with_bigdata')
+sys.path.append(root_dir)
 import data_utility as du
 from multi_task_data import Prepare_Task_Data
 
-root_dir = '/home/mldp/ML_with_bigdata'
+# root_dir = '/home/mldp/ML_with_bigdata'
 scalar = None
 
 

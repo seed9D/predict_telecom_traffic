@@ -207,7 +207,8 @@ class GridSearch():
 		rate_array = np.arange(0.001, 0.004, 0.0005)
 		rate_array = rate_array.tolist()
 
-		basic_result_path = '/home/mldp/ML_with_bigdata/CNN_RNN/result/search_learning_rate/'
+		# basic_result_path = '/home/mldp/ML_with_bigdata/CNN_RNN/result/search_learning_rate/'
+		basic_result_path = './result/search_learning_rate/'
 		# shutil.rmtree(basic_result_path)
 		if not os.path.exists(basic_result_path):
 			os.makedirs(basic_result_path)
@@ -222,7 +223,7 @@ class GridSearch():
 				os.makedirs(result_path)
 
 			model_path = {
-				'reload_path': '/home/mldp/ML_with_bigdata/CNN_RNN/output_model/CNN_RNN_test.ckpt',
+				'reload_path': './output_model/CNN_RNN_test.ckpt',
 				'save_path': save_model_path,
 				'result_path': result_path
 			}
@@ -266,7 +267,8 @@ class GridSearch():
 
 		keep_rate_array = np.arange(0.3, 1., 0.05)
 		keep_rate_array = keep_rate_array.tolist()
-		basic_result_path = '/home/mldp/ML_with_bigdata/CNN_RNN/result/search_keep_rate/'
+		# basic_result_path = '/home/mldp/ML_with_bigdata/CNN_RNN/result/search_keep_rate/'
+		basic_result_path = './result/search_keep_rate/'
 
 		if not os.path.exists(basic_result_path):
 			os.makedirs(basic_result_path)
@@ -281,7 +283,7 @@ class GridSearch():
 				os.makedirs(result_path)
 
 			model_path = {
-				'reload_path': '/home/mldp/ML_with_bigdata/CNN_RNN/output_model/CNN_RNN_test.ckpt',
+				'reload_path': './output_model/CNN_RNN_test.ckpt',
 				'save_path': save_model_path,
 				'result_path': result_path
 			}
@@ -313,7 +315,7 @@ class GridSearch():
 		set_attr = 'prediction_layer_keep_rate'
 		iterator = np.arange(0.3, 1., 0.05)
 		self.search_task_name = 'serach_precition_keep_rate'
-		self.basic_result_path = '/home/mldp/ML_with_bigdata/CNN_RNN/result/'
+		self.basic_result_path = os.path.join('./result')
 		self.basic_result_path = os.path.join(self.basic_result_path, self.search_task_name)
 		if not os.path.exists(self.basic_result_path):
 			os.makedirs(self.basic_result_path)
@@ -325,7 +327,7 @@ class GridSearch():
 		set_attr = 'weight_decay'
 		iterator = [0.0001, 0.001, 0.01, 0.1, 1, 10, 100]
 		self.search_task_name = 'search_weight_decay'
-		self.basic_result_path = '/home/mldp/ML_with_bigdata/CNN_RNN/result/'
+		self.basic_result_path = os.path.join('./result')
 		self.basic_result_path = os.path.join(self.basic_result_path, self.search_task_name)
 		if not os.path.exists(self.basic_result_path):
 			os.makedirs(self.basic_result_path)
@@ -336,7 +338,7 @@ class GridSearch():
 		set_attr = 'batch_size'
 		iterator = range(10, 130, 10)
 		self.search_task_name = 'search_batch_size'
-		self.basic_result_path = '/home/mldp/ML_with_bigdata/CNN_RNN/result/'
+		self.basic_result_path = os.path.join('./result')
 		self.basic_result_path = os.path.join(self.basic_result_path, self.search_task_name)
 		if not os.path.exists(self.basic_result_path):
 			os.makedirs(self.basic_result_path)
@@ -347,7 +349,7 @@ class GridSearch():
 		set_attr = 'RNN_num_layers'
 		iterator = range(2, 7, 1)
 		self.search_task_name = 'search_RNN_layer'
-		self.basic_result_path = '/home/mldp/ML_with_bigdata/CNN_RNN/result/'
+		self.basic_result_path = os.path.join('./result')
 		self.basic_result_path = os.path.join(self.basic_result_path, self.search_task_name)
 		if not os.path.exists(self.basic_result_path):
 			os.makedirs(self.basic_result_path)
@@ -359,7 +361,7 @@ class GridSearch():
 		index = range(4, 11)
 		iterator = map(lambda x: 2 ** x, index)
 		self.search_task_name = 'search_RNN_nodes'
-		self.basic_result_path = '/home/mldp/ML_with_bigdata/CNN_RNN/result/'
+		self.basic_result_path = os.path.join('./result')
 		self.basic_result_path = os.path.join(self.basic_result_path, self.search_task_name)
 		if not os.path.exists(self.basic_result_path):
 			os.makedirs(self.basic_result_path)
@@ -371,7 +373,7 @@ class GridSearch():
 		index = range(3, 11)
 		iterator = map(lambda x: 2 ** x, index)
 		self.search_task_name = 'search_prediction_nodes'
-		self.basic_result_path = '/home/mldp/ML_with_bigdata/CNN_RNN/result/'
+		self.basic_result_path = os.path.join('./result')
 		self.basic_result_path = os.path.join(self.basic_result_path, self.search_task_name)
 		if not os.path.exists(self.basic_result_path):
 			os.makedirs(self.basic_result_path)
@@ -383,7 +385,7 @@ class GridSearch():
 		index = range(3, 11)
 		iterator = map(lambda x: 2 ** x, index)
 		self.search_task_name = 'search_fully_connected_nodes'
-		self.basic_result_path = '/home/mldp/ML_with_bigdata/CNN_RNN/result/'
+		self.basic_result_path = os.path.join('./result')
 		self.basic_result_path = os.path.join(self.basic_result_path, self.search_task_name)
 		if not os.path.exists(self.basic_result_path):
 			os.makedirs(self.basic_result_path)
@@ -544,7 +546,7 @@ class GridSearch():
 				'_' + str(run_index))
 
 			model_path = {
-				'reload_path': '/home/mldp/ML_with_bigdata/CNN_RNN/output_model/CNN_RNN_test.ckpt',
+				'reload_path': './output_model/CNN_RNN_test.ckpt',
 				'save_path': save_model_path,
 				'result_path': result_path
 			}
@@ -552,7 +554,7 @@ class GridSearch():
 			return result
 
 		self.search_task_name = task_name
-		self.basic_result_path = '/home/mldp/ML_with_bigdata/CNN_RNN/result/'
+		self.basic_result_path = './result/'
 		self.basic_result_path = os.path.join(self.basic_result_path, self.search_task_name)
 		report_path = os.path.join(self.basic_result_path, self.search_task_name + '.txt')
 		if not os.path.exists(self.basic_result_path):
@@ -608,7 +610,7 @@ class GridSearch():
 			# print(save_model_path)
 			# print(result_path)
 			model_path = {
-				'reload_path': '/home/mldp/ML_with_bigdata/CNN_RNN/output_model/CNN_RNN_test.ckpt',
+				'reload_path': './output_model/CNN_RNN_test.ckpt',
 				'save_path': save_model_path,
 				'result_path': result_path
 			}

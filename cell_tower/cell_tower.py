@@ -35,7 +35,7 @@ def filter_cell_tower():
             if 9 <= lon <= 9.3 and 45.36 <= lat <= 45.56:
                 limit_date_obj = datetime(2014, 6, 1)
                 create_date_obj = datetime.fromtimestamp(timestamp)
-                if limit_date_obj > create_date_obj:
+            if limit_date_obj > create_date_obj:
                     str_time = create_date_obj.strftime('%Y-%m-%d')
                     print(mcc, mnc, 'radio:{} lon:{} lat:{} create_time:{}'.format(
                         radio, lon, lat, str_time))
@@ -49,7 +49,10 @@ def filter_cell_tower():
 def plot_filtered_cell_tower():
     source_file = './cell_tower.csv'
     df = pd.read_csv(source_file, names=['radio', 'Lon', 'Lat'])
-    df.plot(kind='scatter', x='Lon', y='Lat', marker='.')
+    ex = df.plot(kind='scatter', x='Lon', y='Lat', color='w', edgecolors='darkblue', title='Macro cell')
+    ex.set_xlabel('Longitude')
+    ex.set_ylabel('Latitude')
+    ex.grid()
     plt.show()
 
 
@@ -157,10 +160,11 @@ def plot_cell_tower_and_grid():
                        'coord'][1], marker='.', color='r')
         elif cell['radio'] == 'WCDM':
             ax.scatter(x=cell['coord'][0], y=cell[
-                       'coord'][1], marker='<', color='r')
-        else:
-            ax.scatter(x=cell['coord'][0], y=cell[
                        'coord'][1], marker='.', color='r')
+        else:
+            ax.scatter(x=cell['coord'][0], y=cell[  # UMTS
+                       'coord'][1], marker='.', color='r')
+            # print(cell['radio'])
 
         fc_color = colors[index % len(colors)]
         # bc_color = random.choice(colors)
@@ -168,11 +172,14 @@ def plot_cell_tower_and_grid():
             grid_id_coord = search_grid_id_coord(grid_id, grid_list)
             ax.add_patch(PolygonPatch(grid_id_coord, fc=fc_color,
                                       ec=fc_color, alpha=0.3, zorder=2))
+    plt.xlabel('Longitude')
+    plt.ylabel('Latitude')
+    plt.title('Macro cell coverage')
     plt.show()
 
 
 # filter_cell_tower()
-plot_filtered_cell_tower()
+# plot_filtered_cell_tower()
 # assign_grid_to_cell_tower()
 
-# plot_cell_tower_and_grid()
+plot_cell_tower_and_grid()

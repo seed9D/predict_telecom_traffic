@@ -1,10 +1,10 @@
 import numpy as np
-from utility import feature_scaling
+from utility import feature_scaling, root_dir
 import sys
 import CNN_RNN_config
 from CNN_RNN import CNN_RNN_2
 import os
-sys.path.append('/home/mldp/ML_with_bigdata')
+sys.path.append(root_dir)
 import data_utility as du
 from multi_task_data import Prepare_Task_Data
 
