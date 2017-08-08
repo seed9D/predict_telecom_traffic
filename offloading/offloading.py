@@ -12,6 +12,7 @@ root_dir = '/home/mldp/ML_with_bigdata'
 
 
 class Run_Offloading:
+
 	def __init__(self, model_path, config, cell_num=867):
 		self.cell_num = cell_num
 		self.model_path = model_path
@@ -24,7 +25,7 @@ class Run_Offloading:
 			e_greedy=0.9,
 			replace_target_iter=200,
 			memory_size=1000,
-			batch_size=80,
+			batch_size=50,
 			e_greedy_increment=None)
 
 	def __evaluation(self, episode, mins=None):
@@ -44,13 +45,16 @@ class Run_Offloading:
 		testing_result_small_load = result_dict['small_load'][-149:]
 		testing_result_small_load[testing_result_small_load == 0] = np.nan
 		testing_result_small_load = np.nanmean(testing_result_small_load)
-		print('episode:{} training: reward:{:.4f} macro_load:{:.4f} small load:{:.4f} effi:{:.4f} '.format(episode, training_result_reward, training_result_macro_load, training_result_small_load, training_result_effi))
-		print('episode:{} testing: reward:{:.4f} macro load:{:.4f} small load:{:.4f} effi:{:.4f}'.format(episode, testing_result_reward, testing_result_macro_load, testing_result_small_load, testing_result_effi))
+
+		training_result_action = np.mean(result_dict['action'][:-149])
+		testing_result_action = np.mean(result_dict['action'][-149:])
+		print('episode:{} training: reward:{:.4f} macro_load:{:.4f} small load:{:.4f} effi:{:.4f} action:{:.4f}'.format(episode, training_result_reward, training_result_macro_load, training_result_small_load, training_result_effi, training_result_action))
+		print('episode:{} testing: reward:{:.4f} macro load:{:.4f} small load:{:.4f} effi:{:.4f} action:{:.4f}'.format(episode, testing_result_reward, testing_result_macro_load, testing_result_small_load, testing_result_effi, testing_result_action))
 		print()
 
 	def RL_train(self, mins=None):
 		step = 0
-		for episode in range(100):
+		for episode in range(50):
 			if mins:
 				observation = self.env.reset_10_mins(training=True)
 			else:
@@ -77,6 +81,7 @@ class Run_Offloading:
 				# self.RL.save_model('./output_model/deepQ_500.ckpt')
 				self.__evaluation(episode, mins)
 		print('over')
+		self.__evaluation(episode, mins)
 		# self.RL.plot_cost()
 		# self.RL.save_model('./output_model/deepQ_500.ckpt')
 		self.RL.save_model(self.model_path)
@@ -136,14 +141,20 @@ class Run_Offloading:
 		total_power_consumption = self.env.total_power_consumption
 		macro_cell_load = self.env.macro_cell_load
 		small_cell_load = self.env.small_cell_load
-		internet_traffic_demand = self.env.internet_traffic_demand
+		internet_traffic_digested = self.env.internet_traffic_digested
 		actions = self.env.actions
+		internet_traffic_demand = self.env.internet_traffic_demand
+		macro_digested_traffic = self.env.macro_digested_traffic
+		small_digested_traffic = self.env.small_digested_traffic
 		information_dict = {
-			'traffic_demand': np.array(internet_traffic_demand).reshape(-1, 1),
+			'traffic_digested': np.array(internet_traffic_digested).reshape(-1, 1),
 			'macro_load': np.array(macro_cell_load).reshape(-1, 1),
 			'small_load': np.array(small_cell_load).reshape(-1, 1),
 			'power_consumption': np.array(total_power_consumption).reshape(-1, 1),
-			'action': np.array(actions).reshape(-1, 1)
+			'action': np.array(actions).reshape(-1, 1),
+			'traffic_demand': np.array(internet_traffic_demand).reshape(-1, 1),
+			'macro_digested_traffic': np.array(macro_digested_traffic).reshape(-1, 1),
+			'small_digested_traffic': np.array(small_digested_traffic).reshape(-1, 1)
 		}
 
 		return information_dict
@@ -226,8 +237,8 @@ def offloading_plot(with_RL, without_RL, without_RL_without_offloading):
 if __name__ == "__main__":
 	model_path = os.path.join(root_dir, 'offloading/output_model/deepQ_test.ckpt')
 	config = Env_Config()
-	offloading = Run_Offloading(model_path, config, 768)
-	without_RL_with_offloading_result_dict = offloading.run_test_without_RL(10)
+	offloading = Run_Offloading(model_path, config, 448)
+	without_RL_with_offloading_result_dict = offloading.run_test_without_RL(config.small_cell_num)
 	without_RL_offloading_result_dict = offloading.run_test_without_RL(0)
 	without_RL_with_offloading_test_effi = np.mean(without_RL_with_offloading_result_dict['energy_effi'][-149:])
 	without_RL_offloading_test_effi = np.mean(without_RL_offloading_result_dict['energy_effi'][-149:])

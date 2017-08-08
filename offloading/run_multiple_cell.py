@@ -64,15 +64,29 @@ def filter_cell_index():
 def dict_to_nparray(result_dict, cell_num):
 	energy_effi_array = result_dict['energy_effi']
 	reward_array = result_dict['reward']
-	traffic_demand_array = result_dict['traffic_demand']
+	traffic_digested_array = result_dict['traffic_digested']
 	macro_load_array = result_dict['macro_load']
 	small_load_array = result_dict['small_load']
 	action_array = result_dict['action']
 	power_consumption_array = result_dict['power_consumption']
+	traffic_demand_array = result_dict['traffic_demand']
+	small_digested_traffic_array = result_dict['small_digested_traffic']
+	macro_digested_traffic_array = result_dict['macro_digested_traffic']
 	cell_num_array = np.zeros_like(reward_array, dtype=float)
 	cell_num_array.fill(cell_num)
 
-	result_array = np.concatenate((cell_num_array, reward_array, energy_effi_array, traffic_demand_array, macro_load_array, small_load_array, power_consumption_array, action_array), axis=1)
+	result_array = np.concatenate((
+		cell_num_array,
+		reward_array,
+		energy_effi_array,
+		traffic_digested_array,
+		macro_load_array,
+		small_load_array,
+		power_consumption_array,
+		action_array,
+		traffic_demand_array,
+		macro_digested_traffic_array,
+		small_digested_traffic_array), axis=1)
 	return result_array
 
 
@@ -90,11 +104,71 @@ def save_report(result_array, file_path):
 		f.write(string_)
 
 
+def run_offloading_without_RL(cell_list):
+	def run(cell_num):
+		config = Env_Config()
+		model_path = os.path.join(root_dir, 'offloading/output_model/deepQ_test.ckpt')
+		offloading = Run_Offloading(model_path, config, cell_num)
+		without_RL_with_offloading_result_dict = offloading.run_test_without_RL(10)
+		without_RL_with_offloading_result_array = dict_to_nparray(without_RL_with_offloading_result_dict, cell_num)
+
+		return without_RL_with_offloading_result_array
+
+	target_path = os.path.join(root_dir, 'offloading/result/offloading_without_RL')
+	utility.check_path_exist(target_path)
+	store_path = os.path.join(target_path, 'loop_report.txt')
+	if os.path.exists(store_path):
+		os.remove(store_path)
+	cell_list_len = len(cell_list)
+	all_cell_result_array_list = []
+	for cell_num in cell_list:
+		logger.info('cell_num:{}'.format(cell_num))
+		result_array = run(cell_num)
+		all_cell_result_array_list.append(result_array)
+		save_report(result_array, store_path)
+		all_cell_result_array = np.stack(all_cell_result_array_list, axis=0)
+		du.save_array(all_cell_result_array, os.path.join(target_path, 'all_cell_result_array.npy'))
+	all_cell_result_array = np.stack(all_cell_result_array_list, axis=0)
+	du.save_array(all_cell_result_array, os.path.join(target_path, 'all_cell_result_array.npy'))
+	plt.ioff()
+
+
+def run_without_offloading(cell_list):
+	def run(cell_num):
+		config = Env_Config()
+		model_path = os.path.join(root_dir, 'offloading/output_model/deepQ_test.ckpt')
+		offloading = Run_Offloading(model_path, config, cell_num)
+		result_dict = offloading.run_test_without_RL(0)
+		result_array = dict_to_nparray(result_dict, cell_num)
+
+		return result_array
+
+	target_path = os.path.join(root_dir, 'offloading/result/without_offloading_without_RL')
+	utility.check_path_exist(target_path)
+	store_path = os.path.join(target_path, 'loop_report.txt')
+	if os.path.exists(store_path):
+		os.remove(store_path)
+	cell_list_len = len(cell_list)
+	all_cell_result_array_list = []
+
+	for cell_num in cell_list:
+		logger.info('cell_num:{}'.format(cell_num))
+		result_array = run(cell_num)
+		all_cell_result_array_list.append(result_array)
+		save_report(result_array, store_path)
+		all_cell_result_array = np.stack(all_cell_result_array_list, axis=0)
+		du.save_array(all_cell_result_array, os.path.join(target_path, 'all_cell_result_array.npy'))
+	all_cell_result_array = np.stack(all_cell_result_array_list, axis=0)
+	du.save_array(all_cell_result_array, os.path.join(target_path, 'all_cell_result_array.npy'))
+	plt.ioff()
+
+
 def run_prediction_and_RL(cell_list):
 
 	def run_offloading(cell_num):
 		config = Env_Config()
-		offloading = Run_Offloading(config, cell_num)
+		model_path = os.path.join(root_dir, 'offloading/output_model/deepQ_predicition_RL.ckpt')
+		offloading = Run_Offloading(model_path, config, cell_num)
 		without_RL_with_offloading_result_dict = offloading.run_test_without_RL(10)
 		without_RL_offloading_result_dict = offloading.run_test_without_RL(0)
 
@@ -134,68 +208,12 @@ def run_prediction_and_RL(cell_list):
 	plt.ioff()
 
 
-def run_offloading_without_RL(cell_list):
-	def run(cell_num):
-		config = Env_Config()
-		offloading = Run_Offloading(config, cell_num)
-		without_RL_with_offloading_result_dict = offloading.run_test_without_RL(10)
-		without_RL_with_offloading_result_array = dict_to_nparray(without_RL_with_offloading_result_dict, cell_num)
-
-		return without_RL_with_offloading_result_array
-
-	target_path = os.path.join(root_dir, 'offloading/result/offloading_without_RL')
-	utility.check_path_exist(target_path)
-	store_path = os.path.join(target_path, 'loop_report.txt')
-	if os.path.exists(store_path):
-		os.remove(store_path)
-	cell_list_len = len(cell_list)
-	all_cell_result_array_list = []
-	for cell_num in cell_list:
-		logger.info('cell_num:{}'.format(cell_num))
-		result_array = run(cell_num)
-		all_cell_result_array_list.append(result_array)
-		save_report(result_array, store_path)
-		all_cell_result_array = np.stack(all_cell_result_array_list, axis=0)
-		du.save_array(all_cell_result_array, os.path.join(target_path, 'all_cell_result_array.npy'))
-	all_cell_result_array = np.stack(all_cell_result_array_list, axis=0)
-	du.save_array(all_cell_result_array, os.path.join(target_path, 'all_cell_result_array.npy'))
-	plt.ioff()
-
-
-def run_without_offloading(cell_list):
-	def run(cell_num):
-		config = Env_Config()
-		offloading = Run_Offloading(config, cell_num)
-		result_dict = offloading.run_test_without_RL(0)
-		result_array = dict_to_nparray(result_dict, cell_num)
-
-		return result_array
-
-	target_path = os.path.join(root_dir, 'offloading/result/without_offloading_without_RL')
-	utility.check_path_exist(target_path)
-	store_path = os.path.join(target_path, 'loop_report.txt')
-	if os.path.exists(store_path):
-		os.remove(store_path)
-	cell_list_len = len(cell_list)
-	all_cell_result_array_list = []
-
-	for cell_num in cell_list:
-		logger.info('cell_num:{}'.format(cell_num))
-		result_array = run(cell_num)
-		all_cell_result_array_list.append(result_array)
-		save_report(result_array, store_path)
-		all_cell_result_array = np.stack(all_cell_result_array_list, axis=0)
-		du.save_array(all_cell_result_array, os.path.join(target_path, 'all_cell_result_array.npy'))
-	all_cell_result_array = np.stack(all_cell_result_array_list, axis=0)
-	du.save_array(all_cell_result_array, os.path.join(target_path, 'all_cell_result_array.npy'))
-	plt.ioff()
-
-
 def run_god_prediction_and_RL(cell_list):
 	def run_offloading(cell_num):
 		config = Env_Config()
 		config.base_dir = os.path.join(root_dir, 'offloading/npy/real_god_prediction')
-		offloading = Run_Offloading(config, cell_num)
+		model_path = os.path.join(root_dir, 'offloading/output_model/deepQ_god.ckpt')
+		offloading = Run_Offloading(model_path, config, cell_num)
 		offloading_without_RL_result_dict = offloading.run_test_without_RL(10)
 		without_offloading_result_dict = offloading.run_test_without_RL(0)
 
@@ -214,6 +232,9 @@ def run_god_prediction_and_RL(cell_list):
 	plt.ion()
 	target_path = os.path.join(root_dir, 'offloading/result/RL_with_god_prediction')
 	utility.check_path_exist(target_path)
+	store_path = os.path.join(target_path, 'loop_report.txt')
+	if os.path.exists(store_path):
+		os.remove(store_path)
 
 	cell_list_len = len(cell_list)
 	all_cell_result_array_list = []
@@ -222,6 +243,7 @@ def run_god_prediction_and_RL(cell_list):
 		result_array = run_offloading(cell_num)
 		all_cell_result_array_list.append(result_array)
 		logger.info('cell_num:{} average effi mean:{}'.format(cell_num, np.mean(result_array[-149:, 2])))
+		save_report(result_array, store_path)
 		all_cell_result_array = np.stack(all_cell_result_array_list, axis=0)
 		du.save_array(all_cell_result_array, os.path.join(target_path, 'all_cell_result_array.npy'))
 
@@ -234,7 +256,8 @@ def run_without_preidction_and_with_RL(cell_list):
 	def run_offloading(cell_num):
 		config = Env_Config()
 		config.base_dir = os.path.join(root_dir, 'offloading/npy/real_without_prediction')
-		offloading = Run_Offloading(config, cell_num)
+		model_path = os.path.join(root_dir, 'offloading/output_model/deepQ_RL_without_prediction.ckpt')
+		offloading = Run_Offloading(model_path, config, cell_num)
 		offloading_without_RL_result_dict = offloading.run_test_without_RL(10)
 		without_offloading_result_dict = offloading.run_test_without_RL(0)
 
@@ -253,6 +276,9 @@ def run_without_preidction_and_with_RL(cell_list):
 	plt.ion()
 	target_path = os.path.join(root_dir, 'offloading/result/RL_without_prediction')
 	utility.check_path_exist(target_path)
+	store_path = os.path.join(target_path, 'loop_report.txt')
+	if os.path.exists(store_path):
+		os.remove(store_path)
 
 	cell_list_len = len(cell_list)
 	all_cell_result_array_list = []
@@ -261,7 +287,7 @@ def run_without_preidction_and_with_RL(cell_list):
 		result_array = run_offloading(cell_num)
 		all_cell_result_array_list.append(result_array)
 		logger.info('cell_num:{} average effi mean:{}'.format(cell_num, np.mean(result_array[-149:, 2])))
-
+		save_report(result_array, store_path)
 		all_cell_result_array = np.stack(all_cell_result_array_list, axis=0)
 		du.save_array(all_cell_result_array, os.path.join(target_path, 'all_cell_result_array.npy'))
 
@@ -275,7 +301,8 @@ def run_without_prediction_and_RL_10mins(cell_list):
 	def run_offloading(cell_num):
 		config = Env_Config()
 		config.features_num = 6
-		offloading = Run_Offloading(config, cell_num)
+		model_path = os.path.join(root_dir, 'offloading/output_model/deepQ_RL_10mins.ckpt')
+		offloading = Run_Offloading(model_path, config, cell_num)
 		without_RL_with_offloading_result_dict = offloading.run_test_without_RL(10)
 		without_RL_offloading_result_dict = offloading.run_test_without_RL(0)
 
@@ -314,17 +341,64 @@ def run_without_prediction_and_RL_10mins(cell_list):
 	plt.ioff()
 
 
+def run_ARIMA_prediction_RL(cell_list):
+	def run_offloading(cell_num):
+		config = Env_Config()
+		config.features_num = 3
+		config.base_dir = os.path.join(root_dir, 'offloading/npy/real_prediction_ARIMA')
+		model_path = os.path.join(root_dir, 'offloading/output_model/deepQ_RL_ARIMA_prediction.ckpt')
+		offloading = Run_Offloading(model_path, config, cell_num)
+		without_RL_with_offloading_result_dict = offloading.run_test_without_RL(10)
+		without_RL_offloading_result_dict = offloading.run_test_without_RL(0)
+
+		logger.info('macro load:{} offloading_without_RL:{} without_RL_without_offloading:{}'.format(
+			np.mean(without_RL_offloading_result_dict['macro_load'][-149:]),
+			np.mean(without_RL_with_offloading_result_dict['energy_effi'][-149:]),
+			np.mean(without_RL_offloading_result_dict['energy_effi'][-149:])))
+		offloading.RL_train()
+		with_RL_result_dict = offloading.run_test_with_RL(reload=False)
+		with_RL_result_array = dict_to_nparray(with_RL_result_dict, cell_num)
+		# without_RL_with_offloading_result_array = dict_to_nparray(without_RL_with_offloading_result_dict)
+		# without_RL_offloading_result_array = dict_to_nparray(without_RL_offloading_result_dict)
+		offloading_plot(with_RL_result_dict, without_RL_with_offloading_result_dict, without_RL_offloading_result_dict)
+		return with_RL_result_array
+
+	plt.ion()
+	target_path = os.path.join(root_dir, 'offloading/result/RL_real_ARIMA_prediction')
+	utility.check_path_exist(target_path)
+	store_path = os.path.join(target_path, 'loop_report.txt')
+	if os.path.exists(store_path):
+		os.remove(store_path)
+
+	cell_list_len = len(cell_list)
+	all_cell_result_array_list = []
+	for cell_num in cell_list:
+
+		with_RL_result_array = run_offloading(cell_num)
+		all_cell_result_array_list.append(with_RL_result_array)
+		logger.info('cell_num:{} average effi mean:{}'.format(cell_num, np.mean(with_RL_result_array[-149:, 2])))
+		save_report(with_RL_result_array, store_path)
+		all_cell_result_array = np.stack(all_cell_result_array_list, axis=0)
+		du.save_array(all_cell_result_array, os.path.join(target_path, 'all_cell_result_array.npy'))
+
+	all_cell_result_array = np.stack(all_cell_result_array_list, axis=0)
+	du.save_array(all_cell_result_array, os.path.join(target_path, 'all_cell_result_array.npy'))
+	plt.ioff()
+
+
+
 def run_all_method():
 	cell_list = filter_cell_index()
 	print(cell_list)
+	run_ARIMA_prediction_RL(cell_list)
 	# run_prediction_and_RL(cell_list)
-	# run_without_preidction_and_with_RL(cell_list)
+	# run_without_prediction_and_RL_10mins(cell_list)
 
 	# run_offloading_without_RL(cell_list)
 	# run_without_offloading(cell_list)
 
-	run_without_prediction_and_RL_10mins(cell_list)
 	# run_god_prediction_and_RL(cell_list)
+	# run_without_preidction_and_with_RL(cell_list)
 
 
 if __name__ == '__main__':

@@ -16,23 +16,26 @@ logger = CNN_RNN.utility.setlog('env')
 
 
 class Env_Config(object):
+
 	def __init__(self):
 		self.mean_load = 0.044
 		self.B_LTE = 300
 		self.B_UMTS = 14.4  # HSPA+
 		self.B_GSM = 1.6
 
-		self.avg_throughtput_LTE = 6  # 5MHz
-		self.avg_throughtput_UMTS = 6  # 1.4  # HSPA
-		self.avg_throughtput_GSM = 6  # 0.175  # EDGE
+		self.avg_throughtput_LTE = 12.5   # 5MHz 6
+		self.avg_throughtput_UMTS = 12.5  # 1.4  # HSPA
+		self.avg_throughtput_GSM = 12.5  # 0.175  # EDGE
+		self.avg_throughtput_small_cell = 27
 
 		self.saturation = 0.01
-		self.average_demand_per_CDR = 2.5  # Mb
+		self.average_demand_per_CDR = 15  # Mb
+		self.scale_demand_per_CDR = 10  # Mb
 		self.CDR_threshold = 0
 
 		self.P_Macro_cst = 130  # W
 		self.P_Small_cst = 4.8
-		self.P_Macro_tx_power_factor = 3.5
+		self.P_Macro_tx_power_factor = 5
 		self.P_Small_tx_power_factor = 8
 		self.P_Macro_tx = 20
 		self.P_Small_tx = 1  # 0.05
@@ -46,20 +49,27 @@ class Env_Config(object):
 		self.small_cell_num = 10
 		self.features_num = 3  # min avg max
 		self.macro_threshold = 0.7
-		self.small_threshold = 0.5
+		self.small_threshold = 0.4
 		self.load_factor = 1
-		self.effi_factor = 10000
+		self.effi_factor = 1000
 
 
 def generate_new_real_prediction_traffic_array():
 	# target_path = os.path.join(root_dir, 'offloading/npy/real_prediction_traffic_array.npy')
-	source_path = os.path.join(root_dir, 'CNN_RNN/result/CNN_RNN/all_real_prediction_traffic_array_0718.npy')
+	# source_path = os.path.join(root_dir, 'CNN_RNN/result/CNN_RNN/all_real_prediction_traffic_array_0718.npy')
+	source_path = os.path.join(root_dir, 'CNN_RNN/result/ARIMA/all_real_prediction_traffic_array.npy')
 	data_array = du.load_array(source_path)
 	row_center_list = list(range(40, 80, 3))
 	col_center_list = list(range(30, 70, 3))
 	row_range = (row_center_list[0] - 1, row_center_list[-1] + 1)
 	col_range = (col_center_list[0] - 1, col_center_list[-1] + 1)
 	data_array = data_array[:, :, row_range[0]: row_range[1], col_range[0]: col_range[1]]
+
+	# for row_index in range(data_array.shape[2]):
+	# 	for col_index in range(data_array.shape[3]):
+	# 		grid_id = data_array[0, 0, row_index, col_index, 0]
+	# 		if grid_id != 0:
+	# 			print(grid_id)
 	return data_array
 	# du.save_array(data_array, target_path)
 
@@ -78,9 +88,9 @@ def generate_new_10mins_CDR_internet_traffic():
 		for min_index in range(X_array.shape[1]):
 			for row_index in range(X_array.shape[2]):
 				for col_index in range(X_array.shape[3]):
-					cdr_traffic_demand = np.random.normal(config.average_demand_per_CDR, 5)
+					cdr_traffic_demand = np.random.normal(config.average_demand_per_CDR, config.scale_demand_per_CDR)
 					while cdr_traffic_demand < 0:
-						cdr_traffic_demand = np.random.normal(config.average_demand_per_CDR, 2)
+						cdr_traffic_demand = np.random.normal(config.average_demand_per_CDR, 10)
 					X_array[hour_index, min_index, row_index, col_index, -1] = X_array[hour_index, min_index, row_index, col_index, -1] * cdr_traffic_demand  # cdr to throughput
 
 	return X_array
@@ -89,7 +99,7 @@ def generate_new_10mins_CDR_internet_traffic():
 
 def generate_real_prediction_traffic_array():
 
-	targer_dir = os.path.join(root_dir, 'offloading/npy/real_prediction')
+	targer_dir = os.path.join(root_dir, 'offloading/npy/real_prediction_ARIMA')
 	CNN_RNN.utility.check_path_exist(targer_dir)
 	hour_target_path = os.path.join(targer_dir, 'hour_traffic_array.npy')
 	_10mins_target_path = os.path.join(targer_dir, '10min_CDR_internet_traffic.npy')
@@ -100,6 +110,10 @@ def generate_real_prediction_traffic_array():
 	_10_min_traffic = _10_min_traffic[1:]  # (1486, 6, 41, 41, 3)
 	hour_traffic = hour_traffic[:-1]  # (1486, 1, 41, 41, 8)
 	print('hour_traffic shape:{} _10_min_traffic shape:{}'.format(hour_traffic.shape, _10_min_traffic.shape))
+
+	# for row_index in range(hour_traffic.shape[2]):
+	# 	for col_index in range(hour_traffic.shape[3]):
+	# 		print(hour_traffic[0, 0, row_index, col_index, 0])
 	du.save_array(hour_traffic, hour_target_path)
 	du.save_array(_10_min_traffic, _10mins_target_path)
 
@@ -159,13 +173,15 @@ class CDR_to_Throughput(Env_Config):
 		traffic_array = du.load_array(source_path)
 		traffic_array = np.transpose(traffic_array, (2, 3, 0, 1, 4))
 		traffic_list = []
+		# print(grid_list)
+		print(source_path)
 		for search_grid_id in grid_list:
 			# print('grid:{}'.format(grid))
 			# row, column = compute_row_col(grid)
 			# print(row, column)
 			for row_index in range(traffic_array.shape[0]):
 				for col_index in range(traffic_array.shape[1]):
-					grid_id = traffic_array[row_index, col_index, 0, 0, 0]
+					grid_id = traffic_array[row_index, col_index, -149, 0, 0]
 					if search_grid_id == grid_id:
 						grid_traffic = traffic_array[row_index, col_index, :, :]
 			traffic_list.append(grid_traffic)
@@ -398,6 +414,7 @@ class CDR_to_Throughput(Env_Config):
 
 
 class Milano_env():
+
 	def __init__(self, cell_index, config):
 		# super().__init__()
 		self.config = config
@@ -421,6 +438,8 @@ class Milano_env():
 		epoch_time = 60 * 10  # seconds
 		total_power_consumption = 0
 		totol_internet_traffic = 0
+		total_macro_digested = 0
+		total_small_digested = 0
 		macro_load_list = []
 		small_load_list = []
 
@@ -456,51 +475,128 @@ class Milano_env():
 			macro_cell_avg_throughput,
 			pre_define_small_cell_load_rate=0.7,
 			pre_define_Macro_cell_load_rate=0.5):
-			pre_define_small_cell_share_rate = np.random.normal(pre_define_small_cell_load_rate, scale=0.1)
-			pre_define_small_cell_share_rate = abs(pre_define_small_cell_share_rate)
-			pre_define_small_cell_share_rate = pre_define_small_cell_share_rate if pre_define_small_cell_share_rate < 1 else pre_define_small_cell_load_rate
-			pre_define_Macro_cell_share_rate = 1 - pre_define_small_cell_share_rate
-			# pre_define_Macro_cell_share_rate = 1 / (num_of_small_cell + 1)
-			# pre_define_small_cell_share_rate = 1 - pre_define_Macro_cell_share_rate
+			# pre_define_small_cell_share_rate = np.random.normal(pre_define_small_cell_load_rate, scale=0.1)
+			# pre_define_small_cell_share_rate = abs(pre_define_small_cell_share_rate)
+			# pre_define_small_cell_share_rate = pre_define_small_cell_share_rate if pre_define_small_cell_share_rate < 1 else pre_define_small_cell_load_rate
+			# pre_define_Macro_cell_share_rate = 1 - pre_define_small_cell_share_rate
 
 			# macro_load_time = pre_define_Macro_cell_load_rate * epoch_time
-
 			macro_interent_traffic_ability = macro_cell_avg_throughput * epoch_time
-
 			# small_load_time = pre_define_small_cell_load_rate * epoch_time
 			small_internet_traffic_ability = small_cell_avg_throughput * num_of_small_cell * epoch_time
+			pre_define_Macro_cell_share_rate = (macro_interent_traffic_ability / (small_internet_traffic_ability + macro_interent_traffic_ability))
+			seed_pre_define_Macro_cell_share_rate = abs(np.random.normal(pre_define_Macro_cell_share_rate, scale=0.1))
+			while seed_pre_define_Macro_cell_share_rate > 1:
+				seed_pre_define_Macro_cell_share_rate = abs(np.random.normal(pre_define_Macro_cell_share_rate, scale=0.1))
+
+			pre_define_Macro_cell_share_rate = seed_pre_define_Macro_cell_share_rate
+			pre_define_small_cell_share_rate = 1 - pre_define_Macro_cell_share_rate
+			# pre_define_small_cell_share_rate = 0.9
+			# pre_define_Macro_cell_share_rate = 0.1
 
 			macro_resposible_interent_traffic = request_internet_traffic_demand * pre_define_Macro_cell_share_rate
 			small_resposible_interent_traffic = request_internet_traffic_demand * pre_define_small_cell_share_rate
 
-			if small_internet_traffic_ability < small_resposible_interent_traffic and macro_interent_traffic_ability > macro_resposible_interent_traffic:
+			if macro_interent_traffic_ability + small_internet_traffic_ability < request_internet_traffic_demand:
+				# macro_resposible_interent_traffic = macro_interent_traffic_ability
 				small_each_responsible_interent_traffic = small_internet_traffic_ability / num_of_small_cell
 				macro_resposible_interent_traffic = request_internet_traffic_demand - small_internet_traffic_ability
+				# print('1', num_of_small_cell)
 
-			elif small_internet_traffic_ability < small_resposible_interent_traffic and macro_interent_traffic_ability < macro_resposible_interent_traffic:
-				small_each_responsible_interent_traffic = small_internet_traffic_ability / num_of_small_cell
-				macro_resposible_interent_traffic = request_internet_traffic_demand - small_internet_traffic_ability
-
-			elif small_internet_traffic_ability > small_resposible_interent_traffic and macro_interent_traffic_ability > macro_resposible_interent_traffic:
-				small_each_responsible_interent_traffic = small_resposible_interent_traffic / num_of_small_cell
-				macro_resposible_interent_traffic = macro_resposible_interent_traffic
-
-			elif small_internet_traffic_ability > small_resposible_interent_traffic and macro_interent_traffic_ability < macro_resposible_interent_traffic:
-
-				macro_exceed_internet_traffic = macro_resposible_interent_traffic - macro_interent_traffic_ability
-
-				small_resposible_interent_traffic += macro_exceed_internet_traffic
-				if small_internet_traffic_ability < small_resposible_interent_traffic:
+			else:
+				if small_internet_traffic_ability < small_resposible_interent_traffic and macro_interent_traffic_ability > macro_resposible_interent_traffic:
 					small_each_responsible_interent_traffic = small_internet_traffic_ability / num_of_small_cell
 					macro_resposible_interent_traffic = request_internet_traffic_demand - small_internet_traffic_ability
-				else:
-					Macro_cell_load_rate = np.random.normal(pre_define_Macro_cell_load_rate, 0.1)
-					Macro_cell_load_rate = abs(Macro_cell_load_rate)
-					Macro_cell_load_rate = Macro_cell_load_rate if Macro_cell_load_rate < 1 else 1
-					# print(Macro_cell_load_rate)
-					macro_load_time = Macro_cell_load_rate * epoch_time
-					macro_resposible_interent_traffic = macro_load_time * macro_cell_avg_throughput
-					small_each_responsible_interent_traffic = (request_internet_traffic_demand - macro_resposible_interent_traffic) / num_of_small_cell
+					# print('2', num_of_small_cell)
+				elif small_internet_traffic_ability < small_resposible_interent_traffic and macro_interent_traffic_ability < macro_resposible_interent_traffic:
+					small_each_responsible_interent_traffic = small_internet_traffic_ability / num_of_small_cell
+					macro_resposible_interent_traffic = request_internet_traffic_demand - small_internet_traffic_ability
+					# print('3', num_of_small_cell)
+				elif small_internet_traffic_ability > small_resposible_interent_traffic and macro_interent_traffic_ability > macro_resposible_interent_traffic:
+					# Macro_cell_share_rate = macro_interent_traffic_ability / (macro_interent_traffic_ability + small_internet_traffic_ability)
+					# small_cell_share_rate = 1 - Macro_cell_share_rate
+
+					# macro_resposible_interent_traffic = request_internet_traffic_demand * Macro_cell_share_rate
+					# small_resposible_interent_traffic = request_internet_traffic_demand * small_cell_share_rate
+					# small_each_responsible_interent_traffic = small_resposible_interent_traffic / num_of_small_cell
+					keep_macro_resposible_interent_traffic = macro_resposible_interent_traffic
+					keep_small_resposible_interent_traffic = small_resposible_interent_traffic
+					macro_load_rate = macro_resposible_interent_traffic / (macro_cell_avg_throughput * epoch_time)
+					# be_macro = macro_load_rate
+					# be_small = small_resposible_interent_traffic / (num_of_small_cell * epoch_time * small_cell_avg_throughput)
+
+					while pre_define_Macro_cell_load_rate < macro_load_rate:
+						offloading_rate = np.random.normal(macro_load_rate, scale=0.1)
+						offloading_rate = abs(offloading_rate)
+						offloading_rate = offloading_rate if offloading_rate < 1 else pre_define_Macro_cell_load_rate
+
+						offloading_traffic = offloading_rate * macro_resposible_interent_traffic
+						macro_resposible_interent_traffic -= offloading_traffic
+						small_resposible_interent_traffic += offloading_traffic
+						small_each_responsible_interent_traffic = small_resposible_interent_traffic / num_of_small_cell
+
+						macro_load_rate = macro_resposible_interent_traffic / (macro_cell_avg_throughput * epoch_time)
+
+					if pre_define_Macro_cell_load_rate > macro_load_rate:
+
+						small_each_responsible_interent_traffic = small_resposible_interent_traffic / num_of_small_cell
+						macro_resposible_interent_traffic = macro_resposible_interent_traffic
+
+					if small_resposible_interent_traffic > small_internet_traffic_ability:
+						# logger.warning('small cell over load!! responseble:{:.4f} ability:{:.4f}'.format(small_resposible_interent_traffic, small_internet_traffic_ability))
+						small_each_responsible_interent_traffic = keep_small_resposible_interent_traffic / num_of_small_cell
+						macro_resposible_interent_traffic = keep_macro_resposible_interent_traffic
+
+						# print('5', num_of_small_cell)
+					# af_macro_load_rate = macro_resposible_interent_traffic / (macro_cell_avg_throughput * epoch_time)
+					# af_small = small_each_responsible_interent_traffic / (small_cell_avg_throughput * epoch_time)
+					# if af_macro_load_rate > 1:
+					# print(be_macro, af_macro_load_rate, be_small, af_small)
+
+				elif small_internet_traffic_ability > small_resposible_interent_traffic and macro_interent_traffic_ability < macro_resposible_interent_traffic:
+					# offloading_before = macro_resposible_interent_traffic
+					macro_load_rate = macro_resposible_interent_traffic / (macro_cell_avg_throughput * epoch_time)
+					while pre_define_Macro_cell_load_rate < macro_load_rate:
+						offloading_rate = np.random.normal(pre_define_Macro_cell_load_rate, scale=0.01)
+						offloading_rate = abs(offloading_rate)
+						offloading_rate = offloading_rate if offloading_rate < 1 else pre_define_Macro_cell_load_rate
+
+						offloading_traffic = offloading_rate * macro_resposible_interent_traffic
+						macro_resposible_interent_traffic -= offloading_traffic
+						small_resposible_interent_traffic += offloading_traffic
+						small_each_responsible_interent_traffic = small_resposible_interent_traffic / num_of_small_cell
+						if small_resposible_interent_traffic > small_internet_traffic_ability:
+							# logger.warning('small cell over load!! responseble:{:.4f} ability:{:.4f}'.format(small_resposible_interent_traffic, small_internet_traffic_ability))
+							small_each_responsible_interent_traffic = 0.9 * epoch_time * small_cell_avg_throughput
+							macro_resposible_interent_traffic = request_internet_traffic_demand - (small_each_responsible_interent_traffic * num_of_small_cell)
+							break
+						macro_load_rate = macro_resposible_interent_traffic / (macro_cell_avg_throughput * epoch_time)
+						# logger.warning('small cell over load!! responseble:{:.4f} ability:{:.4f}'.format(small_each_responsible_interent_traffic * num_of_small_cell, small_internet_traffic_ability))
+						# print('6.5', num_of_small_cell)
+					# print('6', num_of_small_cell)
+					# offloading_after = macro_resposible_interent_traffic
+
+					# macro_exceed_internet_traffic = macro_resposible_interent_traffic - macro_interent_traffic_ability
+
+					# small_resposible_interent_traffic += macro_exceed_internet_traffic
+					# if small_internet_traffic_ability < small_resposible_interent_traffic:
+					# 	small_each_responsible_interent_traffic = small_internet_traffic_ability / num_of_small_cell
+					# 	macro_resposible_interent_traffic = request_internet_traffic_demand - small_internet_traffic_ability
+					# else:
+					# 	macro_resposible_interent_traffic = macro_interent_traffic_ability
+					# 	small_resposible_interent_traffic = request_internet_traffic_demand - macro_resposible_interent_traffic
+					# 	if small_resposible_interent_traffic < small_internet_traffic_ability:
+					# 		small_each_responsible_interent_traffic = small_resposible_interent_traffic / num_of_small_cell
+					# 	else:
+					# 		small_each_responsible_interent_traffic = small_internet_traffic_ability / num_of_small_cell
+					# 		macro_resposible_interent_traffic = request_internet_traffic_demand - small_internet_traffic_ability
+						# Macro_cell_load_rate = np.random.normal(pre_define_Macro_cell_load_rate, 0.1)
+						# Macro_cell_load_rate = abs(Macro_cell_load_rate)
+						# Macro_cell_load_rate = Macro_cell_load_rate if Macro_cell_load_rate < 1 else 1
+						# # print(Macro_cell_load_rate)
+						# macro_load_time = Macro_cell_load_rate * epoch_time
+						# macro_resposible_interent_traffic = macro_load_time * macro_cell_avg_throughput
+						# small_each_responsible_interent_traffic = (request_internet_traffic_demand - macro_resposible_interent_traffic) / num_of_small_cell
 
 			# print('total:{}, macro:{} small:{}'.format(request_internet_traffic_demand, macro_resposible_interent_traffic, small_each_responsible_interent_traffic))
 			'''
@@ -549,9 +645,11 @@ class Milano_env():
 			else:
 				macro_resposible_interent_traffic = request_internet_traffic_demand - small_total_responsible_interent_traffic
 			'''
+
+			# print('return ', macro_resposible_interent_traffic / (macro_cell_avg_throughput * epoch_time), small_each_responsible_interent_traffic / (epoch_time * small_cell_avg_throughput))
 			return macro_resposible_interent_traffic, small_each_responsible_interent_traffic
 
-		small_cell_avg_throughput = self.config.avg_throughtput_LTE
+		small_cell_avg_throughput = self.config.avg_throughtput_small_cell
 		macro_cell_avg_throughput = get_Macro_average_throughput(self.cell_info['radio'])
 
 		for index, _10min in enumerate(_10min_traffic):
@@ -572,6 +670,7 @@ class Milano_env():
 				# print('Small cell:load_rate:{:.4f}, energy_consumption:{:.4f} energy_effi:{:.4f}'.format(small_load_rate, Small_energy_consumption, small_cell_energy_efficiency))
 				total_power_consumption += Small_energy_consumption * num_of_small_cell
 				totol_internet_traffic += small_each_responsible_interent_traffic * num_of_small_cell
+				total_small_digested += small_each_responsible_interent_traffic * num_of_small_cell
 				small_load_list.append(small_load_rate)
 			else:
 				macro_resposible_interent_traffic = request_internet_traffic_demand
@@ -582,30 +681,36 @@ class Milano_env():
 			macro_load_rate = macro_cell_load_time / epoch_time
 			if macro_load_rate > 1:
 				load_rate_limit = 1
-				macro_limit_internet_traffic = macro_cell_avg_throughput * epoch_time
+				macro_digested_traffic = macro_cell_avg_throughput * epoch_time
 			else:
 				load_rate_limit = macro_load_rate
-				macro_limit_internet_traffic = macro_resposible_interent_traffic
+				macro_digested_traffic = macro_resposible_interent_traffic
 
 			macro_energy_comsumption = epoch_time * self.config.P_Macro_cst + self.config.P_Macro_tx_power_factor * self.config.P_Macro_tx * load_rate_limit * epoch_time
-			# macro_energy_efficiency = macro_limit_internet_traffic / macro_energy_comsumption
+			# macro_energy_efficiency = macro_digested_traffic / macro_energy_comsumption
 			# print('Macro cell:load_rate:{:.4f}, energy_consumption:{:.4f} energy_effi:{:.4f}'.format(macro_load_rate, macro_energy_comsumption, macro_energy_efficiency))
 			macro_load_list.append(macro_load_rate)
 			total_power_consumption += macro_energy_comsumption
-			totol_internet_traffic += macro_limit_internet_traffic
-
+			totol_internet_traffic += macro_digested_traffic
+			total_macro_digested += macro_digested_traffic
 		location_energy_effi = totol_internet_traffic / total_power_consumption
 		if location_energy_effi < 0:
 			logger.error('energy_effi:{:.4f} action:{} totol_internet_traffic:{:.4f}, hour_sum:{:.4f} total_power_consumption:{:.2f}'.format(location_energy_effi, num_of_small_cell, totol_internet_traffic, np.sum(_10min_traffic[:, 1]), total_power_consumption))
 		self.total_power_consumption.append(total_power_consumption)
 		self.macro_cell_load.append(mean(macro_load_list))  # per hour
-		self.internet_traffic_demand.append(totol_internet_traffic)  # per hour
+		self.internet_traffic_digested.append(totol_internet_traffic)  # per hour
 		self.actions.append(num_of_small_cell)
+		self.internet_traffic_demand.append(np.sum(_10min_traffic[:, 1]))
+		self.macro_digested_traffic.append(total_macro_digested)
+		self.small_digested_traffic.append(total_small_digested)
+
 		if len(small_load_list) > 0:
 			self.small_cell_load.append(mean(small_load_list))
 		else:
 			self.small_cell_load.append(0)
+		# print(num_of_small_cell, small_load_list)
 		# print('hour location_energy_effi', location_energy_effi)
+		# print(macro_load_list, small_load_list)
 		return location_energy_effi, macro_load_list, small_load_list
 
 	def _reward(self, _10min_traffic, action):
@@ -614,33 +719,36 @@ class Milano_env():
 		afa = self.config.load_factor
 		beta = self.config.effi_factor
 		energy_effi, macro_load_rate_list, small_load_list = self._calculate_energy_efficiency(_10min_traffic, action)
-		reward = energy_effi * beta
+		eff_reward = energy_effi * beta
+		load_reward = 0
 		for i, macro_load_rate in enumerate(macro_load_rate_list):
 
 			if macro_load_rate > macro_threshold:
 				macro_load_rate_Eva = np.exp((macro_load_rate - macro_threshold) * 10)
 				macro_load_rate_Eva = macro_load_rate_Eva if macro_load_rate_Eva < 1000 else 1000
-				reward -= afa * macro_load_rate_Eva
+				load_reward -= afa * macro_load_rate_Eva
 
 			if action > 0:  # small cell number > 0
 				small_load = small_load_list[i]
+				# print(macro_load_rate, small_load)
 				if macro_load_rate < macro_threshold and small_load < small_threshold:  # gap: 0.3
-					small_load_eva = np.exp((small_threshold - small_load) * 10)
-					reward -= afa * (small_load_eva * action) * 3
+					small_load_eva = np.exp((small_threshold - small_load) * 10) * 2
+					# print('punish', macro_load_rate, small_load, action, small_load_eva * action * afa)
+					load_reward -= afa * (small_load_eva * action)
 
-				if small_load > small_threshold and small_load < 0.7:  # gap: 0.4
-					small_load_eva = np.exp(small_load * 10)
-					reward += afa * (small_load_eva * action) * 3
+				if 0.7 > small_load > small_threshold:  # gap: 0.4
+					small_load_eva = np.exp(small_load * 10) * 2
+					load_reward += afa * (small_load_eva * action)
+					# print('encourage', small_load)
+				if small_load > 0.7 and action is not self.config.small_cell_num:
+					small_load_eva = np.exp((small_load - 0.7) * 10) * 10   # gap: 0.3
+					load_reward -= afa * (small_load_eva * action)
 
-				if small_load > 0.7 and action is not 10:
-					small_load_eva = np.exp((small_load - 0.7) * 10)  # gap: 0.3
-					reward -= afa * (small_load_eva * action)
-
+		reward = eff_reward + load_reward
+		# print(eff_reward, load_reward, reward)
 		# 	else:
 		# 		macro_load_rate_Eva = macro_threshold - macro_load_rate
 		# 		reward += afa * macro_load_rate_Eva
-			
-
 			# if small_load > small_threshold:
 			# 	small_load_eva = small_load - small_threshold
 			# 	reward += afa * (small_load_eva * action)
@@ -677,9 +785,13 @@ class Milano_env():
 
 		self.total_power_consumption = []  # per hour
 		self.macro_cell_load = []  # per hour
-		self.internet_traffic_demand = []  # per hour
+		self.internet_traffic_digested = []  # per hour
+		self.internet_traffic_demand = []
 		self.small_cell_load = []
 		self.actions = []
+		self.macro_digested_traffic = []
+		self.small_digested_traffic = []
+
 
 		'''
 		self.traffic_hour_real_prediciton_CDR_array,  # (1487, 1, 7)
@@ -705,9 +817,12 @@ class Milano_env():
 	def reset_10_mins(self, training=True):
 		self.total_power_consumption = []  # per hour
 		self.macro_cell_load = []  # per hour
-		self.internet_traffic_demand = []  # per hour
+		self.internet_traffic_digested = []  # per hour
+		self.internet_traffic_demand = []
 		self.small_cell_load = []
 		self.actions = []
+		self.macro_digested_traffic = []
+		self.small_digested_traffic = []
 
 		past_10_minutes = self._10mins_internet_traffic_demand[:-1]
 		current_10_minute = self._10mins_internet_traffic_demand[1:]
@@ -754,11 +869,12 @@ if __name__ == "__main__":
 	# env = Milano_env(867)
 	# env.reset()
 	# env.step(5)
-	generate_real_prediction_traffic_array()
-	generate_without_prediction_traffic_array()
-	generate_god_mode_traffic_array()
+	# generate_real_prediction_traffic_array()
+	# generate_without_prediction_traffic_array()
+	# generate_god_mode_traffic_array()
 	# for n in range(500):
 	# 	a = np.random.normal(2.5, 5)
 	# 	while a < 0:
 	# 		a = np.random.normal(2.5, 2)
 		# print(a)
+	generate_new_real_prediction_traffic_array()
