@@ -3,7 +3,7 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import sys
-# import stationary_test as st
+import stationary_test as st
 sys.path.append('/home/mldp/ML_with_bigdata')
 # import .data_utility as du
 import data_utility as du
@@ -265,7 +265,7 @@ class MTL_ARIMA_Model(ARIMA_Model):
 
 
 def stationat_test(timeseries_array):
-	timeseries_array = timeseries_array[1:] - timeseries_array[:-1]
+	# timeseries_array = timeseries_array[1:] - timeseries_array[:-1]
 	st.series_plot(timeseries_array)
 	st.lag_plot(timeseries_array)
 	st.Pearson_correlation_coefficient(timeseries_array)
@@ -286,17 +286,17 @@ if __name__ == '__main__':
 	row = 10
 	col = 1
 	data_array = data_array[:, 0, row, col, :]
-	# stationat_test(data_array[:, 3])
+	stationat_test(data_array[:, 3])
 	# '''
 	# order_list = [(3, 1, 3), (3, 1, 2), (3, 1, 1), (2, 1, 3), (2, 1, 2), (2, 1, 1), (1, 1, 3), (1, 1, 2), (1, 1, 1), (3, 1, 0), (1, 1, 0), (2, 1, 0), (3, 0, 3), (3, 0, 2), (2, 0, 2), (2, 0, 1), (3, 0, 1)]
 	# order_list = [(3, 0, 3), (3, 0, 2), (2, 0, 2), (2, 0, 1), (3, 0, 1)]
 	# '''
-	order_list = [(3, 1, 0)]
-	arima = MTL_ARIMA_Model(order_list)
-	arima.set_MTL_data_set(data_array[:, 2], data_array[:, 3], data_array[:, 4])
-	arima.MTL_predict()
-	arima.evaluate()
-	plt.show()
+	# order_list = [(3, 1, 0)]
+	# arima = MTL_ARIMA_Model(order_list)
+	# arima.set_MTL_data_set(data_array[:, 2], data_array[:, 3], data_array[:, 4])
+	# arima.MTL_predict()
+	# arima.evaluate()
+	# plt.show()
 	'''
 	residuals = pd.DataFrame(arima.model_fit.resid)
 	residuals.plot()

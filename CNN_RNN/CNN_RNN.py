@@ -723,7 +723,7 @@ class Multitask_Neural_Network(Tf_Utility):
 			self.save_result_report(result_path)
 			save_figure(result_path)
 		plt.ioff()
-		# plt.show()
+		plt.show()
 		return self.__summarized_report()
 
 	def start_STL_train(self, model_path, task_name, reload=False):

@@ -14,7 +14,7 @@ from pprint import pprint
 class HyperParameterConfig:
 	def __init__(self):
 		self.iter_epoch = 2000
-		self.batch_size = 50
+		self.batch_size = 100
 		self.learning_rate = 0.0014
 		self.keep_rate = 0.85
 		self.weight_decay = 0.001
@@ -32,7 +32,7 @@ class HyperParameterConfig:
 
 	def CNN_RNN(self):
 		'''build_bi_RNN_network'''
-		self.RNN_num_layers = 4
+		self.RNN_num_layers = 3
 		self.RNN_num_step = 6
 		self.RNN_hidden_node_size = 256
 		self.RNN_cell = 'LSTMcell'
@@ -42,7 +42,7 @@ class HyperParameterConfig:
 
 		'''build_CNN_network'''
 		self.CNN_layer_activation_fn = 'relu'
-		self.CNN_layer_1_5x5_kernel_shape = [5, 5, 1, 32]
+		self.CNN_layer_1_5x5_kernel_shape = [5, 5, 2, 32]
 		self.CNN_layer_1_5x5_kernel_strides = [1, 1, 1, 1]
 		self.CNN_layer_1_5x5_conv_Winit = 'xavier'
 
@@ -50,7 +50,7 @@ class HyperParameterConfig:
 		self.CNN_layer_1_5x5_pooling_ksize = [1, 2, 2, 1]
 		self.CNN_layer_1_5x5_pooling_strides = [1, 2, 2, 1]
 
-		self.CNN_layer_1_3x3_kernel_shape = [3, 3, 1, 32]
+		self.CNN_layer_1_3x3_kernel_shape = [3, 3, 2, 32]
 		self.CNN_layer_1_3x3_kernel_strides = [1, 1, 1, 1]
 		self.CNN_layer_1_3x3_conv_Winit = 'xavier'
 

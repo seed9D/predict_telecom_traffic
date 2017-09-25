@@ -583,10 +583,10 @@ def predict_train(cnn_rnn, X_array, Y_array, model_path):
 
 
 def predict_MTL_train(neural, X_array, Y_array, model_path):
-    # print(Y_array.shape)
+    print(X_array.shape)
 
     prediction_min, prediction_avg, prediction_max = neural.start_MTL_predict(
-        X_array[:, :, :, :, 2:],
+        X_array,
         Y_array[:, :, :, :, 2:],
         model_path)
     # real_min = Y_array[:, :, :, :, 2, np.newaxis]
@@ -667,6 +667,17 @@ def print_Y_array(Y_array):
     plt.show()
 
 
+def time_feature(X_array_date):
+    for i in range(X_array_date.shape[0]):
+        for j in range(X_array_date.shape[1]):
+            for row in range(X_array_date.shape[2]):
+                for col in range(X_array_date.shape[3]):
+                    date = set_time_zone(X_array_date[i, j, row, col])
+                    # print(date_time_covert_to_str(date)[6:])
+                    X_array_date[i, j, row, col, 0] = date_time_covert_to_str(date)[6:]
+    return X_array_date
+
+
 def print_training_grid_id(train_array):
     print(train_array.shape)
     for row in range(train_array.shape[2]):
@@ -680,28 +691,37 @@ TK = Prepare_Task_Data('./npy/final')
 X_array, Y_array = TK.Task_max_min_avg(generate_data=False)
 Y_array = Y_array[:, :, 10:13, 10:13, :]
 
+X_array_date = X_array[:, :, :, :, 1, np.newaxis]
+X_array_date = time_feature(X_array_date)
+X_array_date, _ = feature_scaling(X_array_date, feature_range=(0.1, 255))
 new_X_array, scaler = feature_scaling(X_array[:, :, :, :, 2:])
 new_Y_array, _ = feature_scaling(Y_array[:, :, :, :, 2:], scaler)
 X_array = copy(X_array, new_X_array)
 Y_array = copy(Y_array, new_Y_array)
 del new_X_array, new_Y_array
 hyper_config = CNN_RNN_config.HyperParameterConfig()
-hyper_config.read_config(file_path=os.path.join(
-    root_dir, 'CNN_RNN/result/random_search_0609/_85/config.json'))
+# hyper_config.read_config(file_path=os.path.join(
+    # root_dir, 'CNN_RNN/result/random_search_0609/_85/config.json'))
+hyper_config.CNN_RNN()
 key_var = hyper_config.get_variable()
 batch_size = key_var['batch_size']
 
 X_array_train = X_array[0:batch_size]   # should correspond to bathc size
+X_array_train_date = X_array_date[0:batch_size]
+X_array_train = np.concatenate((X_array_train_date, X_array_train), axis=-1)
 Y_array_train = Y_array[0:batch_size]  # should correspond to bathc size
+
 # should correspond to bathc size
-X_array_test = X_array[X_array.shape[0] - batch_size:]
+X_array_test = X_array[X_array.shape[0] - batch_size:, :, :, :, -1, np.newaxis]
+X_array_test_date = X_array_date[X_array.shape[0] - batch_size:]
+X_array_test = np.concatenate((X_array_test_date, X_array_test), axis=-1)
 # should correspond to bathc size
 Y_array_test = Y_array[Y_array.shape[0] - batch_size:]
 del X_array, Y_array
 
 
 input_data_shape = [X_array_train.shape[1],
-                    X_array_train.shape[2], X_array_train.shape[3], 1]
+                    X_array_train.shape[2], X_array_train.shape[3], 2]
 output_data_shape = [Y_array_train.shape[1],
                      Y_array_train.shape[2], Y_array_train.shape[3], 1]
 

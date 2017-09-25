@@ -10,7 +10,8 @@ sys.path.append('/home/mldp/ML_with_bigdata')
 import data_utility as du
 import CNN_RNN.utility as utility
 from multi_task_data import Prepare_Task_Data
-root_dir = '/home/mldp/ML_with_bigdata'
+# root_dir = '/home/mldp/ML_with_bigdata'
+root_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 logger = utility.setlog('run_multiple_cell')
 
@@ -46,7 +47,7 @@ def filter_cell_index():
 	def filter_by_range(Y_real_prediction_array):
 		Y_real_prediction_array = np.transpose(Y_real_prediction_array, (2, 3, 0, 1, 4))
 		grid_id_list = []
-		row_range = list(range(30, 50))
+		row_range = list(range(20, 50))
 		col_range = list(range(30, 50))
 		for row_index in range(Y_real_prediction_array.shape[0]):
 			for col_index in range(Y_real_prediction_array.shape[1]):
@@ -57,12 +58,14 @@ def filter_cell_index():
 					grid_id_list.append(int(grid_id))
 		return grid_id_list
 
-	all_real_prediction_traffic_array_path = os.path.join(root_dir, 'offloading/npy/real_prediction/hour_traffic_array.npy')
+	all_real_prediction_traffic_array_path = os.path.join(root_dir, 'offloading/npy/real_prediction/hour_traffic_array_0730.npy')
 
 	CNN_RNN_MTL_array = du.load_array(all_real_prediction_traffic_array_path)
-	# evaluate_threshold = 0.75
-	# grid_id_list = evaluate_performance(CNN_RNN_MTL_array, evaluate_threshold)
-	grid_id_list = filter_by_range(CNN_RNN_MTL_array)
+
+	evaluate_threshold = 0.75
+	grid_id_list = evaluate_performance(CNN_RNN_MTL_array, evaluate_threshold)
+
+	# grid_id_list = filter_by_range(CNN_RNN_MTL_array)
 	cell_grids = get_cell_tower_grid_pair()
 	cell_index_list = []
 	for cell_grid in cell_grids:
@@ -401,11 +404,10 @@ def run_ARIMA_prediction_RL(cell_list):
 	plt.ioff()
 
 
-
 def run_all_method():
 	cell_list = filter_cell_index()
 	print(cell_list)
-	run_ARIMA_prediction_RL(cell_list)
+	# run_ARIMA_prediction_RL(cell_list)
 	# run_prediction_and_RL(cell_list)
 	# run_without_prediction_and_RL_10mins(cell_list)
 

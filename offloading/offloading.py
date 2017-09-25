@@ -10,9 +10,8 @@ import CNN_RNN.utility
 logger = CNN_RNN.utility.setlog('offloading')
 root_dir = '/home/mldp/ML_with_bigdata'
 
-
 class Run_Offloading:
-
+	""" with neural network"""
 	def __init__(self, model_path, config, cell_num=867):
 		self.cell_num = cell_num
 		self.model_path = model_path

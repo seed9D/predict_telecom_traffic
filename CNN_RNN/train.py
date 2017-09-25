@@ -1,5 +1,5 @@
 import numpy as np
-from utility import feature_scaling, root_dir
+from utility import feature_scaling, root_dir, set_time_zone, date_time_covert_to_str
 import matplotlib.pyplot as plt
 import sys
 import CNN_RNN_config
@@ -23,18 +23,33 @@ def print_Y_array(Y_array):
 	plt.show()
 
 
+def time_feature(X_array_date):
+	for i in range(X_array_date.shape[0]):
+		for j in range(X_array_date.shape[1]):
+			for row in range(X_array_date.shape[2]):
+				for col in range(X_array_date.shape[3]):
+					date = set_time_zone(X_array_date[i, j, row, col])
+					# print(date_time_covert_to_str(date)[6:])
+					X_array_date[i, j, row, col, 0] = date_time_covert_to_str(date)[6:]
+	return X_array_date
+
 def train():
 	# X_array, Y_array = get_X_and_Y_array(task_num=5)
 	TK = Prepare_Task_Data('./npy/final')
 	X_array, Y_array = TK.Task_max_min_avg(generate_data=False)
 	data_len = X_array.shape[0]
+	X_array_date = X_array[: 9 * data_len // 10, :, :, :, 1, np.newaxis]
+	X_array_date = time_feature(X_array_date)
+	X_array_date, _ = feature_scaling(X_array_date, feature_range=(0.1, 255))
+
 	X_array = X_array[: 9 * data_len // 10, :, :, :, -1, np.newaxis]
 	Y_array = Y_array[: 9 * data_len // 10, :, :, :, 2:]
 	# X_array = X_array[:, :, 10:15, 10:15, :]
 	Y_array = Y_array[:, :, 10:13, 10:13, :]
-	X_array, scaler = feature_scaling(X_array)
+	X_array, scaler = feature_scaling(X_array, feature_range=(0.1, 255))
 	Y_array, _ = feature_scaling(Y_array, scaler)
 
+	X_array = np.concatenate((X_array_date, X_array), -1)
 	# X_array_2, Y_array_2 = get_X_and_Y_array(task_num=6)
 	# Y_array_2 = Y_array_2[:, :, 10:13, 10:13, :]
 	# parameter
@@ -48,9 +63,9 @@ def train():
 		'result_path': result_path
 	}
 	hyper_config = CNN_RNN_config.HyperParameterConfig()
-	hyper_config.read_config(file_path=os.path.join(root_dir, 'CNN_RNN/result/random_search_0609/_85/config.json'))
-
-	neural = concurrent_CNN_RNN(input_data_shape, output_data_shape, hyper_config)
+	# hyper_config.read_config(file_path=os.path.join(root_dir, 'CNN_RNN/result/random_search_0609/_85/config.json'))
+	hyper_config.CNN_RNN()
+	neural = CNN_RNN(input_data_shape, output_data_shape, hyper_config)
 
 	neural.create_MTL_task(X_array, Y_array[:, :, :, :, 0, np.newaxis], 'min_traffic')
 	neural.create_MTL_task(X_array, Y_array[:, :, :, :, 1, np.newaxis], 'avg_traffic')
