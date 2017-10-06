@@ -109,6 +109,20 @@ def generate_real_prediction_traffic_array():
 # 	du.save_array(hour_traffic, hour_target_path)
 # 	du.save_array(_10_min_traffic, _10mins_target_path)
 
+def convert_prediction_to_non_prediction():
+	source_path = os.path.join(root_dir, 'offloading/npy/real_prediction')
+	target_path = os.path.join(root_dir, 'offloading/npy/real_without_prediction')
+
+	_10_min_traffic = du.load_array(os.path.join(source_path, '10min_CDR_internet_traffic.npy'))
+	hour_traffic = du.load_array(os.path.join(source_path, 'hour_traffic_array.npy'))
+	print('origin 10 min shape:{} origin hour shape:{}'.format(_10_min_traffic.shape, hour_traffic.shape))
+
+	_10_min_traffic = _10_min_traffic[1:]  # (1485, 6, 41, 41, 3)
+	hour_traffic = hour_traffic[:-1]  # (1485, 1, 41, 41, 8)
+	print('new 10 min shape:{} new hour shape:{}'.format(_10_min_traffic.shape, hour_traffic.shape))
+	du.save_array(_10_min_traffic, os.path.join(target_path, '10min_CDR_internet_traffic'))
+	du.save_array(hour_traffic, os.path.join(target_path, 'hour_traffic_array'))
 
 if __name__ == "__main__":
 	generate_real_prediction_traffic_array()
+	# convert_prediction_to_non_prediction()

@@ -1,10 +1,9 @@
 import numpy as np
-import pandas as pd
 import os
 import matplotlib.pyplot as plt
 import json
 import sys
-from offloading import Run_Offloading, offloading_plot
+from offloading import Run_Offloading, offloading_plot, Run_Offloading_with_Qtable
 from env import Env_Config
 sys.path.append('/home/mldp/ML_with_bigdata')
 import data_utility as du
@@ -404,12 +403,58 @@ def run_ARIMA_prediction_RL(cell_list):
 	plt.ioff()
 
 
+def run_Q_table_without_prediction(cell_list):
+
+	def run_offloading(cell_num):
+		config = Env_Config()
+		model_path = os.path.join(root_dir, 'offloading/output_model/Q_table_RL.ckpt')
+		offloading = Run_Offloading_with_Qtable(model_path, config, cell_num)
+		without_RL_with_offloading_result_dict = offloading.run_test_without_RL(10)
+		without_RL_offloading_result_dict = offloading.run_test_without_RL(0)
+
+		logger.info('macro load:{} offloading_without_RL:{} without_RL_without_offloading:{}'.format(
+			np.mean(without_RL_offloading_result_dict['macro_load'][-149:]),
+			np.mean(without_RL_with_offloading_result_dict['energy_effi'][-149:]),
+			np.mean(without_RL_offloading_result_dict['energy_effi'][-149:])))
+		offloading.RL_train()
+		with_RL_result_dict = offloading.run_test_with_RL()
+		with_RL_result_array = dict_to_nparray(with_RL_result_dict, cell_num)
+		# without_RL_with_offloading_result_array = dict_to_nparray(without_RL_with_offloading_result_dict)
+		# without_RL_offloading_result_array = dict_to_nparray(without_RL_offloading_result_dict)
+		offloading_plot(with_RL_result_dict, without_RL_with_offloading_result_dict, without_RL_offloading_result_dict)
+		return with_RL_result_array
+
+	plt.ion()
+
+	target_path = os.path.join(root_dir, 'offloading/result/with_Q_table_without_prediction')
+	utility.check_path_exist(target_path)
+	store_path = os.path.join(target_path, 'loop_report.txt')
+	if os.path.exists(store_path):
+		os.remove(store_path)
+
+	cell_list_len = len(cell_list)
+	all_cell_result_array_list = []
+	for cell_num in cell_list:
+
+		with_RL_result_array = run_offloading(cell_num)
+		all_cell_result_array_list.append(with_RL_result_array)
+		logger.info('cell_num:{} average effi mean:{}'.format(cell_num, np.mean(with_RL_result_array[-149:, 2])))
+		save_report(with_RL_result_array, store_path)
+		all_cell_result_array = np.stack(all_cell_result_array_list, axis=0)
+		du.save_array(all_cell_result_array, os.path.join(target_path, 'all_cell_result_array.npy'))
+
+	all_cell_result_array = np.stack(all_cell_result_array_list, axis=0)
+	du.save_array(all_cell_result_array, os.path.join(target_path, 'all_cell_result_array.npy'))
+	plt.ioff()
+
+
 def run_all_method():
 	cell_list = filter_cell_index()
 	print(cell_list)
 	# run_ARIMA_prediction_RL(cell_list)
 	# run_prediction_and_RL(cell_list)
 	# run_without_prediction_and_RL_10mins(cell_list)
+	run_Q_table_without_prediction(cell_list)
 
 	# run_offloading_without_RL(cell_list)
 	# run_without_offloading(cell_list)

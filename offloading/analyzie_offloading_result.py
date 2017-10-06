@@ -13,6 +13,9 @@ logger = CNN_RNN.utility.setlog('analysize')
 
 
 def analysis_energy_effi():
+	'''
+	not in use anymore
+	'''
 	def get_energyEFFI_pd(file_path):
 		data_array = du.load_array(file_path)
 		energy_array = data_array[:, -149:, 2]  # (144, 1486)
@@ -71,6 +74,7 @@ def analysis_energy_effi():
 	God_prediction_offload_RL_path = os.path.join(root_dir, 'offloading/result/RL_with_god_prediction', 'all_cell_result_array.npy')
 	offloading_RL_without_prediction_path = os.path.join(root_dir, 'offloading/result/RL_without_prediction', 'all_cell_result_array_0726.npy')
 	_10mins_offloading_RL_without_prediction_path = os.path.join(root_dir, 'offloading/result/RL_10mins_without_prediction', 'all_cell_result_array_0731.npy')
+	offloading_q_table_path = os.path.join(root_dir, 'offloading/result/with_Q_table_without_prediction', 'all_cell_result_array_0927.npy')
 
 	prediction_offloading_RL = get_energyEFFI_pd(prediction_offloading_RL_path)
 	without_offloading_RL = get_energyEFFI_pd(without_offloading_RL_path)
@@ -79,17 +83,18 @@ def analysis_energy_effi():
 	God_prediction_offload_RL = get_energyEFFI_pd(God_prediction_offload_RL_path)
 	offloading_RL_without_prediction = get_energyEFFI_pd(offloading_RL_without_prediction_path)
 	_10mins_offloading_RL_without_prediction = get_energyEFFI_pd(_10mins_offloading_RL_without_prediction_path)
+	offloading_with_Q_table = get_energyEFFI_pd(offloading_q_table_path)
 
 	EFFI_df = pd.concat((
-		prediction_offloading_RL, without_offloading_RL, offloading_without_RL, _10mins_offloading_RL_without_prediction),
+		prediction_offloading_RL, without_offloading_RL, offloading_without_RL, _10mins_offloading_RL_without_prediction, offloading_with_Q_table),
 		axis=1)
-	EFFI_df.columns = ['Pre_off_RL', 'without_off_RL', 'off_without_RL', '10_mins_without_pre']
+	EFFI_df.columns = ['Pre_off_RL', 'without_off_RL', 'off_without_RL', '10_mins_without_pre', 'off_Qtable']
 	# df = EFFI_df[EFFI_df < 0].dropna()
 	logger.info('\n {}'.format(EFFI_df.describe()))
 	# EFFI_df.plot(kind='hist', subplots=True)
 	# plot_KDE(EFFI_df, 'Energy efficiency')
 	# plt.show()
-	grouping_by_macro_load(EFFI_df[['without_off_RL', 'off_without_RL', 'Pre_off_RL', '10_mins_without_pre']])
+	grouping_by_macro_load(EFFI_df[['without_off_RL', 'off_without_RL', 'Pre_off_RL', '10_mins_without_pre', 'off_Qtable']])
 
 
 def get_dataframe(file_path):
@@ -147,6 +152,9 @@ def grouping_by_macro_load(df):
 
 
 def get_groups_load_dict():
+	'''
+	group each cells load into different level
+	'''
 	without_loading_data_path = os.path.join(root_dir, 'offloading/result/without_offloading_without_RL', 'all_cell_result_array_0731.npy')
 	cell_result = du.load_array(without_loading_data_path)
 	logger.debug('cell result shape:{}'.format(cell_result.shape))  # (144, 1486, 8) 144: cell_num, 1486: time sequence, 8:cell_num, reward, energy, traffic_demand, macro load, small load, power consumption
@@ -398,7 +406,7 @@ def plot_energy_efficiency_energy_consump_traffic_throughput(method_dict):
 	ax_1 = fig.add_subplot(3, 1, 1)
 	ax_2 = fig.add_subplot(3, 1, 2)
 	ax_3 = fig.add_subplot(3, 1, 3)
-	mean_energy_effi.plot(ax=ax_1, kind='bar', alpha=0.7, rot=0, width=0.5)
+	mean_energy_effi.plot(ax=ax_1, kind='bar', alpha=0.7, rot=0, width=0.8)
 	mean_energy_consumption.plot(ax=ax_2, kind='bar', alpha=0.7, rot=0, width=0.8)
 	mean_traffic_throughput.plot(ax=ax_3, kind='bar', alpha=0.7, rot=0, width=0.8)
 
@@ -436,25 +444,30 @@ def ananlyzie_each_method():
 	# God_prediction_offload_RL_path = os.path.join(root_dir, 'offloading/result/RL_with_god_prediction', 'all_cell_result_array.npy')
 	# offloading_RL_without_prediction_path = os.path.join(root_dir, 'offloading/result/RL_without_prediction', 'all_cell_result_array_0726.npy')
 	_10mins_offloading_RL_without_prediction_path = os.path.join(root_dir, 'offloading/result/RL_10mins_without_prediction', 'all_cell_result_array_0731.npy')
+	offloading_q_table_path = os.path.join(root_dir, 'offloading/result/with_Q_table_without_prediction', 'all_cell_result_array_0928.npy')
 
 	prediction_offloading_RL = get_dataframe(prediction_offloading_RL_path)
 	without_offloading_RL = get_dataframe(without_offloading_RL_path)
 	offloading_without_RL = get_dataframe(offloading_without_RL_path)
 	_10mins_offloading_RL_without_prediction = get_dataframe(_10mins_offloading_RL_without_prediction_path)
+	offloading_with_Q_table = get_dataframe(offloading_q_table_path)
 
 	method_dict = OrderedDict()
 	method_dict['Without offloading'] = without_offloading_RL
 	method_dict['Offloading without RL'] = offloading_without_RL
-	method_dict['Offloading without prefiction'] = _10mins_offloading_RL_without_prediction
-	method_dict['Offloading with prediction'] = prediction_offloading_RL
+	method_dict['Offloading with Q table'] = offloading_with_Q_table
+	method_dict['Offloading without prediction (DQN)'] = _10mins_offloading_RL_without_prediction
+	method_dict['Offloading with prediction (DQN)'] = prediction_offloading_RL
+
 
 	# analysis_origin_macro_load_group(method_dict)
-	# plot_energy_efficiency(method_dict)
+	plot_energy_efficiency(method_dict)
 	# plot_power_consumption(method_dict)
 	# plot_traffic_digested(method_dict)
 	# plot_energy_saving(method_dict)
-	plot_cell_load(method_dict)
 
+	''' the two main plot function'''
+	# plot_cell_load(method_dict)
 	# plot_energy_efficiency_energy_consump_traffic_throughput(method_dict)
 	# analysis_low_load(method_dict)
 	plt.show()
@@ -469,10 +482,13 @@ def comparison_predicion_and_without_prediction():
 	_10mins_offloading_RL_without_prediction_path = os.path.join(root_dir, 'offloading/result/RL_10mins_without_prediction', 'all_cell_result_array_0731.npy')
 	without_offloading_RL_path = os.path.join(root_dir, 'offloading/result/without_offloading_without_RL', 'all_cell_result_array_0731.npy')
 	ARIMA_prediction_offloading_RL_path = os.path.join(root_dir, 'offloading/result/RL_real_ARIMA_prediction', 'all_cell_result_array_0805.npy')
+	offloading_with_Q_table_path = os.path.join(root_dir, 'offloading/result/with_Q_table_without_prediction', 'all_cell_result_array_0927.npy')
+
 	prediction_offloading_RL = get_array(prediction_offloading_RL_path)
 	_10mins_offloading_RL_without_prediction = get_array(_10mins_offloading_RL_without_prediction_path)
 	without_offloading_RL = get_array(without_offloading_RL_path)
 	ARIMA_prediction_offloading_RL = get_array(ARIMA_prediction_offloading_RL_path)
+	offloading_with_Q_table = get_array(offloading_with_Q_table_path)
 
 	def overload_comparison():
 		def count_overload(cell_list, load_array):
@@ -497,6 +513,9 @@ def comparison_predicion_and_without_prediction():
 
 	def macro_load_distribution():
 		def group_array(load_groups_dict, load_array):
+			'''
+			find cell number from load array in with load group by load_groups_dict
+			'''
 			for key, load_cell_list in load_groups_dict.items():  # loop load_groups_dict
 				cell_list = []
 				for load_cell_index in range(load_array.shape[0]):  # loop load array cell
@@ -508,27 +527,33 @@ def comparison_predicion_and_without_prediction():
 				yield group_cell_load_array
 
 		def plot_count_bar(data_frame):
+			'''plot each group's new loading rate after offloading'''
+
 			# bins = np.arange(0, 1.1, 0.1, dtype=np.float)
 			# print(data_frame)
 			bins = (0, 0.3, 0.7, 1, 2, 10)
 			cats_Prediction_pd = pd.cut(data_frame['Prediction'], bins)
 			cats_non_Prediction_pd = pd.cut(data_frame['Non prediction'], bins)
 			cats_ARIMA_prediction_pd = pd.cut(data_frame['ARIMA prediction'], bins)
+			cats_Q_table_pd = pd.cut(data_frame['Q table'], bins)
 
 			Prediction_group = data_frame['Prediction'].groupby(cats_Prediction_pd)
 			non_prediction_group = data_frame['Non prediction'].groupby(cats_non_Prediction_pd)
 			ARIMA_prediction_group = data_frame['ARIMA prediction'].groupby(cats_ARIMA_prediction_pd)
+			Q_table_group = data_frame['Q table'].groupby(cats_Q_table_pd)
+
 			# print(non_prediction_group.mean())
 			Prediction_group_counts = Prediction_group.count()
 			non_prediction_counts = non_prediction_group.count()
 			ARIMA_prediction_counts = ARIMA_prediction_group.count()
+			Q_table_counts = Q_table_group.count()
 			# print(Prediction_group_counts)
-			count_df = pd.concat([non_prediction_counts, Prediction_group_counts, ARIMA_prediction_counts], axis=1)
-			count_df.columns = ['Offloading without prefiction', 'Offloading with CNN-RNN prediction', 'Offloading with ARIMA prediction']
+			count_df = pd.concat([Q_table_counts, non_prediction_counts, Prediction_group_counts, ARIMA_prediction_counts], axis=1)
+			count_df.columns = ['Offloading with Q table', 'Offloading without prediction (DQN)', 'Offloading with CNN-RNN prediction (DQN)', 'Offloading with ARIMA prediction (DQN)']
 			count_df.index = ['0~0.3', '0.3~0.7', '0.7~1', '1~2', '2~10']
-			fig = plt.figure(figsize=(10, 4))
+			fig = plt.figure(figsize=(15, 6))
 			ax = fig.add_subplot(1, 1, 1)
-			ax = count_df.plot(ax=ax, kind='bar', color=['C2', 'C3', 'C4'], alpha=0.7, rot=0, width=0.8)
+			ax = count_df.plot(ax=ax, kind='bar', color=['C2', 'C3', 'C4', 'C5'], alpha=0.7, rot=0, width=0.8)
 			ax.set_title('Macro cell loading rate distributinon after offloading', size=18)
 			ax.set_xlabel('Macro cell loading rate group', size=14)
 			ax.set_ylabel('Times', size=14)
@@ -538,30 +563,43 @@ def comparison_predicion_and_without_prediction():
 				ax.annotate(string, xy=(p.get_x(), p.get_height()))
 
 		load_groups_dict = get_groups_load_dict()
-		prediction_group_load_array_generator = group_array(load_groups_dict, prediction_offloading_RL)
-		non_prediction_group_load_array_generator = group_array(load_groups_dict, _10mins_offloading_RL_without_prediction)
-		ARIMA_prediction_group_load_array_generator = group_array(load_groups_dict, ARIMA_prediction_offloading_RL)
 
+		""" non prediction case """
+		offloading_with_Q_table_generator = group_array(load_groups_dict, offloading_with_Q_table)
+		non_prediction_group_load_array_generator = group_array(load_groups_dict, _10mins_offloading_RL_without_prediction)
+
+		"""prediction case"""
+		ARIMA_prediction_group_load_array_generator = group_array(load_groups_dict, ARIMA_prediction_offloading_RL)
+		prediction_group_load_array_generator = group_array(load_groups_dict, prediction_offloading_RL)
+
+		'''from low loading to higher loading'''
 		for group_prediction_load_array in prediction_group_load_array_generator:
 			non_prediction_group_load_array = next(non_prediction_group_load_array_generator)
 			ARIMA_prediction_group_load_array = next(ARIMA_prediction_group_load_array_generator)
+			Q_table_group_load_array = next(offloading_with_Q_table_generator)
+
 			group_prediction_load_array = group_prediction_load_array.reshape((-1, ))
 			non_prediction_group_load_array = non_prediction_group_load_array.reshape((-1, ))
 			ARIMA_prediction_group_load_array = ARIMA_prediction_group_load_array.reshape((-1, ))
+			Q_table_group_load_array = Q_table_group_load_array.reshape((-1, ))
 
 			macro_load_df = pd.DataFrame({
 				'Prediction': group_prediction_load_array,
 				'Non prediction': non_prediction_group_load_array,
-				'ARIMA prediction': ARIMA_prediction_group_load_array})
+				'ARIMA prediction': ARIMA_prediction_group_load_array,
+				'Q table': Q_table_group_load_array})
 			# macro_load_df.plot(kind='line')
 			# print(macro_load_df.describe())
+			'''plot each group's new loading rate after offloading'''
 			plot_count_bar(macro_load_df)
+
 		plt.show()
+
 	overload_comparison()
 	macro_load_distribution()
 
 
 if __name__ == "__main__":
-	# analysis_energy_effi()
+	analysis_energy_effi()
 	# ananlyzie_each_method()
-	comparison_predicion_and_without_prediction()
+	# comparison_predicion_and_without_prediction()

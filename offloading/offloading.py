@@ -1,5 +1,6 @@
 from env import Milano_env, Env_Config
 from DeepQ import DeepQNetwork
+from Qlearning import QLearningTable
 import numpy as np
 import matplotlib.pyplot as plt
 import os
@@ -9,6 +10,137 @@ import CNN_RNN.utility
 
 logger = CNN_RNN.utility.setlog('offloading')
 root_dir = '/home/mldp/ML_with_bigdata'
+
+
+class Run_Offloading_with_Qtable:
+	def __init__(self, model_path, config, cell_num=867):
+		self.traffic_level = 20
+		self.cell_num = cell_num
+		self.model_path = model_path
+		self.env = Milano_env(cell_num, config)
+		self.RL = QLearningTable(
+			self.env.n_actions,
+			learning_rate=0.001,
+			reward_decay=0.9,
+			e_greedy=0.9)
+
+	def __evaluation(self, episode):
+		result_dict = self.run_test_with_RL()
+		training_result_effi = np.mean(result_dict['energy_effi'][:-149])
+		testing_result_effi = np.mean(result_dict['energy_effi'][-149:])
+		training_result_reward = np.mean(result_dict['reward'][:-149])
+		testing_result_reward = np.mean(result_dict['reward'][-149:])
+
+		training_result_macro_load = np.mean(result_dict['macro_load'][:-149])
+		testing_result_macro_load = np.mean(result_dict['macro_load'][-149:])
+
+		training_result_small_load = result_dict['small_load'][:-149]
+		training_result_small_load[training_result_small_load == 0] = np.nan
+		training_result_small_load = np.nanmean(training_result_small_load)
+
+		testing_result_small_load = result_dict['small_load'][-149:]
+		testing_result_small_load[testing_result_small_load == 0] = np.nan
+		testing_result_small_load = np.nanmean(testing_result_small_load)
+
+		training_result_action = np.mean(result_dict['action'][:-149])
+		testing_result_action = np.mean(result_dict['action'][-149:])
+		print('episode:{} training: reward:{:.4f} macro_load:{:.4f} small load:{:.4f} effi:{:.4f} action:{:.4f}'.format(episode, training_result_reward, training_result_macro_load, training_result_small_load, training_result_effi, training_result_action))
+		print('episode:{} testing: reward:{:.4f} macro load:{:.4f} small load:{:.4f} effi:{:.4f} action:{:.4f}'.format(episode, testing_result_reward, testing_result_macro_load, testing_result_small_load, testing_result_effi, testing_result_action))
+		print()
+
+	def __split_traffic_into_different_level(self, observation):
+		if isinstance(observation, np.ndarray):
+			observation_degree = []
+			for traffic in observation:
+				level = int(traffic // self.traffic_level)
+				observation_degree.append(str(level))
+			observation = ','.join(observation_degree)
+			return observation
+		else:
+			return None
+
+	def RL_train(self):
+		for episode in range(50):
+			observation = self.env.reset(training=True)
+			observation = self.__split_traffic_into_different_level(observation)
+			while True:
+				action = self.RL.choose_action(observation)
+				observation_, reward, done = self.env.step(action, training=True)
+				if done:
+					break
+				observation_ = self.__split_traffic_into_different_level(observation_)
+				self.RL.learn(str(observation), action, reward[0], str(observation_))
+				observation = observation_
+		print('over')
+		self.__evaluation(episode)
+
+	def run_test_with_RL(self):
+		reward_list = []
+		energy_effi_list = []
+
+		observation = self.env.reset(training=False)
+		observation = self.__split_traffic_into_different_level(observation)
+		while True:
+			action = self.RL.choose_action(observation)
+			observation_, reward, done = self.env.step(action, training=False)
+
+			if done:
+				break
+			observation_ = self.__split_traffic_into_different_level(observation_)
+			reward_list.append(reward[0])
+			energy_effi_list.append(reward[1])
+			observation = observation_
+
+		reward_array = np.array(reward_list)
+		energy_effi_arry = np.array(energy_effi_list)
+		result_dict = self.__get_result_information()
+		result_dict['energy_effi'] = energy_effi_arry.reshape(-1, 1)
+		result_dict['reward'] = reward_array.reshape(-1, 1)
+		return result_dict
+
+	def run_test_without_RL(self, action=10):
+		reward_list = []
+		energy_effi_list = []
+
+		observation = self.env.reset(training=False)
+		while True:
+			# action = action
+			observation_, reward, done = self.env.step(action, training=False)
+			if done:
+				break
+			reward_list.append(reward[0])
+			energy_effi_list.append(reward[1])
+			observation = observation_
+
+		reward_array = np.array(reward_list)
+		energy_effi_arry = np.array(energy_effi_list)
+		result_dict = self.__get_result_information()
+		result_dict['energy_effi'] = energy_effi_arry.reshape(-1, 1)
+		result_dict['reward'] = reward_array.reshape(-1, 1)
+		return result_dict
+
+	def __get_result_information(self):
+		total_power_consumption = self.env.total_power_consumption
+		macro_cell_load = self.env.macro_cell_load
+		small_cell_load = self.env.small_cell_load
+		internet_traffic_digested = self.env.internet_traffic_digested
+		actions = self.env.actions
+		internet_traffic_demand = self.env.internet_traffic_demand
+		macro_digested_traffic = self.env.macro_digested_traffic
+		small_digested_traffic = self.env.small_digested_traffic
+		information_dict = {
+			'traffic_digested': np.array(internet_traffic_digested).reshape(-1, 1),
+			'macro_load': np.array(macro_cell_load).reshape(-1, 1),
+			'small_load': np.array(small_cell_load).reshape(-1, 1),
+			'power_consumption': np.array(total_power_consumption).reshape(-1, 1),
+			'action': np.array(actions).reshape(-1, 1),
+			'traffic_demand': np.array(internet_traffic_demand).reshape(-1, 1),
+			'macro_digested_traffic': np.array(macro_digested_traffic).reshape(-1, 1),
+			'small_digested_traffic': np.array(small_digested_traffic).reshape(-1, 1)
+		}
+
+		return information_dict
+
 
 class Run_Offloading:
 	""" with neural network"""
