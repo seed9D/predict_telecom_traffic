@@ -61,10 +61,10 @@ def filter_cell_index():
 
 	CNN_RNN_MTL_array = du.load_array(all_real_prediction_traffic_array_path)
 
-	evaluate_threshold = 0.75
-	grid_id_list = evaluate_performance(CNN_RNN_MTL_array, evaluate_threshold)
+	# evaluate_threshold = 0.75
+	# grid_id_list = evaluate_performance(CNN_RNN_MTL_array, evaluate_threshold)
 
-	# grid_id_list = filter_by_range(CNN_RNN_MTL_array)
+	grid_id_list = filter_by_range(CNN_RNN_MTL_array)
 	cell_grids = get_cell_tower_grid_pair()
 	cell_index_list = []
 	for cell_grid in cell_grids:
